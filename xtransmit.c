@@ -1,3 +1,5 @@
+/* vi: set sw=4 ts=4: */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <stdio.h>
 #include <string.h>
@@ -8,10 +10,10 @@
 #include "xcommon.h"
 #include "xtransmit.h"
 
-int xmodemTransmit(unsigned char* src, int srcsz) {
-    unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
+int xmodemTransmit(uint8_t* src, int srcsz) {
+    uint8_t xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
     int bufsz, crc = -1;
-    unsigned char packetno = 1;
+    uint8_t packetno = 1;
     int i, c, len = 0;
     int retry;
 
@@ -60,11 +62,11 @@ int xmodemTransmit(unsigned char* src, int srcsz) {
                         xbuff[3 + c] = CTRLZ;
                 }
                 if (crc) {
-                    unsigned short ccrc = crc16_ccitt(&xbuff[3], bufsz);
+                    uint16_t ccrc = crc16_ccitt(&xbuff[3], bufsz);
                     xbuff[bufsz + 3] = (ccrc >> 8) & 0xFF;
                     xbuff[bufsz + 4] = ccrc & 0xFF;
                 } else {
-                    unsigned char ccks = 0;
+                    uint8_t ccks = 0;
                     for (i = 3; i < bufsz + 3; ++i) {
                         ccks += xbuff[i];
                     }

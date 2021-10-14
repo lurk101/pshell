@@ -1,3 +1,6 @@
+/* vi: set sw=4 ts=4: */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
 #include "crc16.h"
 
 /* CRC16 implementation acording to CCITT standards */
