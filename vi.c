@@ -2002,7 +2002,8 @@ static int init_text_buffer(char* fn) {
     int rc;
 
     // allocate/reallocate text buffer
-    free(text);
+    if (text)
+        free(text);
     text_size = 10240;
     screenbegin = dot = end = text = zalloc(text_size);
 
