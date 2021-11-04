@@ -3,6 +3,7 @@ A tiny Raspberry Pico lfs file manager shell with Vi.
 Building from source.
 
 ```
+# NOTE: Requires sdk 1.3 or later
 git clone https://github.com/lurk101/pshell.git
 cd pshell
 git submodule update --init
