@@ -22,7 +22,9 @@
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
 
+#include "c4.h"
 #include "fs.h"
+#include "stdinit.h"
 #include "tusb.h"
 #include "vi.h"
 #include "xreceive.h"
@@ -449,6 +451,13 @@ static void cd_cmd(void) {
     sprintf(result, "changed to %s", curdir);
 }
 
+static void c4_cmd(void) {
+    if (check_mount(true))
+        return;
+    c4(argc, argv);
+    result[0] = 0;
+}
+
 static void vi_cmd(void) {
     if (check_mount(true))
         return;
@@ -474,6 +483,7 @@ typedef struct {
 static cmd_t cmd_table[] = {
 	{"cd", 		cd_cmd, 		"change directory"},
     {"cp",      cp_cmd,         "copy file"},
+    {"c4",      c4_cmd,         "compile file"},
     {"format", 	format_cmd, 	"format the filesystem"},
     {"get", 	get_cmd, 		"get file (xmodem)"},
     {"ls", 		ls_cmd, 		"list directory"},
@@ -501,27 +511,6 @@ static const char* search_cmds(int len) {
     if (count != 1)
         return NULL;
     return cmd_table[last_i].name + len;
-}
-
-static bool stdio_init(int uart_rx_pin) {
-    gpio_init(uart_rx_pin);
-    gpio_set_pulls(uart_rx_pin, 1, 0);
-    sleep_ms(1);
-    bool v1 = gpio_get(uart_rx_pin);
-    gpio_set_pulls(uart_rx_pin, 0, 1);
-    sleep_ms(1);
-    bool v2 = gpio_get(uart_rx_pin);
-    gpio_set_pulls(uart_rx_pin, 0, 0);
-    if (v1 != v2) {
-        stdio_usb_init();
-        while (!tud_cdc_connected())
-            sleep_ms(1000);
-        return false;
-    } else {
-        stdio_uart_init();
-        getchar_timeout_us(1000);
-    }
-    return true;
 }
 
 static bool screen_size(void) {
@@ -574,7 +563,11 @@ static bool screen_size(void) {
 int main(void) {
 
     // initialize the pico SDK
-    bool uart = stdio_init(PICO_DEFAULT_UART_RX_PIN);
+    stdio_init();
+    bool uart = false;
+#if LIB_PICO_STDIO_UART
+    uart = true;
+#endif
     bool detected = screen_size();
     printf(VT_CLEAR "\n"
                     "Pico Shell - Copyright (C) 1883 Thomas Edison\n"

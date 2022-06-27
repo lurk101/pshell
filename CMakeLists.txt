@@ -5,11 +5,12 @@ include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 project(pshell C CXX ASM)
 pico_sdk_init()
 add_subdirectory(littlefs)
+add_subdirectory(stdinit-lib)
 add_executable(pshell main.c xreceive.c xreceive.h
-    xtransmit.c xtransmit.h crc16.c crc16.h fs.c fs.h vi.c vi.h)
+    xtransmit.c xtransmit.h crc16.c crc16.h fs.c fs.h vi.c vi.h c4.c c4.h)
 pico_enable_stdio_uart(pshell 1)
 pico_enable_stdio_usb(pshell 1)
 target_compile_definitions(pshell PUBLIC -DPICO_MALLOC_PANIC=0)
-target_link_libraries(pshell PUBLIC pico_stdlib littlefs
+target_link_libraries(pshell PUBLIC pico_stdlib littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog)
 pico_add_extra_outputs(pshell)
