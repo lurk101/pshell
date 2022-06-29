@@ -15,6 +15,6 @@
 #ifndef _C4_
 #define _C4_
 
-int c4(int argc, char* argv[]);
+int mc(int argc, char* argv[]);
 
 #endif

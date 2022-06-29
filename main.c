@@ -22,10 +22,9 @@
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
 
-#include "c4.h"
+#include "mc.h"
 #include "fs.h"
 #include "stdinit.h"
-#include "tusb.h"
 #include "vi.h"
 #include "xreceive.h"
 #include "xtransmit.h"
@@ -451,10 +450,10 @@ static void cd_cmd(void) {
     sprintf(result, "changed to %s", curdir);
 }
 
-static void c4_cmd(void) {
+static void mc_cmd(void) {
     if (check_mount(true))
         return;
-    c4(argc, argv);
+    mc(argc, argv);
     result[0] = 0;
 }
 
@@ -483,10 +482,10 @@ typedef struct {
 static cmd_t cmd_table[] = {
 	{"cd", 		cd_cmd, 		"change directory"},
     {"cp",      cp_cmd,         "copy file"},
-    {"c4",      c4_cmd,         "compile file"},
     {"format", 	format_cmd, 	"format the filesystem"},
     {"get", 	get_cmd, 		"get file (xmodem)"},
     {"ls", 		ls_cmd, 		"list directory"},
+    {"mc",      mc_cmd,         "compile file"},
     {"mkdir", 	mkdir_cmd, 		"create directory"},
     {"mount", 	mount_cmd, 		"mount filesystem"},
     {"mv",      mv_cmd,         "rename file or directory"},

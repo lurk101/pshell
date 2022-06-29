@@ -7,9 +7,9 @@ pico_sdk_init()
 add_subdirectory(littlefs)
 add_subdirectory(stdinit-lib)
 add_executable(pshell main.c xreceive.c xreceive.h
-    xtransmit.c xtransmit.h crc16.c crc16.h fs.c fs.h vi.c vi.h c4.c c4.h)
+    xtransmit.c xtransmit.h crc16.c crc16.h fs.c fs.h vi.c vi.h mc.c mc.h)
 pico_enable_stdio_uart(pshell 1)
-pico_enable_stdio_usb(pshell 1)
+pico_enable_stdio_usb(pshell 0)
 target_compile_definitions(pshell PUBLIC -DPICO_MALLOC_PANIC=0)
 target_link_libraries(pshell PUBLIC pico_stdlib littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog)
