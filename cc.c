@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <hardware/timer.h>
+
 #include "fs.h"
 
 extern char* full_path(char* name);
@@ -89,8 +91,8 @@ static struct ident_s {
 static int ir_count;
 
 // (library) external functions
-enum { SYSC_PRINTF = 0, SYSC_MALLOC, SYSC_FREE };
-static const char* ef_cache[] = {"printf", "malloc", "free"};
+enum { SYSC_PRINTF = 0, SYSC_MALLOC, SYSC_FREE, SYSC_TIME_US_32 };
+static const char* ef_cache[] = {"printf", "malloc", "free", "time_us_32"};
 static const int ef_count = sizeof(ef_cache) / sizeof(ef_cache[0]);
 
 static struct member_s {
@@ -2987,6 +2989,8 @@ static void stmt(int ctx) {
     }
 }
 
+int time_wrapper() { return time_us_32(); }
+
 int cc(int argc, char** argv) {
     int *freed_ast = NULL, *ast = NULL;
     int i;
@@ -3248,7 +3252,7 @@ int cc(int argc, char** argv) {
                 int extra = a;
                 asm volatile("l1: cmp  %[extra], #0 \n"
                              "    beq  l2           \n"
-                             "    ldr  r0, [%[hi]]  \n"
+                             "    ldr  r0, [%[hi]] \n"
                              "    push {r0}         \n"
                              "    add  %[hi], $4    \n"
                              "    sub  %[extra], #1 \n"
@@ -3285,23 +3289,25 @@ int cc(int argc, char** argv) {
                 }
                 fflush(stdout);
             } else if (sysc == SYSC_MALLOC) {
-                int* ap = &a;
                 asm volatile("    ldr  r0, [sp]     \n"
                              "    push {r0}         \n"
                              "    bl   malloc       \n"
                              "    add  sp, #4       \n"
-                             "    str  r0, [%[rslt]]\n"
                              :
-                             : [rslt] "r"(ap)
+                             :
                              : "r0");
+                int* ap = &a;
+                asm volatile("    str  r0, [%[rslt]]\n" : : [rslt] "r"(ap) : "r0");
             } else if (sysc == SYSC_FREE) {
                 asm volatile("    ldr  r0, [sp]     \n"
-                             "    push {r0}         \n"
-                             "    bl   malloc       \n"
-                             "    add  sp, #4       \n"
+                             "    bl   free         \n"
                              :
                              :
                              : "r0");
+            } else if (sysc == SYSC_TIME_US_32) {
+                asm volatile("    bl   time_wrapper \n");
+                int* ap = &a;
+                asm volatile("    str  r0, [%[rslt]]\n" : : [rslt] "r"(ap) : "r0");
             }
         } else if (i == EXIT)
             goto done;

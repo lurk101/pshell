@@ -594,7 +594,6 @@ static bool screen_size(void) {
 
 // application entry point
 int main(void) {
-
     // initialize the pico SDK
     stdio_init();
     bool uart = false;

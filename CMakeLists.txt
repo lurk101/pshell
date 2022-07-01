@@ -13,5 +13,5 @@ pico_enable_stdio_uart(pshell 1)
 pico_enable_stdio_usb(pshell 0)
 target_compile_definitions(pshell PUBLIC -DPICO_MALLOC_PANIC=0)
 target_link_libraries(pshell PUBLIC pico_stdlib littlefs stdinit-lib
-    hardware_flash hardware_sync hardware_watchdog)
+    hardware_flash hardware_sync hardware_watchdog hardware_timer)
 pico_add_extra_outputs(pshell)
