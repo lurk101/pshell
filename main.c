@@ -22,7 +22,7 @@
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
 
-#include "mc.h"
+#include "cc.h"
 #include "fs.h"
 #include "stdinit.h"
 #include "vi.h"
@@ -266,6 +266,33 @@ static void cp_cmd(void) {
     free(to);
 }
 
+static void cat_cmd(void) {
+    if (check_mount(true))
+        return;
+    if (check_name())
+        return;
+    lfs_file_t file;
+    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < 0) {
+        strcpy(result, "error opening file");
+        return;
+    }
+    int l = fs_file_seek(&file, 0, LFS_SEEK_END);
+    fs_file_seek(&file, 0, LFS_SEEK_SET);
+    char buf[256];
+    while (l) {
+        int l2 = l;
+        if (l2 > sizeof(buf))
+            l2 = sizeof(buf);
+        if (fs_file_read(&file, buf, l2) != l2) {
+            sprintf(result, "error reading file");
+            break;
+        }
+        fwrite(buf, l2, 1, stdout);
+        l -= l2;
+    }
+    fs_file_close(&file);
+}
+
 static void get_cmd(void) {
     if (check_mount(true))
         return;
@@ -450,16 +477,21 @@ static void cd_cmd(void) {
     sprintf(result, "changed to %s", curdir);
 }
 
-static void mc_cmd(void) {
+static void cc_cmd(void) {
     if (check_mount(true))
         return;
-    mc(argc, argv);
+    cc(argc, argv);
     result[0] = 0;
 }
 
 static void vi_cmd(void) {
     if (check_mount(true))
         return;
+    vi(screen_x, screen_y, argc - 1, argv + 1);
+    strcpy(result, VT_CLEAR "\n");
+}
+
+static void clear_cmd(void) {
     vi(screen_x, screen_y, argc - 1, argv + 1);
     strcpy(result, VT_CLEAR "\n");
 }
@@ -480,12 +512,14 @@ typedef struct {
 
 // clang-format off
 static cmd_t cmd_table[] = {
+    {"cat",     cat_cmd,        "display file"},
+    {"cc",      cc_cmd,         "compile C source file"},
 	{"cd", 		cd_cmd, 		"change directory"},
-    {"cp",      cp_cmd,         "copy file"},
+	{"clear",   clear_cmd,      "clear the screen"},
+    {"cp",      cp_cmd,         "copy a file"},
     {"format", 	format_cmd, 	"format the filesystem"},
     {"get", 	get_cmd, 		"get file (xmodem)"},
     {"ls", 		ls_cmd, 		"list directory"},
-    {"mc",      mc_cmd,         "compile file"},
     {"mkdir", 	mkdir_cmd, 		"create directory"},
     {"mount", 	mount_cmd, 		"mount filesystem"},
     {"mv",      mv_cmd,         "rename file or directory"},
@@ -494,7 +528,7 @@ static cmd_t cmd_table[] = {
     {"rm", 		rm_cmd, 		"remove file or directory"},
     {"status", 	status_cmd,		"filesystem status"},
     {"unmount",	unmount_cmd,	"unmount filesystem"},
-    {"vi", 		vi_cmd, 		"vi editor"}
+    {"vi", 		vi_cmd, 		"editor"}
 };
 // clang-format on
 

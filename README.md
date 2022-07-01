@@ -1,4 +1,4 @@
-A tiny Raspberry Pico lfs file manager shell with Vi.
+A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 
 Building from source.
 

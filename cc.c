@@ -1,34 +1,30 @@
 /*
- * mc is capable of compiling a (subset of) C source files into GNU/Linux
- * executables or running via just-in-time compilation on 32-bit ARM
- * processor-based platforms. There is no preprocessor.
+ * mc is capable of compiling a (subset of) C source files
+ * There is no preprocessor.
  *
  * The following options are supported:
- *   -s : Print source and generated intermediate representation (IR).
- *   -o : Create executable file and terminate normally.
+ *   -s : Print source and generated representation.
  *
- * If -o and -s are omitted, the compiled code is executed immediately (if
- * there were no compile errors) with the command line arguments passed
- * after the source file parameter.
+ * If -s is omitted, the compiled code is executed immediately
  *
  * All modifications as of Feb 19 2022 are by HPCguy.
  * See AMaCC project repository for baseline code prior to that date.
+ *
+ * Further modifications by lurk101 for RP Pico
  */
 
-#include <memory.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "fs.h"
 
 extern char* full_path(char* name);
 
-#define SMALL_TBL_SZ 256
+#define SMALL_TBL_WRDS 256
+#define BIG_TBL_BYTES (16 * 1024)
 
 char *freep, *p, *lp;  // current position in source code
 char *freedata, *data; // data/bss pointer
@@ -2991,21 +2987,19 @@ static void stmt(int ctx) {
     }
 }
 
-int mc(int argc, char** argv) {
-    printf("%d %d %d %d %d &d &d\n", 1, 2, 3, 4, 5, 6, 7);
+int cc(int argc, char** argv) {
     int *freed_ast = NULL, *ast = NULL;
     int i;
     lfs_file_t* fd = malloc(sizeof(lfs_file_t));
-    int poolsz = 16 * 1024; // arbitrary size
 
     if (setjmp(done_jmp))
         goto done;
 
-    if (!(sym = (struct ident_s*)malloc(poolsz))) {
+    if (!(sym = (struct ident_s*)malloc(BIG_TBL_BYTES))) {
         printf("could not allocate symbol area");
         goto done;
     }
-    memset(sym, 0, poolsz);
+    memset(sym, 0, BIG_TBL_BYTES);
 
     // Register keywords in symbol stack. Must match the sequence of enum
     p = "enum char int float struct union sizeof return goto break continue "
@@ -3037,20 +3031,20 @@ int mc(int argc, char** argv) {
     struct ident_s* idmain = id;
     id->class = Main; // keep track of main
 
-    if (!(freedata = data = (char*)malloc(poolsz)))
+    if (!(freedata = data = (char*)malloc(BIG_TBL_BYTES)))
         printf("could not allocat data area");
-    memset(data, 0, poolsz);
-    if (!(tsize = (int*)malloc(SMALL_TBL_SZ * sizeof(int)))) {
+    memset(data, 0, BIG_TBL_BYTES);
+    if (!(tsize = (int*)malloc(SMALL_TBL_WRDS * sizeof(int)))) {
         printf("could not allocate tsize area");
         goto done;
     }
-    memset(tsize, 0, SMALL_TBL_SZ * sizeof(int)); // not strictly necessary
-    if (!(freed_ast = ast = (int*)malloc(poolsz))) {
+    memset(tsize, 0, SMALL_TBL_WRDS * sizeof(int)); // not strictly necessary
+    if (!(freed_ast = ast = (int*)malloc(BIG_TBL_BYTES))) {
         printf("could not allocate abstract syntax tree area");
         goto done;
     }
-    memset(ast, 0, poolsz);          // not strictly necessary
-    ast = (int*)((int)ast + poolsz); // AST is built as a stack
+    memset(ast, 0, BIG_TBL_BYTES);          // not strictly necessary
+    ast = (int*)((int)ast + BIG_TBL_BYTES); // AST is built as a stack
     n = ast;
 
     // add primitive types
@@ -3104,26 +3098,24 @@ int mc(int argc, char** argv) {
         printf("could not allocate file name area");
         goto done;
     }
-    if (!fs_file_open(fd, fp, LFS_O_RDONLY)) {
+    if (fs_file_open(fd, fp, LFS_O_RDONLY) < 0) {
         printf("could not open(%s)\n", fp);
-        free(fp);
         goto done;
     }
-    free(fp);
 
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
 
-    if (!(text = le = e = (int*)malloc(poolsz))) {
+    if (!(text = le = e = (int*)malloc(BIG_TBL_BYTES))) {
         printf("could not allocate text area");
         goto done;
     }
-    memset(e, 0, poolsz);
-    if (!(members = (struct member_s**)malloc(SMALL_TBL_SZ * sizeof(struct member_s*)))) {
+    memset(e, 0, BIG_TBL_BYTES);
+    if (!(members = (struct member_s**)malloc(SMALL_TBL_WRDS * sizeof(struct member_s*)))) {
         printf("could not malloc() members area");
         goto done;
     }
-    memset(members, 0, SMALL_TBL_SZ * sizeof(struct member_s*));
+    memset(members, 0, SMALL_TBL_WRDS * sizeof(struct member_s*));
 
     if (!(freep = lp = p = (char*)malloc(siz + 1))) {
         printf("could not allocate source area");
@@ -3152,16 +3144,15 @@ int mc(int argc, char** argv) {
         printf("main() not defined\n");
         goto done;
     }
-    //    if (src)
-    //        goto done;
+    if (src)
+        goto done;
 
-    int vent = 0;
     // setup stack
-    if (!(free_sp = bp = sp = (int*)malloc(poolsz))) {
+    if (!(free_sp = bp = sp = (int*)malloc(BIG_TBL_BYTES))) {
         printf("could not allocate text area");
         goto done;
     }
-    bp = sp = (int*)((int)sp + poolsz);
+    bp = sp = (int*)((int)sp + BIG_TBL_BYTES);
     *--sp = EXIT; // call exit if main returns
     *--sp = PSH;
     int* t = sp;
@@ -3319,7 +3310,7 @@ int mc(int argc, char** argv) {
     }
 done:
     if (fd)
-        fs_file_close(fd);
+        free(fd);
     if (free_sp)
         free(free_sp);
     if (freep)
