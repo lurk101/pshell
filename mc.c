@@ -3100,10 +3100,16 @@ int mc(int argc, char** argv) {
     }
 
     char* fp = full_path(*argv);
-    if (!fs_file_open(fd, fp, LFS_O_RDONLY)) {
-        printf("could not open(%s)\n", fp);
+    if (!fp) {
+        printf("could not allocate file name area");
         goto done;
     }
+    if (!fs_file_open(fd, fp, LFS_O_RDONLY)) {
+        printf("could not open(%s)\n", fp);
+        free(fp);
+        goto done;
+    }
+    free(fp);
 
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
@@ -3247,29 +3253,62 @@ int mc(int argc, char** argv) {
         else if (i == SYSC) {
             int sysc = *pc++;
             if (sysc == SYSC_PRINTF) {
-                int j;
-                for (j = 0; j < a; j++) {
-                    int s = sp[j];
-                    //                    __asm mov eax, s
-                    //                    __asm push eax
-                }
-                //                __asm call printf
-                a *= sizeof(int);
-                //                __asm add esp, a
+                int* hi = sp;
+                int extra = a;
+                asm volatile("l1: cmp  %[extra], #0 \n"
+                             "    beq  l2           \n"
+                             "    ldr  r0, [%[hi]]  \n"
+                             "    push {r0}         \n"
+                             "    add  %[hi], $4    \n"
+                             "    sub  %[extra], #1 \n"
+                             "    b    l1           \n"
+                             "l2:                   \n"
+                             :
+                             : [extra] "r"(extra), [hi] "r"(hi)
+                             : "r0");
+                asm volatile("    cmp  %[extra], #1 \n"
+                             "    blt  l3           \n"
+                             "    pop  {r0}         \n"
+                             "    cmp  %[extra], #2 \n"
+                             "    blt  l3           \n"
+                             "    pop  {r1}         \n"
+                             "    cmp  %[extra], #3 \n"
+                             "    blt  l3           \n"
+                             "    pop  {r2}         \n"
+                             "    cmp  %[extra], #4 \n"
+                             "    blt  l3           \n"
+                             "    pop  {r3}         \n"
+                             "l3:                   \n"
+                             :
+                             : [extra] "r"(a)
+                             : "r0", "r1", "r2", "r3");
+                asm volatile("bl __wrap_printf\n");
+                if (a > 4)
+                    asm volatile("mov r0, sp\n"
+                                 "add r0, %[extra]\n"
+                                 "mov sp, r0\n"
+                                 :
+                                 : [extra] "r"(extra)
+                                 : "r0");
                 fflush(stdout);
             } else if (sysc == SYSC_MALLOC) {
-                int s = sp[0];
-                //                __asm mov eax, s
-                //                __asm push eax
-                //                __asm call malloc
-                //                __asm add esp, 4
-                //                __asm mov a, eax
+                int* ap = &a;
+                asm volatile("    ldr  r0, [sp]     \n"
+                             "    push {r0}         \n"
+                             "    bl   malloc       \n"
+                             "    add  sp, #4       \n"
+                             "    str  r0, [%[rslt]]\n"
+                             :
+                             : [rslt] "r"(ap)
+                             : "r0");
             } else if (sysc == SYSC_FREE) {
-                int s = sp[0];
-                //               __asm mov eax, s
-                //               __asm push eax
-                //               __asm call free
-                //               __asm add esp, 4
+                asm volatile("    ldr  r0, [sp]     \n"
+                             "    push {r0}         \n"
+                             "    bl   malloc       \n"
+                             "    add  sp, #4       \n"
+                             :
+                             :
+                             : "r0");
             }
         } else if (i == EXIT)
             goto done;
