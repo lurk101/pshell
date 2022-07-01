@@ -3250,46 +3250,54 @@ int cc(int argc, char** argv) {
             if (sysc == SYSC_PRINTF) {
                 int* hi = sp;
                 int extra = a;
-                asm volatile("l1: cmp  %[extra], #0 \n"
+                asm volatile(".syntax unified       \n"
+                             "    mov  r1, %[extra] \n"
+                             "    mov  r2, %[hi]    \n"
+                             "l1: cmp  r1, #0       \n"
                              "    beq  l2           \n"
-                             "    ldr  r0, [%[hi]] \n"
+                             "    ldr  r0, [r2]     \n"
                              "    push {r0}         \n"
-                             "    add  %[hi], $4    \n"
-                             "    sub  %[extra], #1 \n"
+                             "    adds r2, #4       \n"
+                             "    subs r1, #1       \n"
                              "    b    l1           \n"
                              "l2:                   \n"
                              :
                              : [extra] "r"(extra), [hi] "r"(hi)
-                             : "r0");
-                asm volatile("    cmp  %[extra], #1 \n"
+                             : "r0", "r1", "r2");
+                asm volatile(".syntax unified       \n"
+                             "    mov  r3, %[extra] \n"
+                             "    cmp  r3, #1       \n"
                              "    blt  l3           \n"
                              "    pop  {r0}         \n"
-                             "    cmp  %[extra], #2 \n"
+                             "    cmp  r3, #2       \n"
                              "    blt  l3           \n"
                              "    pop  {r1}         \n"
-                             "    cmp  %[extra], #3 \n"
+                             "    cmp  r3, #3       \n"
                              "    blt  l3           \n"
                              "    pop  {r2}         \n"
-                             "    cmp  %[extra], #4 \n"
+                             "    cmp  r3, #4       \n"
                              "    blt  l3           \n"
                              "    pop  {r3}         \n"
                              "l3:                   \n"
                              :
                              : [extra] "r"(a)
                              : "r0", "r1", "r2", "r3");
-                asm volatile("bl __wrap_printf\n");
+                asm volatile(".syntax unified       \n"
+                             "bl __wrap_printf\n");
                 if (a > 4) {
                     a = (a - 4) * 4;
-                    asm volatile("mov r0, sp\n"
-                                 "add r0, %[extra]\n"
-                                 "mov sp, r0\n"
+                    asm volatile(".syntax unified   \n"
+                                 "mov  r0, %[extra] \n"
+                                 "add  r0, sp       \n"
+                                 "mov  sp, r0       \n"
                                  :
                                  : [extra] "r"(a)
                                  : "r0");
                 }
                 fflush(stdout);
             } else if (sysc == SYSC_MALLOC) {
-                asm volatile("    ldr  r0, [sp]     \n"
+                asm volatile(".syntax unified       \n"
+                             "    ldr  r0, [sp]     \n"
                              "    push {r0}         \n"
                              "    bl   malloc       \n"
                              "    add  sp, #4       \n"
@@ -3297,17 +3305,29 @@ int cc(int argc, char** argv) {
                              :
                              : "r0");
                 int* ap = &a;
-                asm volatile("    str  r0, [%[rslt]]\n" : : [rslt] "r"(ap) : "r0");
+                asm volatile(".syntax unified       \n"
+                             "    mov  r1, %[rslt]  \n"
+                             "    str  r0, [r1]     \n"
+                             :
+                             : [rslt] "r"(ap)
+                             : "r0", "r1");
             } else if (sysc == SYSC_FREE) {
-                asm volatile("    ldr  r0, [sp]     \n"
+                asm volatile(".syntax unified       \n"
+                             "    ldr  r0, [sp]     \n"
                              "    bl   free         \n"
                              :
                              :
                              : "r0");
             } else if (sysc == SYSC_TIME_US_32) {
-                asm volatile("    bl   time_wrapper \n");
+                asm volatile(".syntax unified       \n"
+                             "    bl   time_wrapper \n");
                 int* ap = &a;
-                asm volatile("    str  r0, [%[rslt]]\n" : : [rslt] "r"(ap) : "r0");
+                asm volatile(".syntax unified       \n"
+                             "    mov  r1, %[rslt]  \n"
+                             "    str  r0, [r1]     \n"
+                             :
+                             : [rslt] "r"(ap)
+                             : "r0", "r1");
             }
         } else if (i == EXIT)
             goto done;
