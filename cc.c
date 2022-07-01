@@ -3178,7 +3178,7 @@ int cc(int argc, char** argv) {
         }
         if (i == LEA)
             a = (int)(bp + *pc++); // load local address
-        else if (i == IMM)
+        else if ((i == IMM) || (i == IMMF))
             a = *pc++; // load global address or immediate
         else if (i == JMP)
             pc = (int*)*pc; // jump
@@ -3210,7 +3210,7 @@ int cc(int argc, char** argv) {
             *(int*)*sp++ = a; // store int
         else if (i == SC)
             a = *(char*)* sp++ = a; // store char
-        else if (i == PSH)
+        else if ((i == PSH) || (i == PSHF))
             *--sp = a; // push
 
         else if (i == OR)
@@ -3243,8 +3243,15 @@ int cc(int argc, char** argv) {
             a = *sp++ * a;
         else if (i == DIV)
             a = *sp++ / a;
-        else if (i == MOD)
+        else if (i == DIVF) {
+			float fa = *((float*)&a), fsp = *((float*)sp);
+            *((float*)&a) = fsp / fa;
+        } else if (i == MOD)
             a = *sp++ % a;
+        else if (i == ITOF)
+			*((float*)&a) = *sp++;
+        else if (i == FTOI)
+			a = *((float*)sp++);
         else if (i == SYSC) {
             int sysc = *pc++;
             if (sysc == SYSC_PRINTF) {
