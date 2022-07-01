@@ -3274,13 +3274,15 @@ int cc(int argc, char** argv) {
                              : [extra] "r"(a)
                              : "r0", "r1", "r2", "r3");
                 asm volatile("bl __wrap_printf\n");
-                if (a > 4)
+                if (a > 4) {
+                    a = (a - 4) * 4;
                     asm volatile("mov r0, sp\n"
                                  "add r0, %[extra]\n"
                                  "mov sp, r0\n"
                                  :
-                                 : [extra] "r"(extra)
+                                 : [extra] "r"(a)
                                  : "r0");
+                }
                 fflush(stdout);
             } else if (sysc == SYSC_MALLOC) {
                 int* ap = &a;
