@@ -609,6 +609,31 @@ int main(void) {
                     "console on %s (%s %u rows, %u columns)\n\n"
                     "enter command, hit return for help\n\n",
            uart ? "UART" : "USB", detected ? "detected" : "defaulted to", screen_y, screen_x);
+
+    if (fs_mount() != LFS_ERR_OK) {
+        printf("The flash file system appears corrupt or unformatted!\n"
+               " would you like to format it (Y/n) ? ");
+        fflush(stdout);
+        char c = getchar();
+        if (c == 'Y' || c == 'y' || c == '\r') {
+            if (c == 'Y' || c == 'y')
+                putchar(c);
+            echo_key('\r');
+            if (fs_format() != LFS_ERR_OK)
+                printf("Error formating file system!\n");
+            else {
+                if (fs_mount() != LFS_ERR_OK)
+                    printf("Error formating file system!\n");
+                else {
+                    printf("file system formatted and mounted\n");
+                    mounted = true;
+                }
+            }
+        }
+    } else {
+        printf("file system automatically mounted\n\n");
+        mounted = true;
+    }
     while (run) {
         printf("%s: ", full_path(""));
         fflush(stdout);

@@ -24,14 +24,15 @@
 #include "fs.h"
 
 extern char* full_path(char* name);
+extern int cc_printf(void* stk, int wrds);
 
 #define SMALL_TBL_WRDS 256
 #define BIG_TBL_BYTES (16 * 1024)
 
-char *freep, *p, *lp;  // current position in source code
+char *freep = NULL, *p, *lp; // current position in source code
 char *freedata, *data; // data/bss pointer
 
-static int* free_sp;
+static int* base_sp;
 static int *e, *le, *text; // current position in emitted code
 static int* cas;           // case statement patch-up pointer
 static int* def;           // default statement patch-up pointer
@@ -58,7 +59,7 @@ static int ty;            // current expression type
 static int loc;           // local variable offset
 static int line;          // current line number
 static int src;           // print source and assembly flag
-static int signed_char;   // use `signed char` for `char`
+static int trc;           // use `signed char` for `char`
 static int* n;            // current position in emitted abstract syntax tree
                           // With an AST, the compiler is not limited to generate
                           // code on the fly with parsing.
@@ -68,6 +69,8 @@ static int* n;            // current position in emitted abstract syntax tree
 static int ld;            // local variable depth
 static int pplev, pplevt; // preprocessor conditional level
 static int oline, osize;  // for optimization suggestion
+
+static int *freed_ast, *ast;
 
 // identifier
 #define MAX_IR 256
@@ -366,6 +369,20 @@ static const char* instr_str[] = {
 enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000 };
 
 static jmp_buf done_jmp;
+static char* check_root;
+
+static void clear_globals(void) {
+    base_sp = e = le = text = cas = def = brks = cnts = tsize = n = ast =
+        (int*)(check_root = freedata = data = freep = p = lp = (char*)(id = sym = oid = NULL));
+
+    swtc = brkc = cntc = tnew = tk = ty = loc = line = src = trc = ld = pplev = pplevt = oline =
+        osize = ir_count = 0;
+
+    memset(&tkv, 0, sizeof(tkv));
+    memset(ir_var, 0, sizeof(ir_var));
+    memset(&members, 0, sizeof(members));
+    memset(&done_jmp, 0, sizeof(&done_jmp));
+}
 
 static char* append_strtab(char** strtab, char* str) {
     char* s;
@@ -387,9 +404,37 @@ static void die(const char* f, ...) {
     longjmp(done_jmp, 1);
 }
 
-static int ef_getaddr(int idx) // get address external function
-{
-    return idx;
+#define sys_malloc(l) sys_malloc_func(l, __LINE__)
+
+static void* sys_malloc_func(int l, int lno) {
+    l += 8;
+    void* p = malloc(l);
+    if (p) {
+        memset((char*)p + 8, 0, l - 8);
+        *((int*)p + 1) = lno;
+        *((int*)p) = (int)check_root;
+        check_root = p;
+        return (char*)p + 8;
+    }
+    return NULL;
+}
+
+static void sys_free(void* p) {
+    char* p2 = (char*)p - 8;
+    char* lastpl = (char*)&check_root;
+    char* pl = check_root;
+    while (pl != NULL) {
+        if (pl == p2) {
+            int* lpi = (int*)lastpl;
+            *lpi = *((int*)pl);
+            free(pl);
+            return;
+        }
+        lastpl = pl;
+        int i = *((int*)pl);
+        pl = (char*)i;
+    }
+    die("corrupted memory");
 }
 
 static int ef_getidx(char* name) // get cache index of external function
@@ -2127,7 +2172,8 @@ static void gen(int* n) {
         k = b ? n[3] : 0;
         if (k) {
             l = (i != ClearCache) ? (n[4] >> 10) : 0;
-            a = (int*)malloc(sizeof(int) * k);
+            if (!(a = (int*)sys_malloc(sizeof(int) * k)))
+                die("no cache memory");
             for (j = 0; *b; b = (int*)*b)
                 a[j++] = (int)b;
             a[j] = (int)b;
@@ -2138,7 +2184,7 @@ static void gen(int* n) {
                 --j;
                 b = (int*)a[j];
             }
-            free(a);
+            sys_free(a);
             if (i == Syscall) {
                 *++e = IMM;
                 *++e = sj + 1;
@@ -2485,7 +2531,9 @@ static void stmt(int ctx) {
                         if (tk != Id)
                             die("bad struct member definition");
                         sz = (ty >= PTR) ? sizeof(int) : tsize[ty >> 2];
-                        struct member_s* m = (struct member_s*)malloc(sizeof(struct member_s));
+                        struct member_s* m = (struct member_s*)sys_malloc(sizeof(struct member_s));
+                        if (!m)
+                            die("no member memory");
                         m->id = id;
                         m->etype = 0;
                         next();
@@ -3007,21 +3055,20 @@ static inline int f_as_i(float f) {
     return u.i;
 }
 
-int time_wrapper() { return time_us_32(); }
-
 int cc(int argc, char** argv) {
-    int *freed_ast = NULL, *ast = NULL;
+    clear_globals();
+
     int i;
-    lfs_file_t* fd = malloc(sizeof(lfs_file_t));
 
     if (setjmp(done_jmp))
         goto done;
 
-    if (!(sym = (struct ident_s*)malloc(BIG_TBL_BYTES))) {
-        printf("could not allocate symbol area");
-        goto done;
-    }
-    memset(sym, 0, BIG_TBL_BYTES);
+    lfs_file_t* fd = sys_malloc(sizeof(lfs_file_t));
+    if (fd == NULL)
+        die("no file handle memory");
+
+    if (!(sym = (struct ident_s*)sys_malloc(BIG_TBL_BYTES)))
+        die("no symbol memory");
 
     // Register keywords in symbol stack. Must match the sequence of enum
     p = "enum char int float struct union sizeof return goto break continue "
@@ -3053,21 +3100,13 @@ int cc(int argc, char** argv) {
     struct ident_s* idmain = id;
     id->class = Main; // keep track of main
 
-    if (!(freedata = data = (char*)malloc(BIG_TBL_BYTES)))
-        printf("could not allocat data area");
-    memset(data, 0, BIG_TBL_BYTES);
-    if (!(tsize = (int*)malloc(SMALL_TBL_WRDS * sizeof(int)))) {
-        printf("could not allocate tsize area");
-        goto done;
-    }
-    memset(tsize, 0, SMALL_TBL_WRDS * sizeof(int)); // not strictly necessary
-    if (!(freed_ast = ast = (int*)malloc(BIG_TBL_BYTES))) {
-        printf("could not allocate abstract syntax tree area");
-        goto done;
-    }
-    memset(ast, 0, BIG_TBL_BYTES);          // not strictly necessary
-    ast = (int*)((int)ast + BIG_TBL_BYTES); // AST is built as a stack
-    n = ast;
+    if (!(freedata = data = (char*)sys_malloc(BIG_TBL_BYTES)))
+        die("no data memory");
+    if (!(tsize = (int*)sys_malloc(SMALL_TBL_WRDS * sizeof(int))))
+        die("no tsize memory");
+    if (!(freed_ast = ast = (int*)sys_malloc(BIG_TBL_BYTES)))
+        die("could not allocate abstract syntax tree area");
+    n = ast + (BIG_TBL_BYTES / 4) - 1;
 
     // add primitive types
     tsize[tnew++] = sizeof(char);
@@ -3082,8 +3121,8 @@ int cc(int argc, char** argv) {
             src = ((*argv)[2] == 'i') ? 2 : 1;
             --argc;
             ++argv;
-        } else if (!strcmp(*argv, "-fsigned-char")) {
-            signed_char = 1;
+        } else if ((*argv)[1] == 't') {
+            trc = 1;
             --argc;
             ++argv;
         } else if ((*argv)[1] == 'D') {
@@ -3116,38 +3155,23 @@ int cc(int argc, char** argv) {
     }
 
     char* fp = full_path(*argv);
-    if (!fp) {
-        printf("could not allocate file name area");
-        goto done;
-    }
-    if (fs_file_open(fd, fp, LFS_O_RDONLY) < 0) {
-        printf("could not open(%s)\n", fp);
-        goto done;
-    }
+    if (!fp)
+        die("could not allocate file name area");
+    if (fs_file_open(fd, fp, LFS_O_RDONLY) < 0)
+        die("could not open(%s)\n", fp);
 
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
 
-    if (!(text = le = e = (int*)malloc(BIG_TBL_BYTES))) {
-        printf("could not allocate text area");
-        goto done;
-    }
-    memset(e, 0, BIG_TBL_BYTES);
-    if (!(members = (struct member_s**)malloc(SMALL_TBL_WRDS * sizeof(struct member_s*)))) {
-        printf("could not malloc() members area");
-        goto done;
-    }
-    memset(members, 0, SMALL_TBL_WRDS * sizeof(struct member_s*));
+    if (!(text = le = e = (int*)sys_malloc(BIG_TBL_BYTES)))
+        die("no text memory");
+    if (!(members = (struct member_s**)sys_malloc(SMALL_TBL_WRDS * sizeof(struct member_s*))))
+        die("no members table memory");
 
-    if (!(freep = lp = p = (char*)malloc(siz + 1))) {
-        printf("could not allocate source area");
-        goto done;
-    }
-    if (fs_file_read(fd, p, siz) < 0) {
-        printf("unable to read from source file");
-        //      fs_file_close(&fd);
-        goto done;
-    }
+    if (!(freep = lp = p = (char*)sys_malloc(siz + 1)))
+        die("no source memory");
+    if (fs_file_read(fd, p, siz) < 0)
+        die("unable to read from source file");
     p[siz] = 0;
     fs_file_close(fd);
     fd = NULL;
@@ -3162,19 +3186,16 @@ int cc(int argc, char** argv) {
         next();
     }
     int *bp, *sp, *pc;
-    if (!(pc = (int*)idmain->val)) {
-        printf("main() not defined\n");
-        goto done;
-    }
+    if (!(pc = (int*)idmain->val))
+        die("main() not defined\n");
+
     if (src)
         goto done;
 
     // setup stack
-    if (!(free_sp = bp = sp = (int*)malloc(BIG_TBL_BYTES))) {
-        printf("could not allocate text area");
-        goto done;
-    }
-    bp = sp = (int*)((int)sp + BIG_TBL_BYTES);
+    if (!(base_sp = bp = sp = (int*)sys_malloc(BIG_TBL_BYTES)))
+        die("could not allocate text area");
+    bp = sp = (int*)((int)sp + BIG_TBL_BYTES - 4);
     *--sp = EXIT; // call exit if main returns
     *--sp = PSH;
     int* t = sp;
@@ -3184,6 +3205,7 @@ int cc(int argc, char** argv) {
 
     // run...
     int cycle = 0, a = 0;
+    float af = 0.0;
     while (1) {
         i = *pc++;
         ++cycle;
@@ -3196,8 +3218,10 @@ int cc(int argc, char** argv) {
         }
         if (i == LEA)
             a = (int)(bp + *pc++); // load local address
-        else if ((i == IMM) || (i == IMMF))
+        else if (i == IMM)
             a = *pc++; // load global address or immediate
+        else if (i == IMMF)
+            af = *((float*)pc++);
         else if (i == JMP)
             pc = (int*)*pc; // jump
         else if (i == JSR) {
@@ -3228,8 +3252,10 @@ int cc(int argc, char** argv) {
             *(int*)*sp++ = a; // store int
         else if (i == SC)
             a = *(char*)* sp++ = a; // store char
-        else if ((i == PSH) || (i == PSHF))
+        else if (i == PSH)
             *--sp = a; // push
+        else if (i == PSHF)
+            *((float*)--sp) = af;
 
         else if (i == OR)
             a = *sp++ | a;
@@ -3237,26 +3263,30 @@ int cc(int argc, char** argv) {
             a = *sp++ ^ a;
         else if (i == AND)
             a = *sp++ & a;
-        else if ((i == EQ) || (i == EQF))
+        else if (i == EQ)
             a = *sp++ == a;
-        else if ((i == NE) || (i == NEF))
+        else if (i == EQF)
+            a = *((float*)sp++) == af;
+        else if (i == NE)
             a = *sp++ != a;
+        else if (i == NEF)
+            a = *((float*)sp++) != af;
         else if (i == LT)
             a = *sp++ < a;
         else if (i == LTF)
-            a = i_as_f(*sp++) < i_as_f(a);
+            a = *((float*)sp++) < af;
         else if (i == GT)
             a = *sp++ > a;
         else if (i == GTF)
-            a = i_as_f(*sp++) > i_as_f(a);
+            a = *((float*)sp++) > af;
         else if (i == LE)
             a = *sp++ <= a;
         else if (i == LEF)
-            a = i_as_f(*sp++) <= i_as_f(a);
+            a = *((float*)sp++) <= af;
         else if (i == GE)
             a = *sp++ >= a;
         else if (i == GEF)
-            a = i_as_f(*sp++) == i_as_f(a);
+            a = *((float*)sp++) == af;
         else if (i == SHL)
             a = *sp++ << a;
         else if (i == SHR)
@@ -3264,133 +3294,98 @@ int cc(int argc, char** argv) {
         else if (i == ADD)
             a = *sp++ + a;
         else if (i == ADDF)
-            a = f_as_i(i_as_f(*sp++) + i_as_f(a));
+            af = *((float*)sp++) + af;
         else if (i == SUB)
             a = *sp++ - a;
         else if (i == SUBF)
-            a = f_as_i(i_as_f(*sp++) - i_as_f(a));
+            af = *((float*)sp++) - af;
         else if (i == MUL)
             a = *sp++ * a;
         else if (i == MULF)
-            a = f_as_i(i_as_f(*sp++) * i_as_f(a));
+            af = *((float*)sp++) * af;
         else if (i == DIV)
             a = *sp++ / a;
         else if (i == DIVF)
-            a = f_as_i(i_as_f(*sp++) / i_as_f(a));
+            af = *((float*)sp++) / af;
         else if (i == MOD)
             a = *sp++ % a;
         else if (i == ITOF)
-            a = f_as_i((float)*sp++);
+            af = (float)a;
         else if (i == FTOI)
-            a = (int)i_as_f(*sp++);
+            a = (int)af;
         else if (i == SYSC) {
             int sysc = *pc++;
             if (sysc == SYSC_PRINTF) {
-                int* hi = sp;
-                int extra = a;
-                asm volatile(".syntax unified       \n"
-                             "    mov  r1, %[extra] \n"
-                             "    mov  r2, %[hi]    \n"
-                             "l1: cmp  r1, #0       \n"
-                             "    beq  l2           \n"
-                             "    ldr  r0, [r2]     \n"
-                             "    push {r0}         \n"
-                             "    adds r2, #4       \n"
-                             "    subs r1, #1       \n"
-                             "    b    l1           \n"
-                             "l2:                   \n"
-                             :
-                             : [extra] "r"(extra), [hi] "r"(hi)
-                             : "r0", "r1", "r2");
-                asm volatile(".syntax unified       \n"
-                             "    mov  r3, %[extra] \n"
-                             "    cmp  r3, #1       \n"
-                             "    blt  l3           \n"
-                             "    pop  {r0}         \n"
-                             "    cmp  r3, #2       \n"
-                             "    blt  l3           \n"
-                             "    pop  {r1}         \n"
-                             "    cmp  r3, #3       \n"
-                             "    blt  l3           \n"
-                             "    pop  {r2}         \n"
-                             "    cmp  r3, #4       \n"
-                             "    blt  l3           \n"
-                             "    pop  {r3}         \n"
-                             "l3:                   \n"
-                             :
-                             : [extra] "r"(a)
-                             : "r0", "r1", "r2", "r3");
-                asm volatile(".syntax unified       \n"
-                             "bl __wrap_printf\n");
-                if (a > 4) {
-                    a = (a - 4) * 4;
-                    asm volatile(".syntax unified   \n"
-                                 "mov  r0, %[extra] \n"
-                                 "add  r0, sp       \n"
-                                 "mov  sp, r0       \n"
-                                 :
-                                 : [extra] "r"(a)
-                                 : "r0");
+                // HACK ALLERT, we need to figure out which parameters
+                // are floats. Scan the format string.
+                int* stk = sys_malloc(a * 9);
+                if (stk == NULL)
+                    die("format memory error");
+                char* atyp = (char*)stk + a * 8;
+                char* fmt = (char*)sp[a - 1];
+                int an = 0;
+                while (*fmt) {
+                    if (*fmt == '%') {
+                        if (*(fmt + 1) == '%') {
+                            fmt += 2;
+                            continue;
+                        }
+                        fmt++;
+                        an++;
+                        if (*fmt == 0)
+                            die("missing format specifier");
+                        const char* prefx = "-+ #.0123456789";
+                        const char* spec = "aefgAEFG";
+                        while (strchr(prefx, *fmt))
+                            fmt++;
+                        if (*fmt == 0)
+                            die("missing format specifier");
+                        if (strchr(spec, *fmt))
+                            atyp[an] = 1;
+                    }
+                    fmt++;
                 }
+                if (an != a - 1)
+                    die("missing format specifier");
+                volatile int stkp = 0;
+                for (int j = a - 1; j >= 0; j--)
+                    if (atyp[a - j - 1] == 0)
+                        stk[stkp++] = sp[j];
+                    else {
+                        if (stkp & 1)
+                            stk[stkp++] = 0;
+                        union {
+                            double d;
+                            int ii[2];
+                        } u;
+                        u.d = *((float*)&sp[j]);
+                        stk[stkp++] = u.ii[0];
+                        stk[stkp++] = u.ii[1];
+                    }
+                a = cc_printf(stk, stkp);
+                sys_free(stk);
                 fflush(stdout);
-            } else if (sysc == SYSC_MALLOC) {
-                asm volatile(".syntax unified       \n"
-                             "    ldr  r0, [sp]     \n"
-                             "    push {r0}         \n"
-                             "    bl   malloc       \n"
-                             "    add  sp, #4       \n"
-                             :
-                             :
-                             : "r0");
-                int* ap = &a;
-                asm volatile(".syntax unified       \n"
-                             "    mov  r1, %[rslt]  \n"
-                             "    str  r0, [r1]     \n"
-                             :
-                             : [rslt] "r"(ap)
-                             : "r0", "r1");
-            } else if (sysc == SYSC_FREE) {
-                asm volatile(".syntax unified       \n"
-                             "    ldr  r0, [sp]     \n"
-                             "    bl   free         \n"
-                             :
-                             :
-                             : "r0");
-            } else if (sysc == SYSC_TIME_US_32) {
-                asm volatile(".syntax unified       \n"
-                             "    bl   time_wrapper \n");
-                int* ap = &a;
-                asm volatile(".syntax unified       \n"
-                             "    mov  r1, %[rslt]  \n"
-                             "    str  r0, [r1]     \n"
-                             :
-                             : [rslt] "r"(ap)
-                             : "r0", "r1");
-            }
+            } else if (sysc == SYSC_MALLOC)
+                a = (int)sys_malloc(*sp);
+            else if (sysc == SYSC_FREE)
+                sys_free((void*)(*sp));
+            else if (sysc == SYSC_TIME_US_32)
+                a = time_us_32();
+            else
+                die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         } else if (i == EXIT)
-            goto done;
-        else {
-            printf("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
-            return -1;
-        }
+            die("\nnormal program exit\n");
+        else
+            die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
     }
 done:
-    if (fd)
-        free(fd);
-    if (free_sp)
-        free(free_sp);
-    if (freep)
-        free(freep);
-    if (freed_ast)
-        free(freed_ast);
-    if (tsize)
-        free(tsize);
-    if (freedata)
-        free(freedata);
-    if (sym)
-        free(sym);
-    if (text)
-        free(text);
+    char* next = check_root;
+    while (next) {
+        // printf("%08x %d\n", (int)next, *((int*)next + 1));
+        int inxt = *((int*)next);
+        free(next);
+        next = (char*)inxt;
+    }
 
     return 0;
 }
