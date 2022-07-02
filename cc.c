@@ -2989,6 +2989,24 @@ static void stmt(int ctx) {
     }
 }
 
+static inline float i_as_f(int i) {
+    union {
+        int i;
+        float f;
+    } u;
+    u.i = i;
+    return u.f;
+}
+
+static inline int f_as_i(float f) {
+    union {
+        int i;
+        float f;
+    } u;
+    u.f = f;
+    return u.i;
+}
+
 int time_wrapper() { return time_us_32(); }
 
 int cc(int argc, char** argv) {
@@ -3219,39 +3237,52 @@ int cc(int argc, char** argv) {
             a = *sp++ ^ a;
         else if (i == AND)
             a = *sp++ & a;
-        else if (i == EQ)
+        else if ((i == EQ) || (i == EQF))
             a = *sp++ == a;
-        else if (i == NE)
+        else if ((i == NE) || (i == NEF))
             a = *sp++ != a;
         else if (i == LT)
             a = *sp++ < a;
+        else if (i == LTF)
+            a = i_as_f(*sp++) < i_as_f(a);
         else if (i == GT)
             a = *sp++ > a;
+        else if (i == GTF)
+            a = i_as_f(*sp++) > i_as_f(a);
         else if (i == LE)
             a = *sp++ <= a;
+        else if (i == LEF)
+            a = i_as_f(*sp++) <= i_as_f(a);
         else if (i == GE)
             a = *sp++ >= a;
+        else if (i == GEF)
+            a = i_as_f(*sp++) == i_as_f(a);
         else if (i == SHL)
             a = *sp++ << a;
         else if (i == SHR)
             a = *sp++ >> a;
         else if (i == ADD)
             a = *sp++ + a;
+        else if (i == ADDF)
+            a = f_as_i(i_as_f(*sp++) + i_as_f(a));
         else if (i == SUB)
             a = *sp++ - a;
+        else if (i == SUBF)
+            a = f_as_i(i_as_f(*sp++) - i_as_f(a));
         else if (i == MUL)
             a = *sp++ * a;
+        else if (i == MULF)
+            a = f_as_i(i_as_f(*sp++) * i_as_f(a));
         else if (i == DIV)
             a = *sp++ / a;
-        else if (i == DIVF) {
-			float fa = *((float*)&a), fsp = *((float*)sp);
-            *((float*)&a) = fsp / fa;
-        } else if (i == MOD)
+        else if (i == DIVF)
+            a = f_as_i(i_as_f(*sp++) / i_as_f(a));
+        else if (i == MOD)
             a = *sp++ % a;
         else if (i == ITOF)
-			*((float*)&a) = *sp++;
+            a = f_as_i((float)*sp++);
         else if (i == FTOI)
-			a = *((float*)sp++);
+            a = (int)i_as_f(*sp++);
         else if (i == SYSC) {
             int sysc = *pc++;
             if (sysc == SYSC_PRINTF) {
