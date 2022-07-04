@@ -1,5 +1,17 @@
 A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 
+[busybox]: https://www.busybox.net
+[amacc compiler]: https://github.com/jserv/amacc.git
+[c4 virtual machine]: https://github.com/rswier/c4.git
+[Squint]: https://github.com/HPCguy/Squint.git
+
+Credit where credit is due...
+
+- The vi is ported from the [BusyBox] source code.
+- The compiler code is a remix of the [amacc compiler] parser generator
+and the [c4 virtual machine]. Floating point support was taken fom
+the [Squint] project.
+
 Building from source.
 
 ```
@@ -89,3 +101,4 @@ changed to /bak
                                                                                                                         
 done                                                                                                                    
 ```
+
