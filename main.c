@@ -155,9 +155,19 @@ static void put_cmd(void) {
         strcpy(result, "Can't create file");
         return;
     }
+#if LIB_PICO_STDIO_UART
     stdio_set_translate_crlf(&stdio_uart, false);
+#endif
+#if LIB_PICO_STDIO_USB
+    stdio_set_translate_crlf(&stdio_usb, false);
+#endif
     xmodemReceive(xmodem_cb);
+#if LIB_PICO_STDIO_UART
     stdio_set_translate_crlf(&stdio_uart, true);
+#endif
+#if LIB_PICO_STDIO_USB
+    stdio_set_translate_crlf(&stdio_usb, true);
+#endif
     int pos = fs_file_seek(&file, 0, LFS_SEEK_END);
     fs_file_close(&file);
     sprintf(result, "\nfile transfered, size: %d\n", pos);
@@ -322,9 +332,19 @@ static void get_cmd(void) {
         strcpy(result, "error reading file");
         goto err1;
     }
+#if LIB_PICO_STDIO_UART
     stdio_set_translate_crlf(&stdio_uart, false);
+#endif
+#if LIB_PICO_STDIO_USB
+    stdio_set_translate_crlf(&stdio_usb, false);
+#endif
     xmodemTransmit(buf, len);
+#if LIB_PICO_STDIO_UART
     stdio_set_translate_crlf(&stdio_uart, true);
+#endif
+#if LIB_PICO_STDIO_USB
+    stdio_set_translate_crlf(&stdio_usb, true);
+#endif
     printf("\nfile transfered, size: %d\n", len);
 err1:
     free(buf);
@@ -559,7 +579,12 @@ static const char* search_cmds(int len) {
 static bool screen_size(void) {
     int rc = false;
     do {
+#if LIB_PICO_STDIO_UART
         stdio_set_translate_crlf(&stdio_uart, false);
+#endif
+#if LIB_PICO_STDIO_USB
+        stdio_set_translate_crlf(&stdio_usb, false);
+#endif
         printf(VT_ESC "[999;999H" VT_ESC "[6n");
         fflush(stdout);
         int k = getchar_timeout_us(100000);
@@ -572,7 +597,12 @@ static bool screen_size(void) {
                 break;
             *cp++ = k;
         }
+#if LIB_PICO_STDIO_UART
         stdio_set_translate_crlf(&stdio_uart, true);
+#endif
+#if LIB_PICO_STDIO_USB
+        stdio_set_translate_crlf(&stdio_usb, true);
+#endif
         if (cmd_buffer[0] != '[')
             break;
         *cp = 0;

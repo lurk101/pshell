@@ -3153,7 +3153,16 @@ int cc(int argc, char** argv) {
         ++argv;
     }
     if (argc < 1) {
-        printf("usage: mc [-s[i]] [-t[i]] [-D [symbol[ = value]]] [-o out_file] file");
+        printf("\n"
+               "usage: cc [-s[i]] [-t[i]] [-D [symbol[ = value]]] [-o filename] file\n"
+               "    -s,-si  display disassembly and quit. i adds symbolic display.\n"
+               "    -t,-ti  trace execution. i enables single step.\n"
+               "    -D symbol [= value]\n"
+               "            define symbol for limited pre-processor.\n"
+               "    -o filename\n"
+               "            output file name (not yet functional!)\n"
+               "    filename\n"
+               "            C source file name.\n");
         goto done;
     }
 

@@ -1,18 +1,19 @@
 cmake_minimum_required(VERSION 3.13)
+set(PSHELL pshell_uart)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPICO_MALLOC_PANIC=0 -DLFS_NO_ERROR -DLFS_NO_DEBUG -DLFS_NO_WARN")
-project(pshell C CXX ASM)
+project(${PSHELL}_uart C CXX ASM)
 pico_sdk_init()
 add_subdirectory(littlefs)
 add_subdirectory(stdinit-lib)
-add_executable(pshell main.c xreceive.c xreceive.h xtransmit.c xtransmit.h
+add_executable(${PSHELL} main.c xreceive.c xreceive.h xtransmit.c xtransmit.h
     crc16.c crc16.h fs.c fs.h vi.c vi.h cc.c cc.h cc_printf.S version.h)
-pico_enable_stdio_uart(pshell 1)
-pico_enable_stdio_usb(pshell 0)
-target_link_libraries(pshell PUBLIC pico_stdlib littlefs stdinit-lib
+pico_enable_stdio_uart(${PSHELL} 0)
+pico_enable_stdio_usb(${PSHELL} 1)
+target_link_libraries(${PSHELL} PUBLIC pico_stdlib littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog hardware_timer)
-pico_add_extra_outputs(pshell)
+pico_add_extra_outputs(${PSHELL})
 
 
