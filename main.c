@@ -151,7 +151,7 @@ static void put_cmd(void) {
         return;
     if (check_name())
         return;
-    if (fs_file_open(&file, full_path(argv[1]), LFS_O_WRONLY | LFS_O_CREAT) < 0) {
+    if (fs_file_open(&file, full_path(argv[1]), LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
         strcpy(result, "Can't create file");
         return;
     }
@@ -179,7 +179,7 @@ int check_cp_parms(char** from, char** to, int copy) {
         }
         if (copy) {
             struct lfs_info info;
-            if (fs_stat(*from, &info) < 0) {
+            if (fs_stat(*from, &info) < LFS_ERR_OK) {
                 sprintf(result, "%s not found", *from);
                 break;
             }
@@ -194,11 +194,11 @@ int check_cp_parms(char** from, char** to, int copy) {
             break;
         }
         struct lfs_info info;
-        if (fs_stat(*from, &info) < 0) {
+        if (fs_stat(*from, &info) < LFS_ERR_OK) {
             sprintf(result, "%s not found", *from);
             break;
         }
-        if (fs_stat(*to, &info) >= 0) {
+        if (fs_stat(*to, &info) >= LFS_ERR_OK) {
             sprintf(result, "%s already exists", *to);
             break;
         }
@@ -218,7 +218,7 @@ static void mv_cmd(void) {
     char* to;
     if (check_cp_parms(&from, &to, 0))
         return;
-    if (fs_rename(from, to) < 0)
+    if (fs_rename(from, to) < LFS_ERR_OK)
         sprintf(result, "could not rename %s to %s", from, to);
     else
         sprintf(result, "%s renamed to %s", from, to);
@@ -241,12 +241,12 @@ static void cp_cmd(void) {
             strcpy(result, "no memory");
             break;
         }
-        if (fs_file_open(&in, from, LFS_O_RDONLY) < 0) {
+        if (fs_file_open(&in, from, LFS_O_RDONLY) < LFS_ERR_OK) {
             sprintf(result, "error opening %s", from);
             break;
         }
         in_ok = true;
-        if (fs_file_open(&out, to, LFS_O_WRONLY | LFS_O_CREAT) < 0) {
+        if (fs_file_open(&out, to, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
             sprintf(result, "error opening %s", from);
             break;
         }
@@ -281,7 +281,7 @@ static void cat_cmd(void) {
     if (check_name())
         return;
     lfs_file_t file;
-    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < 0) {
+    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < LFS_ERR_OK) {
         strcpy(result, "error opening file");
         return;
     }
@@ -307,7 +307,7 @@ static void get_cmd(void) {
         return;
     if (check_name())
         return;
-    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < 0) {
+    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < LFS_ERR_OK) {
         strcpy(result, "Can't open file");
         return;
     }
@@ -338,7 +338,7 @@ static void mkdir_cmd(void) {
         return;
     if (check_name())
         return;
-    if (fs_mkdir(full_path(argv[1])) < 0) {
+    if (fs_mkdir(full_path(argv[1])) < LFS_ERR_OK) {
         strcpy(result, "Can't create directory");
         return;
     }
@@ -353,7 +353,7 @@ static void rm_cmd(void) {
     // lfs won't remove a non empty directory but returns without error!
     struct lfs_info info;
     char* fp = full_path(argv[1]);
-    if (fs_stat(fp, &info) < 0) {
+    if (fs_stat(fp, &info) < LFS_ERR_OK) {
         sprintf(result, "%s not found", full_path(argv[1]));
         return;
     }
@@ -372,7 +372,7 @@ static void rm_cmd(void) {
             return;
         }
     }
-    if (fs_remove(fp) < 0)
+    if (fs_remove(fp) < LFS_ERR_OK)
         strcpy(result, "Can't remove file or directory");
     sprintf(result, "%s %s removed", isdir ? "directory" : "file", fp);
 }
@@ -435,7 +435,7 @@ static void ls_cmd(void) {
     else
         full_path("");
     lfs_dir_t dir;
-    if (fs_dir_open(&dir, path) < 0) {
+    if (fs_dir_open(&dir, path) < LFS_ERR_OK) {
         strcpy(result, "not a directory");
         return;
     }
@@ -477,7 +477,7 @@ static void cd_cmd(void) {
     }
     full_path(argv[1]);
     lfs_dir_t dir;
-    if (fs_dir_open(&dir, path) < 0) {
+    if (fs_dir_open(&dir, path) < LFS_ERR_OK) {
         strcpy(result, "not a directory");
         return;
     }

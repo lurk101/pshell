@@ -35,16 +35,16 @@ char *data_base, *data; // data/bss pointer
 
 static int* base_sp;
 static int *e, *le, *text_base; // current position in emitted code
-static int* cas;           // case statement patch-up pointer
-static int* def;           // default statement patch-up pointer
-static int* brks;          // break statement patch-up pointer
-static int* cnts;          // continue statement patch-up pointer
-static int swtc;           // !0 -> in a switch-stmt context
-static int brkc;           // !0 -> in a break-stmt context
-static int cntc;           // !0 -> in a continue-stmt context
-static int* tsize;         // array (indexed by type) of type sizes
-static int tnew;           // next available type
-static int tk;             // current token
+static int* cas;                // case statement patch-up pointer
+static int* def;                // default statement patch-up pointer
+static int* brks;               // break statement patch-up pointer
+static int* cnts;               // continue statement patch-up pointer
+static int swtc;                // !0 -> in a switch-stmt context
+static int brkc;                // !0 -> in a break-stmt context
+static int cntc;                // !0 -> in a continue-stmt context
+static int* tsize;              // array (indexed by type) of type sizes
+static int tnew;                // next available type
+static int tk;                  // current token
 static union conv {
     int i;
     float f;
@@ -235,10 +235,10 @@ enum {
      * make function calls.
      */
 
-    IMM, /*  1 */
+    IMM, //  1
     /* IMM <num> to put immediate <num> into R0 */
 
-    IMMF, /* 2 */
+    IMMF, // 2
     /* IMM <num> to put immediate <num> into S0 */
 
     JMP, /*  3 */
@@ -307,34 +307,34 @@ enum {
      * address is stored on the top of the stack.
      */
 
-    OR,
-    /* 18 */ XOR,
-    /* 19 */ AND, /* 20 */
-    EQ,
-    /* 21 */ NE, /* 22 */
-    GE,
-    /* 23 */ LT,
-    /* 24 */ GT,
-    /* 25 */ LE, /* 26 */
-    SHL,
-    /* 27 */ SHR, /* 28 */
-    ADD,
-    /* 29 */ SUB,
-    /* 30 */ MUL,
-    /* 31 */ DIV,
-    /* 32 */ MOD, /* 33 */
-    ADDF,
-    /* 34 */ SUBF,
-    /* 35 */ MULF,
-    /* 36 */ DIVF, /* 37 */
-    FTOI,
-    /* 38 */ ITOF,
-    /* 39 */ EQF,
-    /* 40 */ NEF, /* 41 */
-    GEF,
-    /* 42 */ LTF,
-    /* 43 */ GTF,
-    /* 44 */ LEF, /* 45 */
+    OR,   // 18 */
+    XOR,  // 19 */
+    AND,  // 20 */
+    EQ,   // 21 */
+    NE,   // 22 */
+    GE,   // 23 */
+    LT,   // 24 */
+    GT,   // 25 */
+    LE,   // 26 */
+    SHL,  // 27 */
+    SHR,  // 28 */
+    ADD,  // 29 */
+    SUB,  // 30 */
+    MUL,  // 31 */
+    DIV,  // 32 */
+    MOD,  // 33 */
+    ADDF, // 34 */
+    SUBF, // 35 */
+    MULF, // 36 */
+    DIVF, // 37 */
+    FTOI, // 38 */
+    ITOF, // 39 */
+    EQF,  // 40 */
+    NEF,  // 41 */
+    GEF,  // 42 */
+    LTF,  // 43 */
+    GTF,  // 44 */
+    LEF,  // 45 */
     /* arithmetic instructions
      * Each operator has two arguments: the first one is stored on the top
      * of the stack while the second is stored in R0.
@@ -343,7 +343,6 @@ enum {
      */
 
     SYSC, /* 46 system call */
-    CLCA, /* 47 clear cache, used by JIT compilation */
 
     EXIT,
 
@@ -351,11 +350,11 @@ enum {
 };
 
 static const char* instr_str[] = {
-    "LEA", "IMM",  "IMMF", "JMP", "JSR",  "BZ",   "BNZ",  "ENT",  "ADJ",  "LEV",
-    "PSH", "PSHF", "LC",   "LI",  "LF",   "SC",   "SI",   "SF",   "OR",   "XOR",
-    "AND", "EQ",   "NE",   "GE",  "LT",   "GT",   "LE",   "SHL",  "SHR",  "ADD",
-    "SUB", "MUL",  "DIV",  "MOD", "ADDF", "SUBF", "MULF", "DIVF", "FTOI", "ITOF",
-    "EQF", "NEF",  "GEF",  "LTF", "GTF",  "LEF",  "SYSC", "CLCA", "EXIT", "INVALID"};
+    "LEA", "IMM",  "IMMF", "JMP", "JSR",  "BZ",   "BNZ",  "ENT",  "ADJ",    "LEV",
+    "PSH", "PSHF", "LC",   "LI",  "LF",   "SC",   "SI",   "SF",   "OR",     "XOR",
+    "AND", "EQ",   "NE",   "GE",  "LT",   "GT",   "LE",   "SHL",  "SHR",    "ADD",
+    "SUB", "MUL",  "DIV",  "MOD", "ADDF", "SUBF", "MULF", "DIVF", "FTOI",   "ITOF",
+    "EQF", "NEF",  "GEF",  "LTF", "GTF",  "LEF",  "SYSC", "EXIT", "INVALID"};
 
 // types -- 4 scalar types, 1020 aggregate types, 4 tensor ranks, 8 ptr levels
 // bits 0-1 = tensor rank, 2-11 = type id, 12-14 = ptr level
@@ -363,19 +362,35 @@ static const char* instr_str[] = {
 enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000 };
 
 // (library) external functions
-enum { SYSC_PRINTF = 0, SYSC_MALLOC, SYSC_FREE, SYSC_SQRT, SYSC_TIME_US_32 };
+enum {
+    SYSC_PRINTF = 0,
+    SYSC_MALLOC,
+    SYSC_FREE,
+    SYSC_ATOI,
+    SYSC_SQRT,
+    SYSC_SIN,
+    SYSC_COS,
+    SYSC_TAN,
+    SYSC_LOG,
+    SYSC_POW,
+    SYSC_TIME_US_32
+};
 
-static const char* ef_cache[] = {"printf", "malloc", "free", "sqrt", "time_us_32"};
-static const char ef_type[] = {INT, INT, INT, FLOAT, INT};
+static const char* extern_name[] = {"printf", "malloc", "free", "atoi", "sqrt",      "sin",
+                                    "cos",    "tan",    "log",  "pow",  "time_us_32"};
+static const char extern_type[] = {INT,   INT,   INT,   INT,   FLOAT, FLOAT,
+                                   FLOAT, FLOAT, FLOAT, FLOAT, INT};
 
-static const int ef_count = sizeof(ef_cache) / sizeof(ef_cache[0]);
+static const int extern_count = sizeof(extern_name) / sizeof(extern_name[0]);
 
 static jmp_buf done_jmp;
 static char* malloc_list;
+static lfs_file_t* fd;
 
 static void clear_globals(void) {
     base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = ast =
         (int*)(malloc_list = data_base = data = p = lp = (char*)(id = sym_base = oid = NULL));
+    fd = NULL;
 
     swtc = brkc = cntc = tnew = tk = ty = loc = line = src = trc = ld = pplev = pplevt = oline =
         osize = ir_count = 0;
@@ -442,8 +457,8 @@ static void sys_free(void* p) {
 static int ef_getidx(char* name) // get cache index of external function
 {
     int i, ext_addr = 0x1234;
-    for (i = 0; i < ef_count; ++i)
-        if (!strcmp(ef_cache[i], name))
+    for (i = 0; i < extern_count; ++i)
+        if (!strcmp(extern_name[i], name))
             return i;
     return -1;
 }
@@ -471,7 +486,7 @@ static void next() {
             // hash value is used for fast comparison. Since it is inaccurate,
             // we have to validate the memory content as well.
             for (id = sym_base; id->tk; ++id) { // find one free slot in table
-                if (tk == id->hash &&      // if token is found (hash match), overwrite
+                if (tk == id->hash &&           // if token is found (hash match), overwrite
                     !memcmp(id->name, pp, p - pp)) {
                     tk = id->tk;
                     return;
@@ -2685,7 +2700,7 @@ static void stmt(int ctx) {
                             ++le;
                             printf(" %d\n", *le & 0xf);
                         } else if (*le == SYSC) {
-                            printf(" %s\n", ef_cache[*(++le)]);
+                            printf(" %s\n", extern_name[*(++le)]);
                         } else
                             printf("\n");
                     }
@@ -3059,7 +3074,7 @@ int cc(int argc, char** argv) {
     if (setjmp(done_jmp))
         goto done;
 
-    lfs_file_t* fd = sys_malloc(sizeof(lfs_file_t));
+    fd = sys_malloc(sizeof(lfs_file_t));
     if (fd == NULL)
         die("no file handle memory");
 
@@ -3068,7 +3083,7 @@ int cc(int argc, char** argv) {
 
     // Register keywords in symbol stack. Must match the sequence of enum
     p = "enum char int float struct union sizeof return goto break continue "
-        "if do while for switch case default else __clear_cache void main";
+        "if do while for switch case default else void main";
 
     // call "next" to create symbol table entry.
     // store the keyword's token type in the symbol table entry's "tk" field.
@@ -3079,10 +3094,6 @@ int cc(int argc, char** argv) {
     }
 
     // add __clear_cache to symbol table
-    next();
-    id->class = ClearCache;
-    id->type = INT;
-    id->val = CLCA;
     next();
 
     id->tk = Char;
@@ -3150,8 +3161,11 @@ int cc(int argc, char** argv) {
     char* fp = full_path(*argv);
     if (!fp)
         die("could not allocate file name area");
-    if (fs_file_open(fd, fp, LFS_O_RDONLY) < 0)
-        die("could not open(%s)\n", fp);
+    if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
+        sys_free(fd);
+        fd = NULL;
+        die("could not open %s \n", fp);
+    }
 
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
@@ -3164,7 +3178,7 @@ int cc(int argc, char** argv) {
     char* src_base;
     if (!(src_base = lp = p = (char*)sys_malloc(siz + 1)))
         die("no source memory");
-    if (fs_file_read(fd, p, siz) < 0)
+    if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
         die("unable to read from source file");
     p[siz] = 0;
     fs_file_close(fd);
@@ -3192,23 +3206,26 @@ int cc(int argc, char** argv) {
         if (!(fd = sys_malloc(sizeof(lfs_file_t))))
             die("no file handle memory");
         fp = full_path(ofn);
-        if (fs_file_open(fd, fp, LFS_O_WRONLY | LFS_O_CREAT) < 0)
+        if (fs_file_open(fd, fp, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
+            sys_free(fd);
+            fd = NULL;
             die("can't create output file %s", fp);
+        }
         int lt = (char*)e - (char*)text_base;
-        if (fs_file_write(fd, &lt, sizeof(lt)) < 0)
+        if (fs_file_write(fd, &lt, sizeof(lt)) < LFS_ERR_OK)
             die("can't write output file");
-        if (fs_file_write(fd, text_base, lt) < 0)
+        if (fs_file_write(fd, text_base, lt) < LFS_ERR_OK)
             die("can't write output file");
         int ld = data - data_base;
-        if (fs_file_write(fd, &ld, sizeof(ld)) < 0)
+        if (fs_file_write(fd, &ld, sizeof(ld)) < LFS_ERR_OK)
             die("can't write output file");
-        if (fs_file_write(fd, data_base, ld) < 0)
+        if (fs_file_write(fd, data_base, ld) < LFS_ERR_OK)
             die("can't write output file");
         fs_file_close(fd);
         sys_free(fd);
         fd = NULL;
         static const char* exe = "exe";
-        if (fs_setattr(fp, 1, exe, 3) < 0)
+        if (fs_setattr(fp, 1, exe, strlen(exe)) < LFS_ERR_OK)
             die("couldn't mark file as executable");
         printf("executable %s - text %d bytes, data %d bytes\n\n", fp, lt, ld);
     }
@@ -3396,14 +3413,26 @@ int cc(int argc, char** argv) {
                 a = (int)sys_malloc(*sp);
             else if (sysc == SYSC_FREE)
                 sys_free((void*)(*sp));
+            else if (sysc == SYSC_ATOI)
+                a = atoi((char*)*sp);
             else if (sysc == SYSC_SQRT)
                 af = sqrt(*((float*)sp));
+            else if (sysc == SYSC_SIN)
+                af = sin(*((float*)sp));
+            else if (sysc == SYSC_COS)
+                af = cos(*((float*)sp));
+            else if (sysc == SYSC_TAN)
+                af = tan(*((float*)sp));
+            else if (sysc == SYSC_LOG)
+                af = log(*((float*)sp));
+            else if (sysc == SYSC_POW)
+                af = pow(*((float*)sp + 1), *((float*)sp));
             else if (sysc == SYSC_TIME_US_32)
                 a = time_us_32();
             else
                 die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         } else if (i == EXIT)
-            die("\nnormal program exit\n");
+            die("\nCC=%d\n", a);
         else
             die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
     }
