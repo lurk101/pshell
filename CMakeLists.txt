@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPICO_MALLOC_PANIC=0")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPICO_MALLOC_PANIC=0 -DLFS_NO_ERROR -DLFS_NO_DEBUG -DLFS_NO_WARN")
 project(pshell C CXX ASM)
 pico_sdk_init()
 add_subdirectory(littlefs)
@@ -14,3 +14,5 @@ pico_enable_stdio_usb(pshell 0)
 target_link_libraries(pshell PUBLIC pico_stdlib littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog hardware_timer)
 pico_add_extra_outputs(pshell)
+
+

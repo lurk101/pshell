@@ -3121,7 +3121,7 @@ int cc(int argc, char** argv) {
         if ((*argv)[1] == 's') {
             src = ((*argv)[2] == 'i') ? 2 : 1;
         } else if ((*argv)[1] == 't') {
-            trc = 1;
+            trc = ((*argv)[2] == 'i') ? 2 : 1;
         } else if ((*argv)[1] == 'o') {
             --argc;
             ++argv;
@@ -3153,7 +3153,7 @@ int cc(int argc, char** argv) {
         ++argv;
     }
     if (argc < 1) {
-        printf("usage: mc [-s] [-t] [-D [symbol[ = value]]] [-o out_file] file");
+        printf("usage: mc [-s[i]] [-t[i]] [-D [symbol[ = value]]] [-o out_file] file");
         goto done;
     }
 
@@ -3235,137 +3235,141 @@ int cc(int argc, char** argv) {
     if (!(base_sp = bp = sp = (int*)sys_malloc(BIG_TBL_BYTES)))
         die("could not allocate text area");
     bp = sp = (int*)((int)sp + BIG_TBL_BYTES - 4);
-    *--sp = EXIT; // call exit if main returns
-    *--sp = PSH;
+    *(--sp) = EXIT; // call exit if main returns
+    *(--sp) = PSH;
     int* t = sp;
-    *--sp = argc;
-    *--sp = (int)argv;
-    *--sp = (int)t;
+    *(--sp) = argc;
+    *(--sp) = (int)argv;
+    *(--sp) = (int)t;
 
     // run...
-    int cycle = 0, a = 0;
-    float af = 0.0;
+    int cycle = 0;
+    union {
+        int i;
+        float f;
+    } a;
+    a.i = 0;
     while (1) {
         i = *pc++;
         ++cycle;
-        if (src > 1) {
+        if (trc) {
             printf("%d> %.4s", cycle, instr_str[i]);
-            if (i <= ADJ)
+            if ((i <= ADJ) || (i == SYSC))
                 printf(" %d\n", *pc);
             else
                 printf("\n");
         }
         if (i == LEA)
-            a = (int)(bp + *pc++); // load local address
+            a.i = (int)(bp + *pc++); // load local address
         else if (i == IMM)
-            a = *pc++; // load global address or immediate
+            a.i = *pc++; // load global address or immediate
         else if (i == IMMF)
-            af = *((float*)pc++);
+            a.f = *((float*)pc++);
         else if (i == JMP)
             pc = (int*)*pc; // jump
         else if (i == JSR) {
-            *--sp = (int)(pc + 1);
+            *(--sp) = (int)(pc + 1);
             pc = (int*)*pc;
         } // jump to subroutine
         else if (i == BZ)
-            pc = a ? pc + 1 : (int*)*pc; // branch if zero
+            pc = a.i ? pc + 1 : (int*)*pc; // branch if zero
         else if (i == BNZ)
-            pc = a ? (int*)*pc : pc + 1; // branch if not zero
+            pc = a.i ? (int*)*pc : pc + 1; // branch if not zero
         else if (i == ENT) {
-            *--sp = (int)bp;
+            *(--sp) = (int)bp;
             bp = sp;
             sp = sp - *pc++;
         } // enter subroutine
         else if (i == ADJ)
-            sp = sp + *pc++; // stack adjust
+            sp += *pc++ & 0xf; // stack adjust
         else if (i == LEV) {
             sp = bp;
             bp = (int*)*sp++;
             pc = (int*)*sp++;
         } // leave subroutine
         else if (i == LI)
-            a = *(int*)a; // load int
+            a.i = *(int*)a.i; // load int
         else if (i == LF)
-            af = *(float*)a; // load float
+            a.f = *(float*)a.i; // load float
         else if (i == LC)
-            a = *(char*)a; // load char
+            a.i = *(char*)a.i; // load char
         else if (i == SI)
-            *(int*)*sp++ = a; // store int
+            *(int*)*sp++ = a.i; // store int
         else if (i == SF)
-            *(float*)*sp++ = af; // store float
+            *(float*)*sp++ = a.f; // store float
         else if (i == SC)
-            a = *(char*)* sp++ = a; // store char
+            a.i = *(char*)* sp++ = a.i; // store char
         else if (i == PSH)
-            *--sp = a; // push
+            *(--sp) = a.i; // push
         else if (i == PSHF)
-            *((float*)--sp) = af;
+            *((float*)--sp) = a.f;
 
         else if (i == OR)
-            a = *sp++ | a;
+            a.i = *sp++ | a.i;
         else if (i == XOR)
-            a = *sp++ ^ a;
+            a.i = *sp++ ^ a.i;
         else if (i == AND)
-            a = *sp++ & a;
+            a.i = *sp++ & a.i;
         else if (i == EQ)
-            a = *sp++ == a;
+            a.i = *sp++ == a.i;
         else if (i == EQF)
-            a = *((float*)sp++) == af;
+            a.i = *((float*)sp++) == a.f;
         else if (i == NE)
-            a = *sp++ != a;
+            a.i = *sp++ != a.i;
         else if (i == NEF)
-            a = *((float*)sp++) != af;
+            a.i = *((float*)sp++) != a.f;
         else if (i == LT)
-            a = *sp++ < a;
+            a.i = *sp++ < a.i;
         else if (i == LTF)
-            a = *((float*)sp++) < af;
+            a.i = *((float*)sp++) < a.f;
         else if (i == GT)
-            a = *sp++ > a;
+            a.i = *sp++ > a.i;
         else if (i == GTF)
-            a = *((float*)sp++) > af;
+            a.i = *((float*)sp++) > a.f;
         else if (i == LE)
-            a = *sp++ <= a;
+            a.i = *sp++ <= a.i;
         else if (i == LEF)
-            a = *((float*)sp++) <= af;
+            a.i = *((float*)sp++) <= a.f;
         else if (i == GE)
-            a = *sp++ >= a;
+            a.i = *sp++ >= a.i;
         else if (i == GEF)
-            a = *((float*)sp++) == af;
+            a.i = *((float*)sp++) == a.f;
         else if (i == SHL)
-            a = *sp++ << a;
+            a.i = *sp++ << a.i;
         else if (i == SHR)
-            a = *sp++ >> a;
+            a.i = *sp++ >> a.i;
         else if (i == ADD)
-            a = *sp++ + a;
+            a.i = *sp++ + a.i;
         else if (i == ADDF)
-            af = *((float*)sp++) + af;
+            a.f = *((float*)sp++) + a.f;
         else if (i == SUB)
-            a = *sp++ - a;
+            a.i = *sp++ - a.i;
         else if (i == SUBF)
-            af = *((float*)sp++) - af;
+            a.f = *((float*)sp++) - a.f;
         else if (i == MUL)
-            a = *sp++ * a;
+            a.i = *sp++ * a.i;
         else if (i == MULF)
-            af = *((float*)sp++) * af;
+            a.f = *((float*)sp++) * a.f;
         else if (i == DIV)
-            a = *sp++ / a;
+            a.i = *sp++ / a.i;
         else if (i == DIVF)
-            af = *((float*)sp++) / af;
+            a.f = *((float*)sp++) / a.f;
         else if (i == MOD)
-            a = *sp++ % a;
+            a.i = *sp++ % a.i;
         else if (i == ITOF)
-            af = (float)a;
+            a.f = (float)a.i;
         else if (i == FTOI)
-            a = (int)af;
+            a.i = (int)a.f;
         else if (i == SYSC) {
             int sysc = *pc++;
             if (sysc == SYSC_PRINTF) {
                 // HACK ALLERT, we need to figure out which parameters
                 // are floats. Scan the format string.
-                int* stk = sys_malloc(a * 9);
+                int* stk = sys_malloc(a.i * 9);
                 if (stk == NULL)
                     die("format memory error");
-                char* atyp = (char*)stk + a * 8;
-                char* fmt = (char*)sp[a - 1];
+                char* atyp = (char*)stk + a.i * 8;
+                char* fmt = (char*)sp[a.i - 1];
                 int an = 0;
                 while (*fmt) {
                     if (*fmt == '%') {
@@ -3388,11 +3392,11 @@ int cc(int argc, char** argv) {
                     }
                     fmt++;
                 }
-                if (an != a - 1)
+                if (an != a.i - 1)
                     die("missing format specifier");
                 volatile int stkp = 0;
-                for (int j = a - 1; j >= 0; j--)
-                    if (atyp[a - j - 1] == 0)
+                for (int j = a.i - 1; j >= 0; j--)
+                    if (atyp[a.i - j - 1] == 0)
                         stk[stkp++] = sp[j];
                     else {
                         if (stkp & 1)
@@ -3405,35 +3409,46 @@ int cc(int argc, char** argv) {
                         stk[stkp++] = u.ii[0];
                         stk[stkp++] = u.ii[1];
                     }
-                a = cc_printf(stk, stkp);
+                a.i = cc_printf(stk, stkp);
                 sys_free(stk);
                 fflush(stdout);
             } else if (sysc == SYSC_MALLOC)
-                a = (int)sys_malloc(*sp);
+                a.i = (int)sys_malloc(*sp);
             else if (sysc == SYSC_FREE)
                 sys_free((void*)(*sp));
             else if (sysc == SYSC_ATOI)
-                a = atoi((char*)*sp);
+                a.i = atoi((char*)*sp);
             else if (sysc == SYSC_SQRT)
-                af = sqrt(*((float*)sp));
+                a.f = sqrt(*((float*)sp));
             else if (sysc == SYSC_SIN)
-                af = sin(*((float*)sp));
+                a.f = sin(*((float*)sp));
             else if (sysc == SYSC_COS)
-                af = cos(*((float*)sp));
+                a.f = cos(*((float*)sp));
             else if (sysc == SYSC_TAN)
-                af = tan(*((float*)sp));
+                a.f = tan(*((float*)sp));
             else if (sysc == SYSC_LOG)
-                af = log(*((float*)sp));
+                a.f = log(*((float*)sp));
             else if (sysc == SYSC_POW)
-                af = pow(*((float*)sp + 1), *((float*)sp));
+                a.f = pow(*((float*)sp + 1), *((float*)sp));
             else if (sysc == SYSC_TIME_US_32)
-                a = time_us_32();
+                a.i = time_us_32();
             else
                 die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         } else if (i == EXIT)
             die("\nCC=%d\n", a);
         else
             die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
+        if (trc) {
+            printf("acc    %12f 0x%08x %12d\n", a.f, a.i, a.i);
+            printf("stk %08x x %08x %08x %08x $08x\n", (int)sp, *((int*)sp), *((int*)sp + 1),
+                   *((int*)sp + 2), *((int*)sp + 3));
+            printf("stk          i %d %d %d $d\n", *((int*)sp), *((int*)sp + 1), *((int*)sp + 2),
+                   *((int*)sp + 3));
+            printf("stk          f %f %f %f $f\n", *((float*)sp), *((float*)sp + 1),
+                   *((float*)sp + 2), *((float*)sp + 3));
+        }
+        if (trc > 1)
+            getchar();
     }
 done:
     if (fd)

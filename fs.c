@@ -18,7 +18,8 @@
 
 #include "fs.h"
 
-#define FS_SIZE (1024 * 1024)
+// file system offset in flash
+#define FS_BASE (256 * 1024)
 
 static int fs_hal_read(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, void* buffer,
                        lfs_size_t size);
@@ -29,6 +30,8 @@ static int fs_hal_prog(const struct lfs_config* c, lfs_block_t block, lfs_off_t 
 static int fs_hal_erase(const struct lfs_config* c, lfs_block_t block);
 
 static int fs_hal_sync(const struct lfs_config* c);
+
+#define FS_SIZE (PICO_FLASH_SIZE_BYTES - FS_BASE)
 
 // configuration of the filesystem is provided by this struct
 // for Pico: prog size = 256, block size = 4096, so cache is 8K
@@ -53,8 +56,6 @@ lfs_t fs_lfs;
 
 // Pico specific hardware abstraction functions
 
-// file system offset in flash
-#define FS_BASE (PICO_FLASH_SIZE_BYTES - FS_SIZE)
 
 static int fs_hal_read(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, void* buffer,
                        lfs_size_t size) {

@@ -420,11 +420,12 @@ static void status_cmd(void) {
     struct fs_fsstat_t stat;
     fs_fsstat(&stat);
     const char percent = 37;
+    int total_size = stat.block_count * stat.block_size;
     sprintf(result,
-            "\nflash base 0x%x, blocks %d, block size %d, used %d, total %u bytes, %1.1f%c used.\n",
+            "\nflash base 0x%x, blocks %d, block size %d, used %d, total %u bytes (%dK), %1.1f%c "
+            "used.\n",
             fs_flash_base(), (int)stat.block_count, (int)stat.block_size, (int)stat.blocks_used,
-            stat.block_count * stat.block_size, stat.blocks_used * 100.0 / stat.block_count,
-            percent);
+            total_size, total_size / 1024, stat.blocks_used * 100.0 / stat.block_count, percent);
 }
 
 static void ls_cmd(void) {
@@ -630,10 +631,13 @@ int main(void) {
                " would you like to format it (Y/n) ? ");
         fflush(stdout);
         char c = getchar();
-        if (c == 'Y' || c == 'y' || c == '\r') {
-            if (c == 'Y' || c == 'y')
-                putchar(c);
+        while (c != 'y' && c != 'Y' && c != 'N' && c != 'n' && c != '\r')
+            c = getchar();
+        putchar(c);
+        if (c != '\r')
             echo_key('\r');
+        putchar('\n');
+        if (c == 'y' || c == 'y')
             if (fs_format() != LFS_ERR_OK)
                 printf("Error formating file system!\n");
             else {
@@ -644,7 +648,6 @@ int main(void) {
                     mounted = true;
                 }
             }
-        }
     } else {
         printf("file system automatically mounted\n");
         mounted = true;
