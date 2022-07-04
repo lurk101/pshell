@@ -110,7 +110,6 @@ enum {
     Syscall,
     Main,
     ClearCache,
-    Sqrt,
     Glo,
     Par,
     Loc,
@@ -822,7 +821,7 @@ static void expr(int lev) {
         if (tk == '(') {
             if (d->class == Func && d->val == 0)
                 goto resolve_fnproto;
-            if (d->class < Func || d->class > Sqrt) {
+            if (d->class < Func || d->class > ClearCache) {
                 if (d->class != 0)
                     die("bad function call");
                 d->type = INT;
@@ -2193,11 +2192,6 @@ static void gen(int* n) {
             *++e = (i == Syscall) ? n[4] : n[3];
         }
         break;
-    case Sqrt:
-        b = (int*)n[1];
-        gen(b + 1);
-        *++e = n[2];
-        break;
     case While:
     case DoWhile:
         if (i == While) {
@@ -3275,10 +3269,14 @@ int cc(int argc, char** argv) {
         } // leave subroutine
         else if (i == LI)
             a = *(int*)a; // load int
+        else if (i == LF)
+            af = *(float*)a; // load float
         else if (i == LC)
             a = *(char*)a; // load char
         else if (i == SI)
             *(int*)*sp++ = a; // store int
+        else if (i == SF)
+            *(float*)*sp++ = af; // store float
         else if (i == SC)
             a = *(char*)* sp++ = a; // store char
         else if (i == PSH)
