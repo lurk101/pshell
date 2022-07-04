@@ -454,7 +454,7 @@ static void sys_free(void* p) {
     die("corrupted memory");
 }
 
-static int ef_getidx(char* name) // get cache index of external function
+static int extern_getidx(char* name) // get cache index of external function
 {
     int i, ext_addr = 0x1234;
     for (i = 0; i < extern_count; ++i)
@@ -498,8 +498,6 @@ static void next() {
             id->name = pp;
             id->hash = tk;
             tk = id->tk = Id; // token type identifier
-            if (memcmp("main", id->name, 4) == 0)
-                printf("\n");
             return;
         }
         /* Calculate the constant */
@@ -846,9 +844,10 @@ static void expr(int lev) {
                 int namelen = d->hash & 0x3f;
                 char ch = d->name[namelen];
                 d->name[namelen] = 0;
-                d->val = ef_getidx(d->name);
+                d->val = extern_getidx(d->name);
                 if (d->val < 0)
                     die("Unknown external function %s", d->name);
+                d->type = extern_type[d->val];
                 d->name[namelen] = ch;
             }
             next();
