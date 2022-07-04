@@ -13,6 +13,7 @@
  * Further modifications by lurk101 for RP Pico
  */
 
+#include <math.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -29,11 +30,11 @@ extern int cc_printf(void* stk, int wrds);
 #define SMALL_TBL_WRDS 256
 #define BIG_TBL_BYTES (16 * 1024)
 
-char *freep = NULL, *p, *lp; // current position in source code
-char *freedata, *data; // data/bss pointer
+char *p, *lp;           // current position in source code
+char *data_base, *data; // data/bss pointer
 
 static int* base_sp;
-static int *e, *le, *text; // current position in emitted code
+static int *e, *le, *text_base; // current position in emitted code
 static int* cas;           // case statement patch-up pointer
 static int* def;           // default statement patch-up pointer
 static int* brks;          // break statement patch-up pointer
@@ -70,7 +71,7 @@ static int ld;            // local variable depth
 static int pplev, pplevt; // preprocessor conditional level
 static int oline, osize;  // for optimization suggestion
 
-static int *freed_ast, *ast;
+static int *ast_base, *ast;
 
 // identifier
 #define MAX_IR 256
@@ -88,15 +89,10 @@ static struct ident_s {
     int val, hval;
     int etype, hetype; // extended type info. different meaning for funcs.
 } * id,                // currently parsed identifier
-    *sym,              // symbol table (simple list of identifiers)
+    *sym_base,         // symbol table (simple list of identifiers)
     *oid,              // for array optimization suggestion
     *ir_var[MAX_IR];   // IR information for local vars and parameters
 static int ir_count;
-
-// (library) external functions
-enum { SYSC_PRINTF = 0, SYSC_MALLOC, SYSC_FREE, SYSC_TIME_US_32 };
-static const char* ef_cache[] = {"printf", "malloc", "free", "time_us_32"};
-static const int ef_count = sizeof(ef_cache) / sizeof(ef_cache[0]);
 
 static struct member_s {
     struct member_s* next;
@@ -347,9 +343,8 @@ enum {
      * off and the result will be stored in R0.
      */
 
-    SQRT, /* 46 float sqrtf(float); */
-    SYSC, /* 47 system call */
-    CLCA, /* 48 clear cache, used by JIT compilation */
+    SYSC, /* 46 system call */
+    CLCA, /* 47 clear cache, used by JIT compilation */
 
     EXIT,
 
@@ -357,23 +352,31 @@ enum {
 };
 
 static const char* instr_str[] = {
-    "LEA",  "IMM",  "IMMF", "JMP",  "JSR",  "BZ",   "BNZ",    "ENT", "ADJ", "LEV", "PSH",
-    "PSHF", "LC",   "LI",   "LF",   "SC",   "SI",   "SF",     "OR",  "XOR", "AND", "EQ",
-    "NE",   "GE",   "LT",   "GT",   "LE",   "SHL",  "SHR",    "ADD", "SUB", "MUL", "DIV",
-    "MOD",  "ADDF", "SUBF", "MULF", "DIVF", "FTOI", "ITOF",   "EQF", "NEF", "GEF", "LTF",
-    "GTF",  "LEF",  "SQRT", "SYSC", "CLCA", "EXIT", "INVALID"};
+    "LEA", "IMM",  "IMMF", "JMP", "JSR",  "BZ",   "BNZ",  "ENT",  "ADJ",  "LEV",
+    "PSH", "PSHF", "LC",   "LI",  "LF",   "SC",   "SI",   "SF",   "OR",   "XOR",
+    "AND", "EQ",   "NE",   "GE",  "LT",   "GT",   "LE",   "SHL",  "SHR",  "ADD",
+    "SUB", "MUL",  "DIV",  "MOD", "ADDF", "SUBF", "MULF", "DIVF", "FTOI", "ITOF",
+    "EQF", "NEF",  "GEF",  "LTF", "GTF",  "LEF",  "SYSC", "CLCA", "EXIT", "INVALID"};
 
 // types -- 4 scalar types, 1020 aggregate types, 4 tensor ranks, 8 ptr levels
 // bits 0-1 = tensor rank, 2-11 = type id, 12-14 = ptr level
 // 4 type ids are scalars: 0 = char/void, 1 = int, 2 = float, 3 = reserved
 enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000 };
 
+// (library) external functions
+enum { SYSC_PRINTF = 0, SYSC_MALLOC, SYSC_FREE, SYSC_SQRT, SYSC_TIME_US_32 };
+
+static const char* ef_cache[] = {"printf", "malloc", "free", "sqrt", "time_us_32"};
+static const char ef_type[] = {INT, INT, INT, FLOAT, INT};
+
+static const int ef_count = sizeof(ef_cache) / sizeof(ef_cache[0]);
+
 static jmp_buf done_jmp;
-static char* check_root;
+static char* malloc_list;
 
 static void clear_globals(void) {
-    base_sp = e = le = text = cas = def = brks = cnts = tsize = n = ast =
-        (int*)(check_root = freedata = data = freep = p = lp = (char*)(id = sym = oid = NULL));
+    base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = ast =
+        (int*)(malloc_list = data_base = data = p = lp = (char*)(id = sym_base = oid = NULL));
 
     swtc = brkc = cntc = tnew = tk = ty = loc = line = src = trc = ld = pplev = pplevt = oline =
         osize = ir_count = 0;
@@ -412,8 +415,8 @@ static void* sys_malloc_func(int l, int lno) {
     if (p) {
         memset((char*)p + 8, 0, l - 8);
         *((int*)p + 1) = lno;
-        *((int*)p) = (int)check_root;
-        check_root = p;
+        *((int*)p) = (int)malloc_list;
+        malloc_list = p;
         return (char*)p + 8;
     }
     return NULL;
@@ -421,8 +424,8 @@ static void* sys_malloc_func(int l, int lno) {
 
 static void sys_free(void* p) {
     char* p2 = (char*)p - 8;
-    char* lastpl = (char*)&check_root;
-    char* pl = check_root;
+    char* lastpl = (char*)&malloc_list;
+    char* pl = malloc_list;
     while (pl != NULL) {
         if (pl == p2) {
             int* lpi = (int*)lastpl;
@@ -468,7 +471,7 @@ static void next() {
             tk = (tk << 6) + (p - pp); // hash plus symbol length
             // hash value is used for fast comparison. Since it is inaccurate,
             // we have to validate the memory content as well.
-            for (id = sym; id->tk; ++id) { // find one free slot in table
+            for (id = sym_base; id->tk; ++id) { // find one free slot in table
                 if (tk == id->hash &&      // if token is found (hash match), overwrite
                     !memcmp(id->name, pp, p - pp)) {
                     tk = id->tk;
@@ -1195,13 +1198,6 @@ static void expr(int lev) {
                 *--n = Or + (otk - OrAssign);
             } else {
                 *--n = Shl + (otk - ShlAssign);
-                // Compound-op bypasses literal const optimizations
-                if (ty != FLOAT) {
-                    if (otk == DivAssign)
-                        ef_getidx("__aeabi_idiv");
-                    if (otk == ModAssign)
-                        ef_getidx("__aeabi_idivmod");
-                }
             }
             if (t == FLOAT && (otk >= AddAssign && otk <= DivAssign))
                 *n += 5;
@@ -1536,7 +1532,6 @@ static void expr(int lev) {
                                     --n;
                                     *n = (int)(n + 3);
                                     *--n = Div;
-                                    ef_getidx("__aeabi_idiv");
                                 }
                             }
                         }
@@ -1648,7 +1643,6 @@ static void expr(int lev) {
                         *--n = Shr; // 2^n
                     } else {
                         *--n = Div;
-                        ef_getidx("__aeabi_idiv");
                     }
                 }
                 ty = INT;
@@ -1669,7 +1663,6 @@ static void expr(int lev) {
                     *--n = And; // 2^n
                 } else {
                     *--n = Mod;
-                    ef_getidx("__aeabi_idivmod");
                 }
             }
             ty = INT;
@@ -2603,7 +2596,7 @@ static void stmt(int ctx) {
                     die("return type can't be struct");
                 if (id->class == Syscall && id->val)
                     die("forward decl location failed one pass compilation");
-                if (id->class == Func && id->val > (int)text && id->val < (int)e)
+                if (id->class == Func && id->val > (int)text_base && id->val < (int)e)
                     die("duplicate global definition");
                 dd->etype = 0;
                 dd->class = Func;       // type is function
@@ -2682,7 +2675,7 @@ static void stmt(int ctx) {
                                         break;
                                     }
                             } else if ((*le & 0xf0000000) && (*le > 0 || -*le > 0x1000000)) {
-                                for (scan = sym; scan->tk; ++scan)
+                                for (scan = sym_base; scan->tk; ++scan)
                                     if (scan->val == *le) {
                                         printf(" &%.*s", scan->hash & 0x3f, scan->name);
                                         if (src == 2)
@@ -2704,7 +2697,7 @@ static void stmt(int ctx) {
                     }
                 }
             unwind_func:
-                id = sym;
+                id = sym_base;
                 if (src)
                     memset(ir_var, 0, sizeof(struct ident_s*) * MAX_IR);
                 while (id->tk) { // unwind symbol table locals
@@ -3055,10 +3048,19 @@ static inline int f_as_i(float f) {
     return u.i;
 }
 
+int run_exe(int argc, char** argv) {
+    printf("\n(stub) ");
+    for (int i = 0; i < argc; i++)
+        printf("%s ", argv[i]);
+    printf("\n");
+    return 0;
+}
+
 int cc(int argc, char** argv) {
     clear_globals();
 
     int i;
+    char* ofn = NULL;
 
     if (setjmp(done_jmp))
         goto done;
@@ -3067,12 +3069,12 @@ int cc(int argc, char** argv) {
     if (fd == NULL)
         die("no file handle memory");
 
-    if (!(sym = (struct ident_s*)sys_malloc(BIG_TBL_BYTES)))
+    if (!(sym_base = (struct ident_s*)sys_malloc(BIG_TBL_BYTES)))
         die("no symbol memory");
 
     // Register keywords in symbol stack. Must match the sequence of enum
     p = "enum char int float struct union sizeof return goto break continue "
-        "if do while for switch case default else __clear_cache sqrtf void main";
+        "if do while for switch case default else __clear_cache void main";
 
     // call "next" to create symbol table entry.
     // store the keyword's token type in the symbol table entry's "tk" field.
@@ -3088,23 +3090,18 @@ int cc(int argc, char** argv) {
     id->type = INT;
     id->val = CLCA;
     next();
-    id->class = Sqrt;
-    id->type = FLOAT;
-    id->val = SQRT;
-    id->etype = 1057;
 
-    next();
     id->tk = Char;
     id->class = Keyword; // handle void type
     next();
     struct ident_s* idmain = id;
     id->class = Main; // keep track of main
 
-    if (!(freedata = data = (char*)sys_malloc(BIG_TBL_BYTES)))
+    if (!(data_base = data = (char*)sys_malloc(BIG_TBL_BYTES)))
         die("no data memory");
     if (!(tsize = (int*)sys_malloc(SMALL_TBL_WRDS * sizeof(int))))
         die("no tsize memory");
-    if (!(freed_ast = ast = (int*)sys_malloc(BIG_TBL_BYTES)))
+    if (!(ast_base = ast = (int*)sys_malloc(BIG_TBL_BYTES)))
         die("could not allocate abstract syntax tree area");
     n = ast + (BIG_TBL_BYTES / 4) - 1;
 
@@ -3119,12 +3116,14 @@ int cc(int argc, char** argv) {
     while (argc > 0 && **argv == '-') {
         if ((*argv)[1] == 's') {
             src = ((*argv)[2] == 'i') ? 2 : 1;
-            --argc;
-            ++argv;
         } else if ((*argv)[1] == 't') {
             trc = 1;
+        } else if ((*argv)[1] == 'o') {
             --argc;
             ++argv;
+            if (!argc)
+                die("missing output file name");
+            ofn = *argv;
         } else if ((*argv)[1] == 'D') {
             p = &(*argv)[2];
             next();
@@ -3144,13 +3143,13 @@ int cc(int argc, char** argv) {
             dd->class = Num;
             dd->type = INT;
             dd->val = i;
-            --argc;
-            ++argv;
         } else
             argc = 0; // bad compiler option. Force exit.
+        --argc;
+        ++argv;
     }
     if (argc < 1) {
-        printf("usage: mc [-s] [-D [symbol[=value]]] file");
+        printf("usage: mc [-s] [-t] [-D [symbol[ = value]]] [-o out_file] file");
         goto done;
     }
 
@@ -3163,17 +3162,19 @@ int cc(int argc, char** argv) {
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
 
-    if (!(text = le = e = (int*)sys_malloc(BIG_TBL_BYTES)))
+    if (!(text_base = le = e = (int*)sys_malloc(BIG_TBL_BYTES)))
         die("no text memory");
     if (!(members = (struct member_s**)sys_malloc(SMALL_TBL_WRDS * sizeof(struct member_s*))))
         die("no members table memory");
 
-    if (!(freep = lp = p = (char*)sys_malloc(siz + 1)))
+    char* src_base;
+    if (!(src_base = lp = p = (char*)sys_malloc(siz + 1)))
         die("no source memory");
     if (fs_file_read(fd, p, siz) < 0)
         die("unable to read from source file");
     p[siz] = 0;
     fs_file_close(fd);
+    sys_free(fd);
     fd = NULL;
 
     // real C parser begins 00a3c214
@@ -3185,10 +3186,38 @@ int cc(int argc, char** argv) {
         stmt(Glo);
         next();
     }
+    sys_free(ast_base);
+    sys_free(src_base);
+    sys_free(sym_base);
+    sys_free(tsize);
     int *bp, *sp, *pc;
     if (!(pc = (int*)idmain->val))
         die("main() not defined\n");
 
+    if (ofn) {
+        if (!(fd = sys_malloc(sizeof(lfs_file_t))))
+            die("no file handle memory");
+        fp = full_path(ofn);
+        if (fs_file_open(fd, fp, LFS_O_WRONLY | LFS_O_CREAT) < 0)
+            die("can't create output file %s", fp);
+        int lt = (char*)e - (char*)text_base;
+        if (fs_file_write(fd, &lt, sizeof(lt)) < 0)
+            die("can't write output file");
+        if (fs_file_write(fd, text_base, lt) < 0)
+            die("can't write output file");
+        int ld = data - data_base;
+        if (fs_file_write(fd, &ld, sizeof(ld)) < 0)
+            die("can't write output file");
+        if (fs_file_write(fd, data_base, ld) < 0)
+            die("can't write output file");
+        fs_file_close(fd);
+        sys_free(fd);
+        fd = NULL;
+        static const char* exe = "exe";
+        if (fs_setattr(fp, 1, exe, 3) < 0)
+            die("couldn't mark file as executable");
+        printf("executable %s - text %d bytes, data %d bytes\n\n", fp, lt, ld);
+    }
     if (src)
         goto done;
 
@@ -3369,6 +3398,8 @@ int cc(int argc, char** argv) {
                 a = (int)sys_malloc(*sp);
             else if (sysc == SYSC_FREE)
                 sys_free((void*)(*sp));
+            else if (sysc == SYSC_SQRT)
+                af = sqrt(*((float*)sp));
             else if (sysc == SYSC_TIME_US_32)
                 a = time_us_32();
             else
@@ -3379,12 +3410,11 @@ int cc(int argc, char** argv) {
             die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
     }
 done:
-    char* next = check_root;
-    while (next) {
-        // printf("%08x %d\n", (int)next, *((int*)next + 1));
-        int inxt = *((int*)next);
-        free(next);
-        next = (char*)inxt;
+    if (fd)
+        fs_file_close(fd);
+    while (malloc_list) {
+        // printf("%08x %d\n", (int)malloc_list, *((int*)malloc_list + 1));
+        sys_free(malloc_list + 8);
     }
 
     return 0;

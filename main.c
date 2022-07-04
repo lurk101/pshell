@@ -25,6 +25,7 @@
 #include "cc.h"
 #include "fs.h"
 #include "stdinit.h"
+#include "version.h"
 #include "vi.h"
 #include "xreceive.h"
 #include "xtransmit.h"
@@ -233,6 +234,7 @@ static void cp_cmd(void) {
         return;
     result[0] = 0;
     lfs_file_t in, out;
+    bool in_ok = false, out_ok = false;
     do {
         buf = malloc(4096);
         if (buf == NULL) {
@@ -243,10 +245,12 @@ static void cp_cmd(void) {
             sprintf(result, "error opening %s", from);
             break;
         }
+        in_ok = true;
         if (fs_file_open(&out, to, LFS_O_WRONLY | LFS_O_CREAT) < 0) {
             sprintf(result, "error opening %s", from);
             break;
         }
+        out_ok = true;
         int l = fs_file_read(&in, buf, 4096);
         while (l > 0) {
             if (fs_file_write(&out, buf, l) != l) {
@@ -256,10 +260,15 @@ static void cp_cmd(void) {
             l = fs_file_read(&in, buf, 4096);
         }
     } while (false);
-    fs_file_close(&in);
-    fs_file_close(&out);
-    if (buf)
+    if (in_ok)
+        fs_file_close(&in);
+    if (out_ok)
+        fs_file_close(&out);
+    if (buf) {
+        if (out_ok && fs_getattr(from, 1, buf, 3) == 3 && memcmp(buf, "exe", 3) == 0)
+            fs_setattr(to, 1, buf, 3);
         free(buf);
+    }
     if (!result[0])
         sprintf(result, "file %s copied to %s", from, to);
     free(from);
@@ -592,6 +601,12 @@ static bool screen_size(void) {
     return rc;
 }
 
+static void help(void) {
+    printf("\n");
+    for (int i = 0; i < sizeof cmd_table / sizeof cmd_table[0]; i++)
+        printf("%7s - %s\n", cmd_table[i].name, cmd_table[i].descr);
+}
+
 // application entry point
 int main(void) {
     // initialize the pico SDK
@@ -602,7 +617,7 @@ int main(void) {
 #endif
     bool detected = screen_size();
     printf(VT_CLEAR "\n"
-                    "Pico Shell - Copyright (C) 1883 Thomas Edison\n"
+                    "Pico Shell - Version " PS_VERSION " - Copyright (C) 1883 Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
@@ -631,33 +646,44 @@ int main(void) {
             }
         }
     } else {
-        printf("file system automatically mounted\n\n");
+        printf("file system automatically mounted\n");
         mounted = true;
     }
     while (run) {
-        printf("%s: ", full_path(""));
+        printf("\n%s: ", full_path(""));
         fflush(stdout);
         parse_cmd();
-        bool found = false;
         int i;
         result[0] = 0;
-        if (argc)
+        bool found = false;
+        if (argc) {
             for (i = 0; i < sizeof cmd_table / sizeof cmd_table[0]; i++)
                 if (strcmp(argv[0], cmd_table[i].name) == 0) {
                     cmd_table[i].func();
+                    if (result[0])
+                        printf("\n%s\n", result);
                     found = true;
                     break;
                 }
-        if (!found) {
-            if (argc)
-                printf("command unknown!\n\n");
-            for (int i = 0; i < sizeof cmd_table / sizeof cmd_table[0]; i++)
-                printf("%7s - %s\n", cmd_table[i].name, cmd_table[i].descr);
-            printf("\n");
-            continue;
+            if (!found) {
+                char* fp = full_path(argv[0]);
+                struct lfs_info info;
+                if (fs_stat(fp, &info) == LFS_ERR_OK) {
+                    if (info.type == LFS_TYPE_REG) {
+                        char buf[3];
+                        if (fs_getattr(fp, 1, buf, sizeof(buf)) == sizeof(buf) &&
+                            memcmp(buf, "exe", 3) == 0) {
+                            printf("\nCC=%d\n", run_exe(argc, argv));
+                        } else
+                            printf("\n%s is not executable\n", fp);
+                        continue;
+                    }
+                }
+            }
         }
-        printf("%s\n", result);
+        if (!found)
+            help();
     }
-    printf("done\n");
+    printf("\ndone\n");
     sleep_ms(1000);
 }
