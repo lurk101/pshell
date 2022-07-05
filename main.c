@@ -525,10 +525,9 @@ static void clear_cmd(void) {
     vi(screen_x, screen_y, argc - 1, argv + 1);
     strcpy(result, VT_CLEAR "\n");
 }
-void restart_cmd() {
-    watchdog_enable(1, 1);
-    while(1);
-}
+
+void reboot_cmd() { watchdog_reboot(0, 0, 1); }
+
 static void quit_cmd(void) {
     // release any resources we were using
     if (mounted)
@@ -547,22 +546,22 @@ typedef struct {
 static cmd_t cmd_table[] = {
     {"cat",     cat_cmd,        "display file"},
     {"cc",      cc_cmd,         "compile C source file"},
-	{"cd", 		cd_cmd, 		"change directory"},
-	{"clear",   clear_cmd,      "clear the screen"},
+    {"cd",      cd_cmd,         "change directory"},
+    {"clear",   clear_cmd,      "clear the screen"},
     {"cp",      cp_cmd,         "copy a file"},
-    {"format", 	format_cmd, 	"format the filesystem"},
-    {"get", 	get_cmd, 		"get file (xmodem)"},
-    {"ls", 		ls_cmd, 		"list directory"},
-    {"mkdir", 	mkdir_cmd, 		"create directory"},
-    {"mount", 	mount_cmd, 		"mount filesystem"},
+    {"format",  format_cmd,     "format the filesystem"},
+    {"get",     get_cmd,        "get file (xmodem)"},
+    {"ls",      ls_cmd,         "list directory"},
+    {"mkdir",   mkdir_cmd,      "create directory"},
+    {"mount",   mount_cmd,      "mount filesystem"},
     {"mv",      mv_cmd,         "rename file or directory"},
-    {"put", 	put_cmd, 		"put file (xmodem)"},
-    {"q", 		quit_cmd, 		"quit"},
-    {"rm", 		rm_cmd, 		"remove file or directory"},
-    {"restart", restart_cmd,    "Restart system"},
-    {"status", 	status_cmd,		"filesystem status"},
-    {"unmount",	unmount_cmd,	"unmount filesystem"},
-    {"vi", 		vi_cmd, 		"editor"}
+    {"put",     put_cmd,        "put file (xmodem)"},
+    {"q",       quit_cmd,       "quit"},
+    {"reboot",  reboot_cmd,     "Restart system"},
+    {"rm",      rm_cmd,         "remove file or directory"},
+    {"status",  status_cmd,     "filesystem status"},
+    {"unmount", unmount_cmd,    "unmount filesystem"},
+    {"vi",      vi_cmd,         "editor"}
 };
 // clang-format on
 
