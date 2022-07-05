@@ -20,8 +20,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <hardware/timer.h>
+#include <hardware/gpio.h>
 
+#include <pico/stdio.h>
+#include <pico/time.h>
+
+#include "cc.h"
 #include "fs.h"
 
 extern char* full_path(char* name);
@@ -363,9 +367,12 @@ enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000
 
 // (library) external functions
 enum {
+    // varargs functions
     SYSC_PRINTF = 0,
+    // memory management
     SYSC_MALLOC,
     SYSC_FREE,
+    // math functions
     SYSC_ATOI,
     SYSC_SQRT,
     SYSC_SIN,
@@ -373,23 +380,100 @@ enum {
     SYSC_TAN,
     SYSC_LOG,
     SYSC_POW,
-    SYSC_TIME_US_32
+    // SDK functions
+    SYSC_TIME_US_32,
+    SYSC_SLEEP_US,
+    SYSC_SLEEP_MS,
+    // SDK GPIO
+    SYSC_gpio_set_function,
+    SYSC_gpio_get_function,
+    SYSC_gpio_set_pulls,
+    SYSC_gpio_pull_up,
+    SYSC_gpio_is_pulled_up,
+    SYSC_gpio_pull_down,
+    SYSC_gpio_is_pulled_down,
+    SYSC_gpio_disable_pulls,
+    SYSC_gpio_set_outover,
+    SYSC_gpio_set_inover,
+    SYSC_gpio_set_oeover,
+    SYSC_gpio_set_input_enabled,
+    SYSC_gpio_set_input_hysteresis_enabled,
+    SYSC_gpio_is_input_hysteresis_enabled,
+    SYSC_gpio_set_slew_rate,
+    SYSC_gpio_slew_rate,
+    SYSC_gpio_set_drive_strength,
+    SYSC_gpio_get_drive_strength,
+    SYSC_gpio_set_irq_enabled,
+    SYSC_gpio_init,
+    SYSC_gpio_deinit,
+    SYSC_gpio_init_mask,
+    SYSC_gpio_get,
+    SYSC_gpio_get_all,
+    SYSC_gpio_set_mask,
+    SYSC_gpio_clr_mask,
+    SYSC_gpio_xor_mask,
+    SYSC_gpio_put_masked,
+    SYSC_gpio_put_all,
+    SYSC_gpio_put,
+    SYSC_gpio_get_out_level,
+    SYSC_gpio_set_dir_out_masked,
+    SYSC_gpio_set_dir_in_masked,
+    SYSC_gpio_set_dir_masked,
+    SYSC_gpio_set_dir_all_bits,
+    SYSC_gpio_set_dir,
+    SYSC_gpio_is_dir_out,
+    SYSC_gpio_get_dir
 };
 
-static const char* extern_name[] = {"printf", "malloc", "free", "atoi", "sqrt",      "sin",
-                                    "cos",    "tan",    "log",  "pow",  "time_us_32"};
-static const char extern_type[] = {INT,   INT,   INT,   INT,   FLOAT, FLOAT,
-                                   FLOAT, FLOAT, FLOAT, FLOAT, INT};
+static const char* extern_name[] = {
+    // varargs
+    "printf",
+    // memory
+    "malloc", "free",
+    // math
+    "atoi", "sqrt", "sin", "cos", "tan", "log", "pow",
+    // time
+    "time_us_32", "sleep_us", "sleep_ms",
+    // gpio
+    "gpio_set_function", "gpio_get_function", "gpio_set_pulls", "gpio_pull_up", "gpio_is_pulled_up",
+    "gpio_pull_down", "gpio_is_pulled_down", "gpio_disable_pulls", "gpio_set_outover",
+    "gpio_set_inover", "gpio_set_oeover", "gpio_set_input_enabled",
+    "gpio_set_input_hysteresis_enabled", "gpio_is_input_hysteresis_enabled", "gpio_set_slew_rate",
+    "gpio_slew_rate", "gpio_set_drive_strength", "gpio_get_drive_strength", "gpio_set_irq_enabled",
+    "gpio_init", "gpio_deinit", "gpio_init_mask", "gpio_get", "gpio_get_all", "gpio_set_mask",
+    "gpio_clr_mask", "gpio_xor_mask", "gpio_put_masked", "gpio_put_all", "gpio_put",
+    "gpio_get_out_level", "gpio_set_dir_out_masked", "gpio_set_dir_in_masked",
+    "gpio_set_dir_masked", "gpio_set_dir_all_bits", "gpio_set_dir", "gpio_is_dir_out",
+    "gpio_get_dir"};
+
+static const char extern_type[] = {
+    // varargs
+    INT,
+    // memory
+    INT, INT,
+    // math
+    INT, FLOAT, FLOAT, FLOAT, FLOAT, FLOAT, FLOAT,
+    // time
+    INT, INT, INT,
+    // gpio`
+    INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT,
+    INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT};
 
 static const int extern_count = sizeof(extern_name) / sizeof(extern_name[0]);
+
+static struct {
+    int text_size, data_size;
+    int pc;
+} prog_hdr;
 
 static jmp_buf done_jmp;
 static char* malloc_list;
 static lfs_file_t* fd;
+static char* fp;
 
 static void clear_globals(void) {
     base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = ast =
-        (int*)(malloc_list = data_base = data = p = lp = (char*)(id = sym_base = oid = NULL));
+        (int*)(malloc_list = data_base = data = p = lp = fp = (char*)(id = sym_base = oid = NULL));
     fd = NULL;
 
     swtc = brkc = cntc = tnew = tk = ty = loc = line = src = trc = ld = pplev = pplevt = oline =
@@ -893,6 +977,8 @@ static void expr(int lev) {
             ty = INT;
         } else {
             // Variable get offset
+            char* np;
+            int nl;
             switch (d->class) {
             case Loc:
             case Par:
@@ -904,7 +990,19 @@ static void expr(int lev) {
                 *--n = Num;
                 break;
             default:
-                die("undefined variable");
+                np = d->name;
+                while ((*np >= 'a' && *np <= 'z') || (*np >= 'A' && *np <= 'Z') ||
+                       (*np >= '0' && *np <= '9') || (*np == '_'))
+                    np++;
+                nl = np - d->name;
+                np = sys_malloc(nl + 1);
+                if (np) {
+                    for (int i = 0; i < nl; i++)
+                        np[i] = d->name[i];
+                    np[nl] = 0;
+                    die("undefined variable %s", np);
+                } else
+                    die("undefined variable");
             }
             if ((d->type & 3) && d->class != Par) { // push reference address
                 ty = d->type & ~3;
@@ -3056,193 +3154,215 @@ static inline int f_as_i(float f) {
     return u.i;
 }
 
-int run_exe(int argc, char** argv) {
-    printf("\n(stub) ");
-    for (int i = 0; i < argc; i++)
-        printf("%s ", argv[i]);
-    printf("\n");
-    return 0;
-}
-
-int cc(int argc, char** argv) {
+int cc(int run_mode, int argc, char** argv) {
     clear_globals();
 
     int i;
     char* ofn = NULL;
+    int *bp, *pc, *sp;
 
     if (setjmp(done_jmp))
         goto done;
 
-    fd = sys_malloc(sizeof(lfs_file_t));
-    if (fd == NULL)
-        die("no file handle memory");
+    if (!run_mode) {
+        fd = sys_malloc(sizeof(lfs_file_t));
+        if (fd == NULL)
+            die("no file handle memory");
 
-    if (!(sym_base = (struct ident_s*)sys_malloc(BIG_TBL_BYTES)))
-        die("no symbol memory");
+        if (!(sym_base = (struct ident_s*)sys_malloc(BIG_TBL_BYTES)))
+            die("no symbol memory");
 
-    // Register keywords in symbol stack. Must match the sequence of enum
-    p = "enum char int float struct union sizeof return goto break continue "
-        "if do while for switch case default else void main";
+        // Register keywords in symbol stack. Must match the sequence of enum
+        p = "enum char int float struct union sizeof return goto break continue "
+            "if do while for switch case default else void main";
 
-    // call "next" to create symbol table entry.
-    // store the keyword's token type in the symbol table entry's "tk" field.
-    for (i = Enum; i <= Else; ++i) {
+        // call "next" to create symbol table entry.
+        // store the keyword's token type in the symbol table entry's "tk" field.
+        for (i = Enum; i <= Else; ++i) {
+            next();
+            id->tk = i;
+            id->class = Keyword; // add keywords to symbol table
+        }
+
+        // add __clear_cache to symbol table
         next();
-        id->tk = i;
-        id->class = Keyword; // add keywords to symbol table
-    }
 
-    // add __clear_cache to symbol table
-    next();
+        id->tk = Char;
+        id->class = Keyword; // handle void type
+        next();
+        struct ident_s* idmain = id;
+        id->class = Main; // keep track of main
 
-    id->tk = Char;
-    id->class = Keyword; // handle void type
-    next();
-    struct ident_s* idmain = id;
-    id->class = Main; // keep track of main
+        if (!(data_base = data = (char*)sys_malloc(BIG_TBL_BYTES)))
+            die("no data memory");
+        if (!(tsize = (int*)sys_malloc(SMALL_TBL_WRDS * sizeof(int))))
+            die("no tsize memory");
+        if (!(ast_base = ast = (int*)sys_malloc(BIG_TBL_BYTES)))
+            die("could not allocate abstract syntax tree area");
+        n = ast + (BIG_TBL_BYTES / 4) - 1;
 
-    if (!(data_base = data = (char*)sys_malloc(BIG_TBL_BYTES)))
-        die("no data memory");
-    if (!(tsize = (int*)sys_malloc(SMALL_TBL_WRDS * sizeof(int))))
-        die("no tsize memory");
-    if (!(ast_base = ast = (int*)sys_malloc(BIG_TBL_BYTES)))
-        die("could not allocate abstract syntax tree area");
-    n = ast + (BIG_TBL_BYTES / 4) - 1;
+        // add primitive types
+        tsize[tnew++] = sizeof(char);
+        tsize[tnew++] = sizeof(int);
+        tsize[tnew++] = sizeof(float);
+        tsize[tnew++] = 0; // reserved for another scalar type
 
-    // add primitive types
-    tsize[tnew++] = sizeof(char);
-    tsize[tnew++] = sizeof(int);
-    tsize[tnew++] = sizeof(float);
-    tsize[tnew++] = 0; // reserved for another scalar type
-
-    --argc;
-    ++argv;
-    while (argc > 0 && **argv == '-') {
-        if ((*argv)[1] == 's') {
-            src = ((*argv)[2] == 'i') ? 2 : 1;
-        } else if ((*argv)[1] == 't') {
-            trc = ((*argv)[2] == 'i') ? 2 : 1;
-        } else if ((*argv)[1] == 'o') {
-            --argc;
-            ++argv;
-            if (!argc)
-                die("missing output file name");
-            ofn = *argv;
-        } else if ((*argv)[1] == 'D') {
-            p = &(*argv)[2];
-            next();
-            if (tk != Id)
-                die("bad -D identifier");
-            struct ident_s* dd = id;
-            next();
-            i = 0;
-            if (tk == Assign) {
-                next();
-                expr(Cond);
-                if (*n != Num)
-                    die("bad -D initializer");
-                i = n[1];
-                n += 2;
-            }
-            dd->class = Num;
-            dd->type = INT;
-            dd->val = i;
-        } else
-            argc = 0; // bad compiler option. Force exit.
         --argc;
         ++argv;
-    }
-    if (argc < 1) {
-        printf("\n"
-               "usage: cc [-s[i]] [-t[i]] [-D [symbol[ = value]]] [-o filename] file\n"
-               "    -s,-si  display disassembly and quit. i adds symbolic display.\n"
-               "    -t,-ti  trace execution. i enables single step.\n"
-               "    -D symbol [= value]\n"
-               "            define symbol for limited pre-processor.\n"
-               "    -o filename\n"
-               "            output file name (not yet functional!)\n"
-               "    filename\n"
-               "            C source file name.\n");
-        goto done;
-    }
+        while (argc > 0 && **argv == '-') {
+            if ((*argv)[1] == 's') {
+                src = ((*argv)[2] == 'i') ? 2 : 1;
+            } else if ((*argv)[1] == 't') {
+                trc = ((*argv)[2] == 'i') ? 2 : 1;
+            } else if ((*argv)[1] == 'o') {
+                --argc;
+                ++argv;
+                if (!argc)
+                    die("missing output file name");
+                ofn = *argv;
+            } else if ((*argv)[1] == 'D') {
+                p = &(*argv)[2];
+                next();
+                if (tk != Id)
+                    die("bad -D identifier");
+                struct ident_s* dd = id;
+                next();
+                i = 0;
+                if (tk == Assign) {
+                    next();
+                    expr(Cond);
+                    if (*n != Num)
+                        die("bad -D initializer");
+                    i = n[1];
+                    n += 2;
+                }
+                dd->class = Num;
+                dd->type = INT;
+                dd->val = i;
+            } else
+                argc = 0; // bad compiler option. Force exit.
+            --argc;
+            ++argv;
+        }
+        if (argc < 1) {
+            printf("\n"
+                   "usage: cc [-s[i]] [-t[i]] [-D [symbol[ = value]]] [-o filename] filename\n"
+                   "    -s,-si  display disassembly and quit. i adds symbolic display.\n"
+                   "    -t,-ti  trace execution. i enables single step.\n"
+                   "    -D symbol [= value]\n"
+                   "            define symbol for limited pre-processor.\n"
+                   "    -o filename\n"
+                   "            output executable file name.\n"
+                   "    filename\n"
+                   "            C source file name.\n");
+            goto done;
+        }
 
-    char* fp = full_path(*argv);
-    if (!fp)
-        die("could not allocate file name area");
-    if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
-        sys_free(fd);
-        fd = NULL;
-        die("could not open %s \n", fp);
-    }
-
-    int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
-    fs_file_rewind(fd);
-
-    if (!(text_base = le = e = (int*)sys_malloc(BIG_TBL_BYTES)))
-        die("no text memory");
-    if (!(members = (struct member_s**)sys_malloc(SMALL_TBL_WRDS * sizeof(struct member_s*))))
-        die("no members table memory");
-
-    char* src_base;
-    if (!(src_base = lp = p = (char*)sys_malloc(siz + 1)))
-        die("no source memory");
-    if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
-        die("unable to read from source file");
-    p[siz] = 0;
-    fs_file_close(fd);
-    sys_free(fd);
-    fd = NULL;
-
-    // real C parser begins 00a3c214
-    // parse the program
-    line = 1;
-    pplevt = -1;
-    next();
-    while (tk) {
-        stmt(Glo);
-        next();
-    }
-    sys_free(ast_base);
-    sys_free(src_base);
-    sys_free(sym_base);
-    sys_free(tsize);
-    int *bp, *sp, *pc;
-    if (!(pc = (int*)idmain->val))
-        die("main() not defined\n");
-
-    if (ofn) {
-        if (!(fd = sys_malloc(sizeof(lfs_file_t))))
-            die("no file handle memory");
-        fp = full_path(ofn);
-        if (fs_file_open(fd, fp, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
+        fp = full_path(*argv);
+        if (!fp)
+            die("could not allocate file name area");
+        if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
             sys_free(fd);
             fd = NULL;
-            die("can't create output file %s", fp);
+            die("could not open %s \n", fp);
         }
-        int lt = (char*)e - (char*)text_base;
-        if (fs_file_write(fd, &lt, sizeof(lt)) < LFS_ERR_OK)
-            die("can't write output file");
-        if (fs_file_write(fd, text_base, lt) < LFS_ERR_OK)
-            die("can't write output file");
-        int ld = data - data_base;
-        if (fs_file_write(fd, &ld, sizeof(ld)) < LFS_ERR_OK)
-            die("can't write output file");
-        if (fs_file_write(fd, data_base, ld) < LFS_ERR_OK)
-            die("can't write output file");
+
+        int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
+        fs_file_rewind(fd);
+
+        if (!(text_base = le = e = (int*)sys_malloc(BIG_TBL_BYTES)))
+            die("no text memory");
+        if (!(members = (struct member_s**)sys_malloc(SMALL_TBL_WRDS * sizeof(struct member_s*))))
+            die("no members table memory");
+
+        char* src_base;
+        if (!(src_base = lp = p = (char*)sys_malloc(siz + 1)))
+            die("no source memory");
+        if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
+            die("unable to read from source file");
+        p[siz] = 0;
         fs_file_close(fd);
         sys_free(fd);
         fd = NULL;
-        static const char* exe = "exe";
-        if (fs_setattr(fp, 1, exe, strlen(exe)) < LFS_ERR_OK)
-            die("couldn't mark file as executable");
-        printf("executable %s - text %d bytes, data %d bytes\n\n", fp, lt, ld);
-    }
-    if (src)
+
+        // real C parser begins 00a3c214
+        // parse the program
+        line = 1;
+        pplevt = -1;
+        next();
+        while (tk) {
+            stmt(Glo);
+            next();
+        }
+        sys_free(ast_base);
+        sys_free(src_base);
+        sys_free(sym_base);
+        sys_free(tsize);
+        if (!(pc = (int*)idmain->val))
+            die("main() not defined\n");
+        prog_hdr.pc = (int)pc;
+
+        if (ofn) {
+            if (!(fd = sys_malloc(sizeof(lfs_file_t))))
+                die("no file handle memory");
+            fp = full_path(ofn);
+            if (fs_file_open(fd, fp, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
+                sys_free(fd);
+                fd = NULL;
+                die("can't create output file %s", fp);
+            }
+            prog_hdr.text_size = (char*)e - (char*)text_base;
+            prog_hdr.data_size = data - data_base;
+            if (fs_file_write(fd, &prog_hdr, sizeof(prog_hdr)) < LFS_ERR_OK)
+                die("can't write output file");
+            if (fs_file_write(fd, text_base, prog_hdr.text_size) < LFS_ERR_OK)
+                die("can't write output file");
+            if (fs_file_write(fd, data_base, prog_hdr.data_size) < LFS_ERR_OK)
+                die("can't write output file");
+            fs_file_close(fd);
+            sys_free(fd);
+            fd = NULL;
+            static const char* exe = "exe";
+            if (fs_setattr(fp, 1, exe, strlen(exe)) < LFS_ERR_OK)
+                die("couldn't mark file as executable");
+            printf("executable %s - text %d bytes, data %d bytes\n\n", fp, prog_hdr.text_size,
+                   prog_hdr.data_size);
+
+            if (src)
+                goto done;
+        }
+    } else {
+        printf("\nNice try! Executables are not implemented yet\n");
         goto done;
+        // run mode, restore the code and data segments
+        if (!(fd = sys_malloc(sizeof(lfs_file_t))))
+            die("no file handle memory");
+        fp = full_path(argv[0]);
+        if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
+            sys_free(fd);
+            fd = NULL;
+            die("can't open %s", fp);
+        }
+        if (fs_file_read(fd, &prog_hdr, sizeof(prog_hdr)) != sizeof(prog_hdr))
+            die("error reading file");
+        if (!(text_base = (int*)sys_malloc(prog_hdr.text_size)))
+            die("no text segment memory");
+        if (fs_file_read(fd, text_base, prog_hdr.text_size) != prog_hdr.text_size)
+            die("error reading file");
+        if (!(data_base = sys_malloc(prog_hdr.data_size)))
+            die("no data segment memory");
+        if (fs_file_read(fd, data_base, prog_hdr.data_size) != prog_hdr.data_size)
+            die("error reading file");
+        fs_file_close(fd);
+        sys_free(fd);
+        fd = NULL;
+    }
+
+    printf("\n");
 
     // setup stack
     if (!(base_sp = bp = sp = (int*)sys_malloc(BIG_TBL_BYTES)))
-        die("could not allocate text area");
+        die("could not allocate stack area");
     bp = sp = (int*)((int)sp + BIG_TBL_BYTES - 4);
     *(--sp) = EXIT; // call exit if main returns
     *(--sp) = PSH;
@@ -3259,6 +3379,9 @@ int cc(int argc, char** argv) {
     } a;
     a.i = 0;
     while (1) {
+        int key;
+        if (((key = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) && (key == 3))
+            die("\nuser interrupted!!\n");
         i = *pc++;
         ++cycle;
         if (trc) {
@@ -3268,110 +3391,158 @@ int cc(int argc, char** argv) {
             else
                 printf("\n");
         }
-        if (i == LEA)
+        switch (i) {
+        case LEA:
             a.i = (int)(bp + *pc++); // load local address
-        else if (i == IMM)
+            break;
+        case IMM:
             a.i = *pc++; // load global address or immediate
-        else if (i == IMMF)
+            break;
+        case IMMF:
             a.f = *((float*)pc++);
-        else if (i == JMP)
+            break;
+        case JMP:
             pc = (int*)*pc; // jump
-        else if (i == JSR) {
+            break;
+        case JSR: // jump to subroutine
             *(--sp) = (int)(pc + 1);
             pc = (int*)*pc;
-        } // jump to subroutine
-        else if (i == BZ)
+            break;
+        case BZ:
             pc = a.i ? pc + 1 : (int*)*pc; // branch if zero
-        else if (i == BNZ)
+            break;
+        case BNZ:
             pc = a.i ? (int*)*pc : pc + 1; // branch if not zero
-        else if (i == ENT) {
+            break;
+        // enter subroutine
+        case ENT:
             *(--sp) = (int)bp;
             bp = sp;
             sp = sp - *pc++;
-        } // enter subroutine
-        else if (i == ADJ)
+            break;
+        case ADJ:
             sp += *pc++ & 0xf; // stack adjust
-        else if (i == LEV) {
+            break;
+        // leave subroutine
+        case LEV:
             sp = bp;
             bp = (int*)*sp++;
             pc = (int*)*sp++;
-        } // leave subroutine
-        else if (i == LI)
+            break;
+        case LI:
             a.i = *(int*)a.i; // load int
-        else if (i == LF)
+            break;
+        case LF:
             a.f = *(float*)a.i; // load float
-        else if (i == LC)
+            break;
+        case LC:
             a.i = *(char*)a.i; // load char
-        else if (i == SI)
+            break;
+        case SI:
             *(int*)*sp++ = a.i; // store int
-        else if (i == SF)
+            break;
+        case SF:
             *(float*)*sp++ = a.f; // store float
-        else if (i == SC)
+            break;
+        case SC:
             a.i = *(char*)* sp++ = a.i; // store char
-        else if (i == PSH)
-            *(--sp) = a.i; // push
-        else if (i == PSHF)
-            *((float*)--sp) = a.f;
+            break;
 
-        else if (i == OR)
+        case PSH:
+            *(--sp) = a.i; // push
+            break;
+        case PSHF:
+            *((float*)--sp) = a.f;
+            break;
+
+        case OR:
             a.i = *sp++ | a.i;
-        else if (i == XOR)
+            break;
+        case XOR:
             a.i = *sp++ ^ a.i;
-        else if (i == AND)
+            break;
+        case AND:
             a.i = *sp++ & a.i;
-        else if (i == EQ)
+            break;
+        case EQ:
             a.i = *sp++ == a.i;
-        else if (i == EQF)
+            break;
+        case EQF:
             a.i = *((float*)sp++) == a.f;
-        else if (i == NE)
+            break;
+        case NE:
             a.i = *sp++ != a.i;
-        else if (i == NEF)
+            break;
+        case NEF:
             a.i = *((float*)sp++) != a.f;
-        else if (i == LT)
+            break;
+        case LT:
             a.i = *sp++ < a.i;
-        else if (i == LTF)
+            break;
+        case LTF:
             a.i = *((float*)sp++) < a.f;
-        else if (i == GT)
+            break;
+        case GT:
             a.i = *sp++ > a.i;
-        else if (i == GTF)
+            break;
+        case GTF:
             a.i = *((float*)sp++) > a.f;
-        else if (i == LE)
+            break;
+        case LE:
             a.i = *sp++ <= a.i;
-        else if (i == LEF)
+            break;
+        case LEF:
             a.i = *((float*)sp++) <= a.f;
-        else if (i == GE)
+            break;
+        case GE:
             a.i = *sp++ >= a.i;
-        else if (i == GEF)
+            break;
+        case GEF:
             a.i = *((float*)sp++) == a.f;
-        else if (i == SHL)
+            break;
+        case SHL:
             a.i = *sp++ << a.i;
-        else if (i == SHR)
+            break;
+        case SHR:
             a.i = *sp++ >> a.i;
-        else if (i == ADD)
+            break;
+        case ADD:
             a.i = *sp++ + a.i;
-        else if (i == ADDF)
+            break;
+        case ADDF:
             a.f = *((float*)sp++) + a.f;
-        else if (i == SUB)
+            break;
+        case SUB:
             a.i = *sp++ - a.i;
-        else if (i == SUBF)
+            break;
+        case SUBF:
             a.f = *((float*)sp++) - a.f;
-        else if (i == MUL)
+            break;
+        case MUL:
             a.i = *sp++ * a.i;
-        else if (i == MULF)
+            break;
+        case MULF:
             a.f = *((float*)sp++) * a.f;
-        else if (i == DIV)
+            break;
+        case DIV:
             a.i = *sp++ / a.i;
-        else if (i == DIVF)
+            break;
+        case DIVF:
             a.f = *((float*)sp++) / a.f;
-        else if (i == MOD)
+            break;
+        case MOD:
             a.i = *sp++ % a.i;
-        else if (i == ITOF)
+            break;
+        case ITOF:
             a.f = (float)a.i;
-        else if (i == FTOI)
+            break;
+        case FTOI:
             a.i = (int)a.f;
-        else if (i == SYSC) {
+            break;
+        case SYSC:
             int sysc = *pc++;
-            if (sysc == SYSC_PRINTF) {
+            switch (sysc) {
+            case SYSC_PRINTF:
                 // HACK ALLERT, we need to figure out which parameters
                 // are floats. Scan the format string.
                 int* stk = sys_malloc(a.i * 9);
@@ -3421,32 +3592,172 @@ int cc(int argc, char** argv) {
                 a.i = cc_printf(stk, stkp);
                 sys_free(stk);
                 fflush(stdout);
-            } else if (sysc == SYSC_MALLOC)
+                break;
+            // memory management
+            case SYSC_MALLOC:
                 a.i = (int)sys_malloc(*sp);
-            else if (sysc == SYSC_FREE)
+                break;
+            case SYSC_FREE:
                 sys_free((void*)(*sp));
-            else if (sysc == SYSC_ATOI)
+                break;
+
+            // math
+            case SYSC_ATOI:
                 a.i = atoi((char*)*sp);
-            else if (sysc == SYSC_SQRT)
+                break;
+            case SYSC_SQRT:
                 a.f = sqrt(*((float*)sp));
-            else if (sysc == SYSC_SIN)
+                break;
+            case SYSC_SIN:
                 a.f = sin(*((float*)sp));
-            else if (sysc == SYSC_COS)
+                break;
+            case SYSC_COS:
                 a.f = cos(*((float*)sp));
-            else if (sysc == SYSC_TAN)
+                break;
+            case SYSC_TAN:
                 a.f = tan(*((float*)sp));
-            else if (sysc == SYSC_LOG)
+                break;
+            case SYSC_LOG:
                 a.f = log(*((float*)sp));
-            else if (sysc == SYSC_POW)
+                break;
+            case SYSC_POW:
                 a.f = pow(*((float*)sp + 1), *((float*)sp));
-            else if (sysc == SYSC_TIME_US_32)
+                break;
+            // time
+            case SYSC_TIME_US_32: // SDK
                 a.i = time_us_32();
-            else
+                break;
+            case SYSC_SLEEP_US:
+                sleep_us(*sp);
+                break;
+            case SYSC_SLEEP_MS:
+                sleep_ms(*sp);
+                break;
+            // SDK gpio
+            case SYSC_gpio_set_function:
+                gpio_set_function(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_get_function:
+                gpio_get_function(*sp);
+                break;
+            case SYSC_gpio_set_pulls:
+                gpio_set_pulls(*(sp + 2), *(sp + 1), *sp);
+                break;
+            case SYSC_gpio_pull_up:
+                gpio_pull_up(*sp);
+                break;
+            case SYSC_gpio_is_pulled_up:
+                gpio_is_pulled_up(*sp);
+                break;
+            case SYSC_gpio_pull_down:
+                gpio_pull_down(*sp);
+                break;
+            case SYSC_gpio_is_pulled_down:
+                gpio_is_pulled_down(*sp);
+                break;
+            case SYSC_gpio_disable_pulls:
+                gpio_disable_pulls(*sp);
+                break;
+            case SYSC_gpio_set_outover:
+                gpio_set_outover(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_set_inover:
+                gpio_set_inover(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_set_oeover:
+                gpio_set_oeover(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_set_input_enabled:
+                gpio_set_input_enabled(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_set_input_hysteresis_enabled:
+                gpio_set_input_hysteresis_enabled(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_is_input_hysteresis_enabled:
+                gpio_is_input_hysteresis_enabled(*sp);
+                break;
+            case SYSC_gpio_set_slew_rate:
+                gpio_set_slew_rate(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_slew_rate:
+                gpio_get_slew_rate(*sp);
+                break;
+            case SYSC_gpio_set_drive_strength:
+                gpio_set_drive_strength(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_get_drive_strength:
+                gpio_get_drive_strength(*sp);
+                break;
+            case SYSC_gpio_set_irq_enabled:
+                gpio_set_irq_enabled(*(sp + 2), *(sp + 1), *sp);
+                break;
+            case SYSC_gpio_init:
+                gpio_init(*sp);
+                break;
+            // case SYSC_gpio_deinit:
+            //  gpio_deinit(*(sp + 1), *sp);
+            //  break;
+            case SYSC_gpio_init_mask:
+                gpio_init_mask(*sp);
+                break;
+            case SYSC_gpio_get:
+                gpio_get(*sp);
+                break;
+            case SYSC_gpio_get_all:
+                gpio_get_all();
+                break;
+            case SYSC_gpio_set_mask:
+                gpio_set_mask(*sp);
+                break;
+            case SYSC_gpio_clr_mask:
+                gpio_clr_mask(*sp);
+                break;
+            case SYSC_gpio_xor_mask:
+                gpio_xor_mask(*sp);
+                break;
+            case SYSC_gpio_put_masked:
+                gpio_put_masked(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_put_all:
+                gpio_put_all(*sp);
+                break;
+            case SYSC_gpio_put:
+                gpio_put(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_get_out_level:
+                gpio_get_out_level(*sp);
+                break;
+            case SYSC_gpio_set_dir_out_masked:
+                gpio_set_dir_out_masked(*sp);
+                break;
+            case SYSC_gpio_set_dir_in_masked:
+                gpio_set_dir_in_masked(*sp);
+                break;
+            case SYSC_gpio_set_dir_masked:
+                gpio_set_dir_masked(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_set_dir_all_bits:
+                gpio_set_dir_all_bits(*sp);
+                break;
+            case SYSC_gpio_set_dir:
+                gpio_set_dir(*(sp + 1), *sp);
+                break;
+            case SYSC_gpio_is_dir_out:
+                gpio_is_dir_out(*sp);
+                break;
+            case SYSC_gpio_get_dir:
+                gpio_get_dir(*sp);
+                break;
+            default:
                 die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
-        } else if (i == EXIT)
+                break;
+            }
+            break;
+        case EXIT:
             die("\nCC=%d\n", a);
-        else
+        default:
             die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
+        }
         if (trc) {
             printf("acc    %12f 0x%08x %12d\n", a.f, a.i, a.i);
             printf("stk %08x x %08x %08x %08x $08x\n", (int)sp, *((int*)sp), *((int*)sp + 1),

@@ -15,7 +15,6 @@
 #ifndef _C4_
 #define _C4_
 
-int cc(int argc, char* argv[]);
-int run_exe(int argc, char* argv[]);
+int cc(int run_mode, int argc, char* argv[]);
 
 #endif

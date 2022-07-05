@@ -7,7 +7,7 @@ A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 
 Credit where credit is due...
 
-- The vi is ported from the [BusyBox] source code.
+- The vi code is ported from the [BusyBox] source code.
 - The compiler code is a remix of the [amacc compiler] parser generator
 and the [c4 virtual machine]. Floating point support was taken fom
 the [Squint] project.

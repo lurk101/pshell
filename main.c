@@ -510,7 +510,7 @@ static void cd_cmd(void) {
 static void cc_cmd(void) {
     if (check_mount(true))
         return;
-    cc(argc, argv);
+    cc(0, argc, argv);
     result[0] = 0;
 }
 
@@ -706,7 +706,7 @@ int main(void) {
                         char buf[3];
                         if (fs_getattr(fp, 1, buf, sizeof(buf)) == sizeof(buf) &&
                             memcmp(buf, "exe", 3) == 0) {
-                            printf("\nCC=%d\n", run_exe(argc, argv));
+                            printf("\nCC=%d\n", cc(1, argc, argv));
                         } else
                             printf("\n%s is not executable\n", fp);
                         continue;
