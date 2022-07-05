@@ -526,14 +526,11 @@ static void clear_cmd(void) {
     strcpy(result, VT_CLEAR "\n");
 }
 
-void reboot_cmd() { watchdog_reboot(0, 0, 1); }
-
-static void quit_cmd(void) {
+static void reboot_cmd(void) {
     // release any resources we were using
     if (mounted)
         fs_unmount();
-    strcpy(result, "");
-    run = false;
+    watchdog_reboot(0, 0, 1);
 }
 
 typedef struct {
@@ -556,7 +553,6 @@ static cmd_t cmd_table[] = {
     {"mount",   mount_cmd,      "mount filesystem"},
     {"mv",      mv_cmd,         "rename file or directory"},
     {"put",     put_cmd,        "put file (xmodem)"},
-    {"q",       quit_cmd,       "quit"},
     {"reboot",  reboot_cmd,     "Restart system"},
     {"rm",      rm_cmd,         "remove file or directory"},
     {"status",  status_cmd,     "filesystem status"},
