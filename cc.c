@@ -29,7 +29,7 @@
 #include "fs.h"
 
 extern char* full_path(char* name);
-extern int cc_printf(void* stk, int wrds);
+extern int cc_printf(void* stk, int wrds, int sflag);
 
 #define SMALL_TBL_WRDS 256
 #define BIG_TBL_BYTES (16 * 1024)
@@ -369,6 +369,7 @@ enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000
 enum {
     // varargs functions
     SYSC_printf = 0,
+    SYSC_sprintf,
     // memory management
     SYSC_malloc,
     SYSC_free,
@@ -427,7 +428,7 @@ enum {
 
 static const char* extern_name[] = {
     // varargs
-    "printf",
+    "printf", "sprintf",
     // memory
     "malloc", "free",
     // math
@@ -3142,6 +3143,60 @@ static inline int f_as_i(float f) {
     return u.i;
 }
 
+static int common_print_wrap(int n_parms, int sflag, int* sp) {
+    // HACK ALLERT, we need to figure out which parameters
+    // are floats. Scan the format string.
+    int* stk = sys_malloc(n_parms * 9);
+    if (stk == NULL)
+        die("format memory error");
+    char* atyp = (char*)stk + n_parms * 8;
+    char* fmt = (char*)sp[n_parms - 1 - sflag];
+    int an = sflag;
+    while (*fmt) {
+        if (*fmt == '%') {
+            if (*(fmt + 1) == '%') {
+                fmt += 2;
+                continue;
+            }
+            fmt++;
+            an++;
+            if (*fmt == 0)
+                die("missing format specifier");
+            const char* prefx = "-+ #.0123456789";
+            const char* spec = "aefgAEFG";
+            while (strchr(prefx, *fmt))
+                fmt++;
+            if (*fmt == 0)
+                die("missing format specifier");
+            if (strchr(spec, *fmt))
+                atyp[an] = 1;
+        }
+        fmt++;
+    }
+    if (an != n_parms - 1)
+        die("missing format specifier");
+    volatile int stkp = 0;
+    for (int j = n_parms - 1; j >= 0; j--)
+        if (atyp[n_parms - j - 1] == 0)
+            stk[stkp++] = sp[j];
+        else {
+            if (stkp & 1)
+                stk[stkp++] = 0;
+            union {
+                double d;
+                int ii[2];
+            } u;
+            u.d = *((float*)&sp[j]);
+            stk[stkp++] = u.ii[0];
+            stk[stkp++] = u.ii[1];
+        }
+    int r = cc_printf(stk, stkp, sflag);
+    sys_free(stk);
+    if (!sflag)
+        fflush(stdout);
+    return r;
+}
+
 int cc(int run_mode, int argc, char** argv) {
     clear_globals();
 
@@ -3532,55 +3587,10 @@ int cc(int run_mode, int argc, char** argv) {
             int sysc = *pc++;
             switch (sysc) {
             case SYSC_printf:
-                // HACK ALLERT, we need to figure out which parameters
-                // are floats. Scan the format string.
-                int* stk = sys_malloc(a.i * 9);
-                if (stk == NULL)
-                    die("format memory error");
-                char* atyp = (char*)stk + a.i * 8;
-                char* fmt = (char*)sp[a.i - 1];
-                int an = 0;
-                while (*fmt) {
-                    if (*fmt == '%') {
-                        if (*(fmt + 1) == '%') {
-                            fmt += 2;
-                            continue;
-                        }
-                        fmt++;
-                        an++;
-                        if (*fmt == 0)
-                            die("missing format specifier");
-                        const char* prefx = "-+ #.0123456789";
-                        const char* spec = "aefgAEFG";
-                        while (strchr(prefx, *fmt))
-                            fmt++;
-                        if (*fmt == 0)
-                            die("missing format specifier");
-                        if (strchr(spec, *fmt))
-                            atyp[an] = 1;
-                    }
-                    fmt++;
-                }
-                if (an != a.i - 1)
-                    die("missing format specifier");
-                volatile int stkp = 0;
-                for (int j = a.i - 1; j >= 0; j--)
-                    if (atyp[a.i - j - 1] == 0)
-                        stk[stkp++] = sp[j];
-                    else {
-                        if (stkp & 1)
-                            stk[stkp++] = 0;
-                        union {
-                            double d;
-                            int ii[2];
-                        } u;
-                        u.d = *((float*)&sp[j]);
-                        stk[stkp++] = u.ii[0];
-                        stk[stkp++] = u.ii[1];
-                    }
-                a.i = cc_printf(stk, stkp);
-                sys_free(stk);
-                fflush(stdout);
+                a.i = common_print_wrap(a.i, 0, sp);
+                break;
+            case SYSC_sprintf:
+                a.i = common_print_wrap(a.i, 1, sp);
                 break;
             // memory management
             case SYSC_malloc:

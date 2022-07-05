@@ -8,6 +8,7 @@
 .thumb_func
 
 .extern __wrap_printf
+.extern __wrap_sprintf
 
 // int cc_printf(void* stk, int wrds);
 
@@ -16,11 +17,13 @@ cc_printf:
     // r4 parameter block
     // r5 parameter block words
     // r6 stack save
+    // r7 0 - printf, 1 - sprintf
 
-        push {r4,r5,r6, lr}   // save the top regs 
+        push {r4,r5,r6,r7,lr}   // save the top regs 
         mov  r4, r0       // Set up the base and count regs
         mov  r5, r1      
         mov  r6, sp       // Save the stack pointer 
+        mov  r7, r2
 
         // the final stack pointer needs to be 8 byte aligned
         lsls r0, r5, #2   // if both on even boundary
@@ -59,7 +62,11 @@ l3:     cmp  r5, #0       // move up to the 1st 4 words
         beq  l4          
         pop  {r3}        
 
-l4:     bl  __wrap_printf // call SDK's printf
+l4:     cmp  r7, 0
+		bne  l5
+        bl  __wrap_printf // call SDK's printf
+        b    l6
+l5:     bl  __wrap_sprintf // call SDK's printf
 
-        mov  sp, r6       // restore the stack and top regs
-        pop  {r4,r5,r6,pc}  
+l6:     mov  sp, r6       // restore the stack and top regs
+        pop  {r4,r5,r6,r7,pc}  
