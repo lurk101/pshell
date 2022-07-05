@@ -368,22 +368,22 @@ enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000
 // (library) external functions
 enum {
     // varargs functions
-    SYSC_PRINTF = 0,
+    SYSC_printf = 0,
     // memory management
-    SYSC_MALLOC,
-    SYSC_FREE,
+    SYSC_malloc,
+    SYSC_free,
     // math functions
-    SYSC_ATOI,
-    SYSC_SQRT,
-    SYSC_SIN,
-    SYSC_COS,
-    SYSC_TAN,
-    SYSC_LOG,
-    SYSC_POW,
+    SYSC_atoi,
+    SYSC_sqrt,
+    SYSC_sin,
+    SYSC_cos,
+    SYSC_tan,
+    SYSC_log,
+    SYSC_pow,
     // SDK functions
-    SYSC_TIME_US_32,
-    SYSC_SLEEP_US,
-    SYSC_SLEEP_MS,
+    SYSC_time_us_32,
+    SYSC_sleep_us,
+    SYSC_sleep_ms,
     // SDK GPIO
     SYSC_gpio_set_function,
     SYSC_gpio_get_function,
@@ -3542,7 +3542,7 @@ int cc(int run_mode, int argc, char** argv) {
         case SYSC:
             int sysc = *pc++;
             switch (sysc) {
-            case SYSC_PRINTF:
+            case SYSC_printf:
                 // HACK ALLERT, we need to figure out which parameters
                 // are floats. Scan the format string.
                 int* stk = sys_malloc(a.i * 9);
@@ -3594,43 +3594,43 @@ int cc(int run_mode, int argc, char** argv) {
                 fflush(stdout);
                 break;
             // memory management
-            case SYSC_MALLOC:
+            case SYSC_malloc:
                 a.i = (int)sys_malloc(*sp);
                 break;
-            case SYSC_FREE:
+            case SYSC_free:
                 sys_free((void*)(*sp));
                 break;
 
             // math
-            case SYSC_ATOI:
+            case SYSC_atoi:
                 a.i = atoi((char*)*sp);
                 break;
-            case SYSC_SQRT:
+            case SYSC_sqrt:
                 a.f = sqrt(*((float*)sp));
                 break;
-            case SYSC_SIN:
+            case SYSC_sin:
                 a.f = sin(*((float*)sp));
                 break;
-            case SYSC_COS:
+            case SYSC_cos:
                 a.f = cos(*((float*)sp));
                 break;
-            case SYSC_TAN:
+            case SYSC_tan:
                 a.f = tan(*((float*)sp));
                 break;
-            case SYSC_LOG:
+            case SYSC_log:
                 a.f = log(*((float*)sp));
                 break;
-            case SYSC_POW:
+            case SYSC_pow:
                 a.f = pow(*((float*)sp + 1), *((float*)sp));
                 break;
             // time
-            case SYSC_TIME_US_32: // SDK
+            case SYSC_time_us_32: // SDK
                 a.i = time_us_32();
                 break;
-            case SYSC_SLEEP_US:
+            case SYSC_sleep_us:
                 sleep_us(*sp);
                 break;
-            case SYSC_SLEEP_MS:
+            case SYSC_sleep_ms:
                 sleep_ms(*sp);
                 break;
             // SDK gpio
@@ -3701,10 +3701,10 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_init_mask(*sp);
                 break;
             case SYSC_gpio_get:
-                gpio_get(*sp);
+                a.i = gpio_get(*sp);
                 break;
             case SYSC_gpio_get_all:
-                gpio_get_all();
+                a.i = gpio_get_all();
                 break;
             case SYSC_gpio_set_mask:
                 gpio_set_mask(*sp);
@@ -3725,7 +3725,7 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_put(*(sp + 1), *sp);
                 break;
             case SYSC_gpio_get_out_level:
-                gpio_get_out_level(*sp);
+                a.i = gpio_get_out_level(*sp);
                 break;
             case SYSC_gpio_set_dir_out_masked:
                 gpio_set_dir_out_masked(*sp);
@@ -3743,10 +3743,10 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_set_dir(*(sp + 1), *sp);
                 break;
             case SYSC_gpio_is_dir_out:
-                gpio_is_dir_out(*sp);
+                a.i = gpio_is_dir_out(*sp);
                 break;
             case SYSC_gpio_get_dir:
-                gpio_get_dir(*sp);
+                a.i = gpio_get_dir(*sp);
                 break;
             default:
                 die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
