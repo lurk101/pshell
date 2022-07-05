@@ -446,19 +446,6 @@ static const char* extern_name[] = {
     "gpio_set_dir_masked", "gpio_set_dir_all_bits", "gpio_set_dir", "gpio_is_dir_out",
     "gpio_get_dir"};
 
-static const char extern_type[] = {
-    // varargs
-    INT,
-    // memory
-    INT, INT,
-    // math
-    INT, FLOAT, FLOAT, FLOAT, FLOAT, FLOAT, FLOAT,
-    // time
-    INT, INT, INT,
-    // gpio`
-    INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT,
-    INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT};
-
 static const int extern_count = sizeof(extern_name) / sizeof(extern_name[0]);
 
 static struct {
@@ -931,7 +918,8 @@ static void expr(int lev) {
                 d->val = extern_getidx(d->name);
                 if (d->val < 0)
                     die("Unknown external function %s", d->name);
-                d->type = extern_type[d->val];
+                d->type = (d->val >= SYSC_sqrt) && (d->val <= SYSC_pow) ? FLOAT : INT;
+
                 d->name[namelen] = ch;
             }
             next();
@@ -3380,7 +3368,8 @@ int cc(int run_mode, int argc, char** argv) {
     a.i = 0;
     while (1) {
         int key;
-        if (((key = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) && (key == 3))
+        if (((cycle & 255) == 0) && ((key = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) &&
+            (key == 3))
             die("\nuser interrupted!!\n");
         i = *pc++;
         ++cycle;

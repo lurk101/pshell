@@ -649,15 +649,17 @@ int main(void) {
 #if LIB_PICO_STDIO_UART
     uart = true;
 #endif
-    bool detected = screen_size();
+    screen_size();
     printf(VT_CLEAR "\n"
-                    "Pico Shell - Version " PS_VERSION " - Copyright (C) 1883 Thomas Edison\n"
+                    "Pico Shell - Copyright (C) 1883 Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
-                    "console on %s (%s %u rows, %u columns)\n\n"
+                    "pico shell v" PS_VERSION ", LittleFS v%d.%d\n\n"
+                    "console on %s (%u rows, %u columns)\n\n"
                     "enter command, hit return for help\n\n",
-           uart ? "UART" : "USB", detected ? "detected" : "defaulted to", screen_y, screen_x);
+           LFS_VERSION >> 16, LFS_VERSION & 0xffff, uart ? "UART" : "USB",
+           screen_y, screen_x);
 
     if (fs_mount() != LFS_ERR_OK) {
         printf("The flash file system appears corrupt or unformatted!\n"
