@@ -525,7 +525,10 @@ static void clear_cmd(void) {
     vi(screen_x, screen_y, argc - 1, argv + 1);
     strcpy(result, VT_CLEAR "\n");
 }
-
+void restart_cmd() {
+    watchdog_enable(1, 1);
+    while(1);
+}
 static void quit_cmd(void) {
     // release any resources we were using
     if (mounted)
@@ -556,6 +559,7 @@ static cmd_t cmd_table[] = {
     {"put", 	put_cmd, 		"put file (xmodem)"},
     {"q", 		quit_cmd, 		"quit"},
     {"rm", 		rm_cmd, 		"remove file or directory"},
+    {"restart", restart_cmd,    "Restart system"},
     {"status", 	status_cmd,		"filesystem status"},
     {"unmount",	unmount_cmd,	"unmount filesystem"},
     {"vi", 		vi_cmd, 		"editor"}
