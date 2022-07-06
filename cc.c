@@ -3712,10 +3712,28 @@ int cc(int run_mode, int argc, char** argv) {
                 a.i = time_us_32();
                 break;
             case SYSC_sleep_us:
-                sleep_us(*sp);
+                unsigned us = *sp;
+                while (us > 500000) {
+                    sleep_ms(500);
+                    us -= 500000;
+                    key = getchar_timeout_us(0);
+                    if (key != PICO_ERROR_TIMEOUT)
+                        if ((key == 27) || (key == 3)) // check for escape
+                            die("\nuser interrupted!!\n");
+                }
+                sleep_us(us);
                 break;
             case SYSC_sleep_ms:
-                sleep_ms(*sp);
+                unsigned ms = *sp;
+                while (ms > 500) {
+                    sleep_ms(500);
+                    ms -= 500;
+                    key = getchar_timeout_us(0);
+                    if (key != PICO_ERROR_TIMEOUT)
+                        if ((key == 27) || (key == 3)) // check for escape
+                            die("\nuser interrupted!!\n");
+                }
+                sleep_ms(ms);
                 break;
             // SDK gpio
             case SYSC_gpio_set_function:
