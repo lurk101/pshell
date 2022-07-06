@@ -3480,11 +3480,17 @@ int cc(int run_mode, int argc, char** argv) {
         float f;
     } a;
     a.i = 0;
+    unsigned int last_esc = time_us_32();
     while (1) {
         int key;
-        if (((cycle & 255) == 0) && ((key = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) &&
-            (key == 3))
-            die("\nuser interrupted!!\n");
+        unsigned int t = time_us_32();
+        if (t - last_esc > 500000) {
+            key = getchar_timeout_us(0);
+            if (key != PICO_ERROR_TIMEOUT)
+                if ((key == 27) || (key == 3)) // check for escape
+                    die("\nuser interrupted!!\n");
+            last_esc = t;
+        }
         i = *pc++;
         ++cycle;
         if (trc) {

@@ -21,6 +21,7 @@
 
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
+#include "pico/sync.h"
 
 #include "cc.h"
 #include "fs.h"
@@ -536,6 +537,15 @@ static void reboot_cmd(void) {
     watchdog_reboot(0, 0, 1);
 }
 
+static void quit_cmd(void) {
+    // release any resources we were using
+    if (mounted)
+        fs_unmount();
+    printf("\nbye!\n");
+    for (;;)
+        __wfi();
+}
+
 typedef struct {
     const char* name;
     cmd_func_t func;
@@ -556,6 +566,7 @@ static cmd_t cmd_table[] = {
     {"mount",   mount_cmd,      "mount filesystem"},
     {"mv",      mv_cmd,         "rename file or directory"},
     {"put",     put_cmd,        "put file (xmodem)"},
+    {"quit",    quit_cmd,       "shutdown system"},
     {"reboot",  reboot_cmd,     "Restart system"},
     {"rm",      rm_cmd,         "remove file or directory"},
     {"status",  status_cmd,     "filesystem status"},
