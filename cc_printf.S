@@ -19,7 +19,7 @@ cc_printf:
     // r6 stack save
     // r7 0 - printf, 1 - sprintf
 
-        push {r4,r5,r6,r7,lr}   // save the top regs 
+        push {r4-r7,lr}   // save the top regs 
         mov  r4, r0       // Set up the base and count regs
         mov  r5, r1      
         mov  r6, sp       // Save the stack pointer 
@@ -69,4 +69,4 @@ l4:     cmp  r7, 0
 l5:     bl  __wrap_sprintf // call SDK's sprintf
 
 l6:     mov  sp, r6       // restore the stack and top regs
-        pop  {r4,r5,r6,r7,pc}  
+        pop  {r4-r7,pc}  

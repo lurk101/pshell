@@ -651,9 +651,21 @@ static void help(void) {
         printf("%7s - %s\n", cmd_table[i].name, cmd_table[i].descr);
 }
 
+extern int ram_vector_table[48];
+
+static void HardFault_Handler(void) {
+    static const char* clear = "\n\n*** CRASH - Rebooting ***\r\n\n";
+    for (const char* cp = clear; *cp; cp++)
+        putchar_raw(*cp);
+    watchdog_reboot(0, 0, 5000);
+    for (;;)
+        ;
+}
+
 // application entry point
 int main(void) {
     // initialize the pico SDK
+    ram_vector_table[3] = (int)HardFault_Handler;
     stdio_init();
     bool uart = false;
 #if LIB_PICO_STDIO_UART
@@ -667,8 +679,8 @@ int main(void) {
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
-                    "pico shell v" PS_VERSION " (%s %s), LittleFS v%d.%d\n\n"
-                    "console on %s (%u X %u)\n\n"
+                    "pico shell v" PS_VERSION " [%s %s], LittleFS v%d.%d\n\n"
+                    "console on %s [%u X %u]\n\n"
                     "enter command, hit return for help\n\n",
            git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, uart ? "UART" : "USB",
            screen_x, screen_y);
