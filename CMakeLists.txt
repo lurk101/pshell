@@ -1,10 +1,18 @@
 cmake_minimum_required(VERSION 3.13)
 
-set(PSHELL pshell_uart)
+option(USB_CONSOLE "build for USB console" 0)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+
+if (USB_CONSOLE)
+  set(PSHELL pshell_usb)
+else()
+  set(PSHELL pshell_uart)
+  message("Building for UART. For USB use -DUSB_CONSOLE=ON")
+endif()
 
 project(${PSHELL} C CXX ASM)
 
@@ -47,11 +55,12 @@ add_executable(${PSHELL}
     cc_printf.S
     version.h)
 
-pico_enable_stdio_uart(${PSHELL} 1)
-pico_enable_stdio_usb(${PSHELL} 0)
+pico_enable_stdio_uart(${PSHELL} 0)
+pico_enable_stdio_usb(${PSHELL} 1)
 
 target_link_libraries(${PSHELL} PUBLIC pico_stdlib littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
 	hardware_pwm)
 
 pico_add_extra_outputs(${PSHELL})
+

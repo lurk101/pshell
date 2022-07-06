@@ -19,6 +19,7 @@
 
 #include "hardware/watchdog.h"
 
+#include "pico/bootrom.h"
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
 #include "pico/sync.h"
@@ -537,6 +538,15 @@ static void reboot_cmd(void) {
     watchdog_reboot(0, 0, 1);
 }
 
+#if LIB_PICO_STDIO_USB
+static void usbboot_cmd(void) {
+    // release any resources we were using
+    if (mounted)
+        fs_unmount();
+    reset_usb_boot(0, 0);
+}
+#endif
+
 static void quit_cmd(void) {
     // release any resources we were using
     if (mounted)
@@ -571,6 +581,9 @@ static cmd_t cmd_table[] = {
     {"rm",      rm_cmd,         "remove file or directory"},
     {"status",  status_cmd,     "filesystem status"},
     {"unmount", unmount_cmd,    "unmount filesystem"},
+#if LIB_PICO_STDIO_USB
+    {"usbboot", usbboot_cmd,    "Reboot to USB flash mode"},
+#endif
     {"vi",      vi_cmd,         "editor"}
 };
 // clang-format on
