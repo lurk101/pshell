@@ -5,7 +5,7 @@ A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 [c4 virtual machine]: https://github.com/rswier/c4.git
 [Squint]: https://github.com/HPCguy/Squint.git
 [list of implemented functions]: FUNCTIONS.md
-[What's new] WHATSNEW.md
+[What's new]: WHATSNEW.md
 
 Credit where credit is due...
 
@@ -14,7 +14,7 @@ Credit where credit is due...
 and the [c4 virtual machine]. Floating point support was taken fom
 the [Squint] project.
 
-What's new
+[What's new]
 
 About the compiler, briefly…
 
