@@ -389,6 +389,7 @@ enum {
     SYSC_strlen,
     SYSC_strcpy,
     SYSC_strcmp,
+    SYSC_strcat,
     SYSC_memcmp,
     // math functions
     SYSC_atoi,
@@ -486,7 +487,7 @@ static const char* extern_name[] = {
     // memory
     "malloc", "free",
     // string
-    "strlen", "strcpy", "strcmp", "memcmp",
+    "strlen", "strcpy", "strcmp", "strcat", "memcmp",
     // math
     "atoi", "sqrt", "sin", "cos", "tan", "log", "pow",
     // time
@@ -3437,7 +3438,7 @@ int cc(int run_mode, int argc, char** argv) {
                 die("couldn't mark file as executable");
             printf("executable %s - text %d bytes, data %d bytes\n\n", fp, prog_hdr.text_size,
                    prog_hdr.data_size);
-
+            goto done;
         }
         if (src)
             goto done;
@@ -3682,6 +3683,9 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_strcmp:
                 a.i = strcmp((void*)sp[1], (void*)sp[0]);
                 break;
+            case SYSC_strcat:
+                a.i = (int)strcat((void*)sp[1], (void*)sp[0]);
+                break;
             case SYSC_memcmp:
                 a.i = memcmp((void*)sp[2], (void*)sp[1], sp[0]);
                 break;
@@ -3761,6 +3765,7 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_disable_pulls(*sp);
                 break;
             case SYSC_gpio_set_irqover:
+                die("interrupt support not there yet");
                 gpio_set_irqover(sp[1], sp[0]);
                 break;
             case SYSC_gpio_set_outover:
@@ -3794,15 +3799,19 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_get_drive_strength(*sp);
                 break;
             case SYSC_gpio_set_irq_enabled:
+                die("interrupt support not there yet");
                 gpio_set_irq_enabled(*(sp + 2), *(sp + 1), *sp);
                 break;
             case SYSC_gpio_set_irq_enabled_with_callback:
+                die("interrupt support not there yet");
                 gpio_set_irq_enabled_with_callback(*(sp + 3), *(sp + 2), *(sp + 1), (void*)*sp);
                 break;
             case SYSC_gpio_set_dormant_irq_enabled:
+                die("interrupt support not there yet");
                 gpio_set_dormant_irq_enabled(*(sp + 2), *(sp + 1), *sp);
                 break;
             case SYSC_gpio_acknowledge_irq:
+                die("interrupt support not there yet");
                 gpio_acknowledge_irq(*(sp + 1), *sp);
                 break;
             case SYSC_gpio_init:
@@ -3893,8 +3902,7 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_init(sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_pwm_get_default_config:
-                pwm_config* c = (void*)sp[0];
-                *c = pwm_get_default_config();
+                *((pwm_config*)sp[0]) = pwm_get_default_config();
                 break;
             case SYSC_pwm_set_wrap:
                 pwm_set_wrap(sp[1], sp[0]);
@@ -3942,18 +3950,23 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_set_mask_enabled(sp[0]);
                 break;
             case SYSC_pwm_set_irq_enabled:
+                die("interrupt support not there yet");
                 pwm_set_irq_enabled(sp[1], sp[0]);
                 break;
             case SYSC_pwm_set_irq_mask_enabled:
+                die("interrupt support not there yet");
                 pwm_set_irq_mask_enabled(sp[1], sp[0]);
                 break;
             case SYSC_pwm_clear_irq:
+                die("interrupt support not there yet");
                 pwm_clear_irq(sp[0]);
                 break;
             case SYSC_pwm_get_irq_status_mask:
+                die("interrupt support not there yet");
                 a.i = pwm_get_irq_status_mask();
                 break;
             case SYSC_pwm_force_irq:
+                die("interrupt support not there yet");
                 pwm_force_irq(sp[0]);
                 break;
             case SYSC_pwm_get_dreq:
