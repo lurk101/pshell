@@ -742,8 +742,9 @@ int main(void) {
                     }
                 }
             }
-        }
-        if (!found)
+            if (!found)
+                printf("\nunknown command '%s'. hit ENTER for help\n", argv[0]);
+        } else
             help();
     }
     printf("\ndone\n");
