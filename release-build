@@ -1,0 +1,19 @@
+#!/bin/bash
+if [ $# -eq 0 ] ; then
+    echo "specify version as n.n.n"
+	exit
+fi
+rm -rf release
+mkdir release
+cd release
+cmake ..
+make -j4
+cp *.elf *.hex *.bin *.uf2 ..
+rm -rf *
+cmake .. -DUSB_CONSOLE=ON
+make -j4
+cp *.elf *.hex *.bin *.uf2 ..
+cd ..
+rm -rf release
+tar czf pshel_$1.tgz *.elf *.hex *.bin *.uf2
+rm *.elf *.hex *.bin *.uf2
