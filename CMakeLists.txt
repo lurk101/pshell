@@ -28,7 +28,6 @@ add_compile_options("-DGIT_BRANCH=${GIT_BRANCH}")
 
 add_subdirectory(littlefs)
 add_subdirectory(stdinit-lib)
-configure_file(git_version.h.in git_version.h @ONLY)
 add_executable(${PSHELL} main.c xreceive.c xreceive.h xtransmit.c xtransmit.h
     crc16.c crc16.h fs.c fs.h vi.c vi.h cc.c cc.h cc_printf.S version.h)
 pico_enable_stdio_uart(${PSHELL} 1)
