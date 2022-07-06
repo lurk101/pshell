@@ -360,6 +360,7 @@ enum {
     SYSC, /* 46 system call */
 
     EXIT,
+    IRET, // return from interrupt
 
     INVALID
 };
@@ -384,6 +385,11 @@ enum {
     // memory management
     SYSC_malloc,
     SYSC_free,
+    // string
+    SYSC_strlen,
+    SYSC_strcpy,
+    SYSC_strcmp,
+    SYSC_memcmp,
     // math functions
     SYSC_atoi,
     SYSC_sqrt,
@@ -405,7 +411,7 @@ enum {
     SYSC_gpio_pull_down,
     SYSC_gpio_is_pulled_down,
     SYSC_gpio_disable_pulls,
-	SYSC_gpio_set_irqover,
+    SYSC_gpio_set_irqover,
     SYSC_gpio_set_outover,
     SYSC_gpio_set_inover,
     SYSC_gpio_set_oeover,
@@ -419,7 +425,7 @@ enum {
     SYSC_gpio_set_irq_enabled,
     SYSC_gpio_set_irq_enabled_with_callback,
     SYSC_gpio_set_dormant_irq_enabled,
-	SYSC_gpio_acknowledge_irq,
+    SYSC_gpio_acknowledge_irq,
     SYSC_gpio_init,
     SYSC_gpio_deinit,
     SYSC_gpio_init_mask,
@@ -479,14 +485,16 @@ static const char* extern_name[] = {
     "printf", "sprintf",
     // memory
     "malloc", "free",
+    // string
+    "strlen", "strcpy", "strcmp", "memcmp",
     // math
     "atoi", "sqrt", "sin", "cos", "tan", "log", "pow",
     // time
     "time_us_32", "sleep_us", "sleep_ms",
     // gpio
     "gpio_set_function", "gpio_get_function", "gpio_set_pulls", "gpio_pull_up", "gpio_is_pulled_up",
-    "gpio_pull_down", "gpio_is_pulled_down", "gpio_disable_pulls", "gpio_set_irqover", "gpio_set_outover",
-    "gpio_set_inover", "gpio_set_oeover", "gpio_set_input_enabled",
+    "gpio_pull_down", "gpio_is_pulled_down", "gpio_disable_pulls", "gpio_set_irqover",
+    "gpio_set_outover", "gpio_set_inover", "gpio_set_oeover", "gpio_set_input_enabled",
     "gpio_set_input_hysteresis_enabled", "gpio_is_input_hysteresis_enabled", "gpio_set_slew_rate",
     "gpio_slew_rate", "gpio_set_drive_strength", "gpio_get_drive_strength", "gpio_set_irq_enabled",
     "gpio_set_irq_enabled_with_callback", "gpio_set_dormant_irq_enabled", "gpio_acknowledge_irq",
@@ -3430,9 +3438,9 @@ int cc(int run_mode, int argc, char** argv) {
             printf("executable %s - text %d bytes, data %d bytes\n\n", fp, prog_hdr.text_size,
                    prog_hdr.data_size);
 
-            if (src)
-                goto done;
         }
+        if (src)
+            goto done;
     } else {
         printf("\nNice try! Executables are not implemented yet\n");
         goto done;
@@ -3664,7 +3672,19 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_free:
                 sys_free((void*)(*sp));
                 break;
-
+            // string
+            case SYSC_strlen:
+                a.i = strlen((void*)sp[0]);
+                break;
+            case SYSC_strcpy:
+                a.i = (int)strcpy((void*)sp[1], (void*)sp[0]);
+                break;
+            case SYSC_strcmp:
+                a.i = strcmp((void*)sp[1], (void*)sp[0]);
+                break;
+            case SYSC_memcmp:
+                a.i = memcmp((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
             // math
             case SYSC_atoi:
                 a.i = atoi((char*)*sp);
@@ -3722,9 +3742,9 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_gpio_disable_pulls:
                 gpio_disable_pulls(*sp);
                 break;
-			case SYSC_gpio_set_irqover:
-				gpio_set_irqover(sp[1], sp[0]);
-				break;
+            case SYSC_gpio_set_irqover:
+                gpio_set_irqover(sp[1], sp[0]);
+                break;
             case SYSC_gpio_set_outover:
                 gpio_set_outover(*(sp + 1), *sp);
                 break;
@@ -3928,6 +3948,8 @@ int cc(int run_mode, int argc, char** argv) {
             break;
         case EXIT:
             die("\nCC=%d\n", a);
+        case IRET:
+            die("return from interrupt not yet implemented");
         default:
             die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         }

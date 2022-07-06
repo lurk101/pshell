@@ -15,12 +15,14 @@ the [Squint] project.
 
 About the compiler, briefly…
 
-- Data types: integer, float and char.
+- Data types: integer, float, char and pointer.
 - Aggregate types: single dimension array, struct and union.
-- Flow: for, while, if then else, break, continue.
+- Flow control: for, while, if then else, break, continue goto.
 - Memory, math and SDK functions. ([list of implemented functions])
 
 Building from source.
+
+Edit the root folder CMakeLists.tx file to pick a console device, then:
 
 ```
 # NOTE: Requires sdk 1.3 or later
@@ -33,7 +35,7 @@ cmake ..
 make
 ```
 
-Example log.
+Example (somewhat dated) log.
 
 ```sh
 Pico Shell - Copyright (C) 1883 Thomas Edison
