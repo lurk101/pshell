@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include <hardware/gpio.h>
+#include <hardware/pwm.h>
 
 #include <pico/stdio.h>
 #include <pico/time.h>
@@ -28,11 +29,21 @@
 #include "cc.h"
 #include "fs.h"
 
+#define K 1024
+
+#define DATA_BYTES (4 * K)
+#define TEXT_BYTES (16 * K)
+#define SYM_TBL_BYTES (4 * K)
+#define TS_TBL_BYTES (1 * K)
+#define AST_TBL_BYTES (16 * K)
+#define MEMBER_DICT_BYTES (1 * K)
+#define STACK_BYTES (16 * K)
+
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 
-#define SMALL_TBL_WRDS 256
-#define BIG_TBL_BYTES (16 * 1024)
+//#define SMALL_TBL_WRDS 256
+//#define BIG_TBL_BYTES (16 * 1024)
 
 char *p, *lp;           // current position in source code
 char *data_base, *data; // data/bss pointer
@@ -394,6 +405,7 @@ enum {
     SYSC_gpio_pull_down,
     SYSC_gpio_is_pulled_down,
     SYSC_gpio_disable_pulls,
+	SYSC_gpio_set_irqover,
     SYSC_gpio_set_outover,
     SYSC_gpio_set_inover,
     SYSC_gpio_set_oeover,
@@ -401,10 +413,13 @@ enum {
     SYSC_gpio_set_input_hysteresis_enabled,
     SYSC_gpio_is_input_hysteresis_enabled,
     SYSC_gpio_set_slew_rate,
-    SYSC_gpio_slew_rate,
+    SYSC_gpio_get_slew_rate,
     SYSC_gpio_set_drive_strength,
     SYSC_gpio_get_drive_strength,
     SYSC_gpio_set_irq_enabled,
+    SYSC_gpio_set_irq_enabled_with_callback,
+    SYSC_gpio_set_dormant_irq_enabled,
+	SYSC_gpio_acknowledge_irq,
     SYSC_gpio_init,
     SYSC_gpio_deinit,
     SYSC_gpio_init_mask,
@@ -423,7 +438,40 @@ enum {
     SYSC_gpio_set_dir_all_bits,
     SYSC_gpio_set_dir,
     SYSC_gpio_is_dir_out,
-    SYSC_gpio_get_dir
+    SYSC_gpio_get_dir,
+    // PWM
+    SYSC_pwm_gpio_to_slice_num,
+    SYSC_pwm_gpio_to_channel,
+    SYSC_pwm_config_set_phase_correct,
+    SYSC_pwm_config_set_clkdiv,
+    SYSC_pwm_config_set_clkdiv_int_frac,
+    SYSC_pwm_config_set_clkdiv_int,
+    SYSC_pwm_config_set_clkdiv_mode,
+    SYSC_pwm_config_set_output_polarity,
+    SYSC_pwm_config_set_wrap,
+    SYSC_pwm_init,
+    SYSC_pwm_get_default_config,
+    SYSC_pwm_set_wrap,
+    SYSC_pwm_set_chan_level,
+    SYSC_pwm_set_both_levels,
+    SYSC_pwm_set_gpio_level,
+    SYSC_pwm_get_counter,
+    SYSC_pwm_set_counter,
+    SYSC_pwm_advance_count,
+    SYSC_pwm_retard_count,
+    SYSC_pwm_set_clkdiv_int_frac,
+    SYSC_pwm_set_clkdiv,
+    SYSC_pwm_set_output_polarity,
+    SYSC_pwm_set_clkdiv_mode,
+    SYSC_pwm_set_phase_correct,
+    SYSC_pwm_set_enabled,
+    SYSC_pwm_set_mask_enabled,
+    SYSC_pwm_set_irq_enabled,
+    SYSC_pwm_set_irq_mask_enabled,
+    SYSC_pwm_clear_irq,
+    SYSC_pwm_get_irq_status_mask,
+    SYSC_pwm_force_irq,
+    SYSC_pwm_get_dreq
 };
 
 static const char* extern_name[] = {
@@ -437,15 +485,26 @@ static const char* extern_name[] = {
     "time_us_32", "sleep_us", "sleep_ms",
     // gpio
     "gpio_set_function", "gpio_get_function", "gpio_set_pulls", "gpio_pull_up", "gpio_is_pulled_up",
-    "gpio_pull_down", "gpio_is_pulled_down", "gpio_disable_pulls", "gpio_set_outover",
+    "gpio_pull_down", "gpio_is_pulled_down", "gpio_disable_pulls", "gpio_set_irqover", "gpio_set_outover",
     "gpio_set_inover", "gpio_set_oeover", "gpio_set_input_enabled",
     "gpio_set_input_hysteresis_enabled", "gpio_is_input_hysteresis_enabled", "gpio_set_slew_rate",
     "gpio_slew_rate", "gpio_set_drive_strength", "gpio_get_drive_strength", "gpio_set_irq_enabled",
+    "gpio_set_irq_enabled_with_callback", "gpio_set_dormant_irq_enabled", "gpio_acknowledge_irq",
     "gpio_init", "gpio_deinit", "gpio_init_mask", "gpio_get", "gpio_get_all", "gpio_set_mask",
     "gpio_clr_mask", "gpio_xor_mask", "gpio_put_masked", "gpio_put_all", "gpio_put",
     "gpio_get_out_level", "gpio_set_dir_out_masked", "gpio_set_dir_in_masked",
     "gpio_set_dir_masked", "gpio_set_dir_all_bits", "gpio_set_dir", "gpio_is_dir_out",
-    "gpio_get_dir"};
+    "gpio_get_dir",
+    // PWM
+    "pwm_gpio_to_slice_num", "pwm_gpio_to_channel", "pwm_config_set_phase_correct",
+    "pwm_config_set_clkdiv", "pwm_config_set_clkdiv_int_frac", "pwm_config_set_clkdiv_int",
+    "pwm_config_set_clkdiv_mode", "pwm_config_set_output_polarity", "pwm_config_set_wrap",
+    "pwm_init", "pwm_get_default_config", "pwm_set_wrap", "pwm_set_chan_level",
+    "pwm_set_both_levels", "pwm_set_gpio_level", "pwm_get_counter", "pwm_set_counter",
+    "pwm_advance_count", "pwm_retard_count", "pwm_set_clkdiv_int_frac", "pwm_set_clkdiv",
+    "pwm_set_output_polarity", "pwm_set_clkdiv_mode", "pwm_set_phase_correct", "pwm_set_enabled",
+    "pwm_set_mask_enabled", "pwm_set_irq_enabled", "pwm_set_irq_mask_enabled", "pwm_clear_irq",
+    "pwm_get_irq_status_mask", "pwm_force_irq", "pwm_get_dreq"};
 
 static const int extern_count = sizeof(extern_name) / sizeof(extern_name[0]);
 
@@ -3212,7 +3271,7 @@ int cc(int run_mode, int argc, char** argv) {
         if (fd == NULL)
             die("no file handle memory");
 
-        if (!(sym_base = (struct ident_s*)sys_malloc(BIG_TBL_BYTES)))
+        if (!(sym_base = (struct ident_s*)sys_malloc(SYM_TBL_BYTES)))
             die("no symbol memory");
 
         // Register keywords in symbol stack. Must match the sequence of enum
@@ -3236,13 +3295,13 @@ int cc(int run_mode, int argc, char** argv) {
         struct ident_s* idmain = id;
         id->class = Main; // keep track of main
 
-        if (!(data_base = data = (char*)sys_malloc(BIG_TBL_BYTES)))
+        if (!(data_base = data = (char*)sys_malloc(DATA_BYTES)))
             die("no data memory");
-        if (!(tsize = (int*)sys_malloc(SMALL_TBL_WRDS * sizeof(int))))
+        if (!(tsize = (int*)sys_malloc(TS_TBL_BYTES)))
             die("no tsize memory");
-        if (!(ast_base = ast = (int*)sys_malloc(BIG_TBL_BYTES)))
+        if (!(ast_base = ast = (int*)sys_malloc(AST_TBL_BYTES)))
             die("could not allocate abstract syntax tree area");
-        n = ast + (BIG_TBL_BYTES / 4) - 1;
+        n = ast + (AST_TBL_BYTES / 4) - 1;
 
         // add primitive types
         tsize[tnew++] = sizeof(char);
@@ -3313,9 +3372,9 @@ int cc(int run_mode, int argc, char** argv) {
         int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
         fs_file_rewind(fd);
 
-        if (!(text_base = le = e = (int*)sys_malloc(BIG_TBL_BYTES)))
+        if (!(text_base = le = e = (int*)sys_malloc(TEXT_BYTES)))
             die("no text memory");
-        if (!(members = (struct member_s**)sys_malloc(SMALL_TBL_WRDS * sizeof(struct member_s*))))
+        if (!(members = (struct member_s**)sys_malloc(MEMBER_DICT_BYTES)))
             die("no members table memory");
 
         char* src_base;
@@ -3404,9 +3463,9 @@ int cc(int run_mode, int argc, char** argv) {
     printf("\n");
 
     // setup stack
-    if (!(base_sp = bp = sp = (int*)sys_malloc(BIG_TBL_BYTES)))
+    if (!(base_sp = bp = sp = (int*)sys_malloc(STACK_BYTES)))
         die("could not allocate stack area");
-    bp = sp = (int*)((int)sp + BIG_TBL_BYTES - 4);
+    bp = sp = (int*)((int)sp + STACK_BYTES - 4);
     *(--sp) = EXIT; // call exit if main returns
     *(--sp) = PSH;
     int* t = sp;
@@ -3657,6 +3716,9 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_gpio_disable_pulls:
                 gpio_disable_pulls(*sp);
                 break;
+			case SYSC_gpio_set_irqover:
+				gpio_set_irqover(sp[1], sp[0]);
+				break;
             case SYSC_gpio_set_outover:
                 gpio_set_outover(*(sp + 1), *sp);
                 break;
@@ -3678,7 +3740,7 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_gpio_set_slew_rate:
                 gpio_set_slew_rate(*(sp + 1), *sp);
                 break;
-            case SYSC_gpio_slew_rate:
+            case SYSC_gpio_get_slew_rate:
                 gpio_get_slew_rate(*sp);
                 break;
             case SYSC_gpio_set_drive_strength:
@@ -3690,12 +3752,21 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_gpio_set_irq_enabled:
                 gpio_set_irq_enabled(*(sp + 2), *(sp + 1), *sp);
                 break;
+            case SYSC_gpio_set_irq_enabled_with_callback:
+                gpio_set_irq_enabled_with_callback(*(sp + 3), *(sp + 2), *(sp + 1), (void*)*sp);
+                break;
+            case SYSC_gpio_set_dormant_irq_enabled:
+                gpio_set_dormant_irq_enabled(*(sp + 2), *(sp + 1), *sp);
+                break;
+            case SYSC_gpio_acknowledge_irq:
+                gpio_acknowledge_irq(*(sp + 1), *sp);
+                break;
             case SYSC_gpio_init:
                 gpio_init(*sp);
                 break;
-            // case SYSC_gpio_deinit:
-            //  gpio_deinit(*(sp + 1), *sp);
-            //  break;
+            case SYSC_gpio_deinit:
+                gpio_deinit(*sp);
+                break;
             case SYSC_gpio_init_mask:
                 gpio_init_mask(*sp);
                 break;
@@ -3746,6 +3817,103 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_gpio_get_dir:
                 a.i = gpio_get_dir(*sp);
+                break;
+            case SYSC_pwm_gpio_to_slice_num:
+                a.i = pwm_gpio_to_slice_num(sp[0]);
+                break;
+            case SYSC_pwm_gpio_to_channel:
+                a.i = pwm_gpio_to_channel(sp[0]);
+                break;
+            case SYSC_pwm_config_set_phase_correct:
+                pwm_config_set_phase_correct((void*)sp[1], sp[0]);
+                break;
+            case SYSC_pwm_config_set_clkdiv:
+                pwm_config_set_clkdiv((void*)sp[1], sp[0]);
+                break;
+            case SYSC_pwm_config_set_clkdiv_int_frac:
+                pwm_config_set_clkdiv_int_frac((void*)sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_pwm_config_set_clkdiv_int:
+                pwm_config_set_clkdiv_int((void*)sp[1], sp[0]);
+                break;
+            case SYSC_pwm_config_set_clkdiv_mode:
+                pwm_config_set_clkdiv_mode((void*)sp[1], sp[0]);
+                break;
+            case SYSC_pwm_config_set_output_polarity:
+                pwm_config_set_output_polarity((void*)sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_pwm_config_set_wrap:
+                pwm_config_set_wrap((void*)sp[1], sp[0]);
+                break;
+            case SYSC_pwm_init:
+                pwm_init(sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_pwm_get_default_config:
+                pwm_config* c = (void*)sp[0];
+                *c = pwm_get_default_config();
+                break;
+            case SYSC_pwm_set_wrap:
+                pwm_set_wrap(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_chan_level:
+                pwm_set_chan_level(sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_both_levels:
+                pwm_set_both_levels(sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_gpio_level:
+                pwm_set_gpio_level(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_get_counter:
+                a.i = pwm_get_counter(sp[0]);
+                break;
+            case SYSC_pwm_set_counter:
+                pwm_set_counter(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_advance_count:
+                pwm_advance_count(sp[0]);
+                break;
+            case SYSC_pwm_retard_count:
+                pwm_retard_count(sp[0]);
+                break;
+            case SYSC_pwm_set_clkdiv_int_frac:
+                pwm_set_clkdiv_int_frac(sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_clkdiv:
+                pwm_set_clkdiv(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_output_polarity:
+                pwm_set_output_polarity(sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_clkdiv_mode:
+                pwm_set_clkdiv_mode(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_phase_correct:
+                pwm_set_phase_correct(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_enabled:
+                pwm_set_enabled(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_mask_enabled:
+                pwm_set_mask_enabled(sp[0]);
+                break;
+            case SYSC_pwm_set_irq_enabled:
+                pwm_set_irq_enabled(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_set_irq_mask_enabled:
+                pwm_set_irq_mask_enabled(sp[1], sp[0]);
+                break;
+            case SYSC_pwm_clear_irq:
+                pwm_clear_irq(sp[0]);
+                break;
+            case SYSC_pwm_get_irq_status_mask:
+                a.i = pwm_get_irq_status_mask();
+                break;
+            case SYSC_pwm_force_irq:
+                pwm_force_irq(sp[0]);
+                break;
+            case SYSC_pwm_get_dreq:
+                a.i = pwm_get_dreq(sp[0]);
                 break;
             default:
                 die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);

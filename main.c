@@ -30,6 +30,9 @@
 #include "xreceive.h"
 #include "xtransmit.h"
 
+#define STRINGIZE(x) #x
+#define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
+
 #define MAX_ARGS 4
 
 #define VT_ESC "\033"
@@ -646,16 +649,18 @@ int main(void) {
     uart = true;
 #endif
     screen_size();
+    const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
+    const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
     printf(VT_CLEAR "\n"
                     "Pico Shell - Copyright (C) 1883 Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
-                    "pico shell v" PS_VERSION ", LittleFS v%d.%d\n\n"
-                    "console on %s (%u rows, %u columns)\n\n"
+                    "pico shell v" PS_VERSION " (%s %s), LittleFS v%d.%d\n\n"
+                    "console on %s (%u X %u)\n\n"
                     "enter command, hit return for help\n\n",
-           LFS_VERSION >> 16, LFS_VERSION & 0xffff, uart ? "UART" : "USB",
-           screen_y, screen_x);
+           git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, uart ? "UART" : "USB",
+           screen_x, screen_y);
 
     if (fs_mount() != LFS_ERR_OK) {
         printf("The flash file system appears corrupt or unformatted!\n"
