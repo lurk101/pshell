@@ -4,6 +4,7 @@ A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 [amacc compiler]: https://github.com/jserv/amacc.git
 [c4 virtual machine]: https://github.com/rswier/c4.git
 [Squint]: https://github.com/HPCguy/Squint.git
+[list of implemented functions]: FUNCTIONS.md
 
 Credit where credit is due...
 
@@ -11,6 +12,13 @@ Credit where credit is due...
 - The compiler code is a remix of the [amacc compiler] parser generator
 and the [c4 virtual machine]. Floating point support was taken fom
 the [Squint] project.
+
+About the compiler, briefly…
+
+- Data types: integer, float and char.
+- Aggregate types: single dimension array, struct and union.
+- Flow: for, while, if then else, break, continue.
+- Memory, math and SDK functions. ([list of implemented functions])
 
 Building from source.
 
