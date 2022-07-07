@@ -15,6 +15,14 @@
 
     atoi sqrtf sinf cosf tanf logf powf
 
+    // miscellaneous
+
+    rand, srand,
+
+	// IO
+
+	getchar, getchar_timeout_us, putchar, open, close, read, write, lseek, rename, remove,
+
     // SDK TIME
 
     time_us_32 sleep_us sleep_ms

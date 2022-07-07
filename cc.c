@@ -407,6 +407,13 @@ enum {
     SYSC_getchar,
     SYSC_getchar_timeout_us,
     SYSC_putchar,
+    SYSC_open,
+    SYSC_close,
+    SYSC_read,
+    SYSC_write,
+    SYSC_lseek,
+    SYSC_rename,
+    SYSC_remove,
     // SDK functions
     SYSC_time_us_32,
     SYSC_sleep_us,
@@ -501,7 +508,8 @@ static const char* extern_name[] = {
     // miscellaneous
     "rand", "srand",
     // io
-    "getchar", "getchar_timeout_us", "putchar",
+    "getchar", "getchar_timeout_us", "putchar", "open", "close", "read", "write", "lseek", "rename",
+    "remove",
     // time
     "time_us_32", "sleep_us", "sleep_ms",
     // gpio
@@ -539,10 +547,16 @@ static char* malloc_list;
 static lfs_file_t* fd;
 static char* fp;
 
+struct file_handle {
+    struct file_handle* next;
+    lfs_file_t file;
+} * file_list;
+
 static void clear_globals(void) {
     base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = ast =
         (int*)(malloc_list = data_base = data = p = lp = fp = (char*)(id = sym_base = oid = NULL));
     fd = NULL;
+    file_list = NULL;
 
     swtc = brkc = cntc = tnew = tk = ty = loc = line = src = trc = ld = pplev = pplevt = oline =
         osize = ir_count = 0;
@@ -577,6 +591,7 @@ static void die_func(const char* func, int lne, const char* fmt, ...) {
 }
 
 static void run_die(const char* fmt, ...) {
+    printf("run time error : ");
     va_list ap;
     va_start(ap, fmt);
     vprintf(fmt, ap);
@@ -3288,6 +3303,13 @@ static int common_print_wrap(int n_parms, int sflag, int* sp) {
     return r;
 }
 
+static inline void check_kbd_halt(void) {
+    int key = getchar_timeout_us(0);
+    if (key != PICO_ERROR_TIMEOUT)
+        if ((key == 27) || (key == 3)) // check for escape
+            run_die("\nuser interrupted!!\n");
+}
+
 int cc(int run_mode, int argc, char** argv) {
     clear_globals();
 
@@ -3514,13 +3536,9 @@ int cc(int run_mode, int argc, char** argv) {
     a.i = 0;
     unsigned int last_esc = time_us_32();
     while (1) {
-        int key;
         unsigned int t = time_us_32();
-        if (t - last_esc > 500000) {
-            key = getchar_timeout_us(0);
-            if (key != PICO_ERROR_TIMEOUT)
-                if ((key == 27) || (key == 3)) // check for escape
-                    run_die("\nuser interrupted!!\n");
+        if (t - last_esc > 1000000) {
+            check_kbd_halt();
             last_esc = t;
         }
         i = *pc++;
@@ -3758,31 +3776,87 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_putchar:
                 putchar(sp[0]);
                 break;
+            case SYSC_open:
+                struct file_handle* h = sys_malloc(sizeof(struct file_handle));
+                if (!h)
+                    run_die("no file handle memory");
+                int mode;
+                char c = *((char*)sp[0]);
+                if (c == 'r')
+                    mode = LFS_O_RDONLY;
+                else if (c == 'w')
+                    mode = LFS_O_WRONLY | LFS_O_CREAT;
+                else
+                    run_die("invalid file open mode '%c'", c);
+                if (fs_file_open(&h->file, full_path((char*)sp[1]), mode) < LFS_ERR_OK) {
+                    sys_free(h);
+                    a.i = 0;
+                    break;
+                }
+                a.i = (int)h;
+                h->next = file_list;
+                file_list = h;
+                break;
+            case SYSC_close:
+                struct file_handle* last_h = (void*)&file_list;
+                h = file_list;
+                while (h) {
+                    if (h == (struct file_handle*)sp[0]) {
+                        last_h->next = h->next;
+                        fs_file_close(&h->file);
+                        sys_free(h);
+                        break;
+                    }
+                    last_h = h;
+                    h = h->next;
+                }
+                if (!h)
+                    run_die("closing unopened file!");
+                break;
+            case SYSC_read:
+                h = (struct file_handle*)sp[2];
+                a.i = fs_file_read(&h->file, (void*)sp[1], sp[0]);
+                break;
+            case SYSC_write:
+                h = (struct file_handle*)sp[2];
+                a.i = fs_file_write(&h->file, (void*)sp[1], sp[0]);
+                break;
+            case SYSC_lseek:
+                h = (struct file_handle*)sp[2];
+                a.i = fs_file_seek(&h->file, sp[1], sp[0]);
+                break;
+            case SYSC_rename:
+                fp = full_path((void*)sp[1]);
+                char* fpa = sys_malloc(strlen(fp) + 1);
+                if (!fpa)
+                    run_die("no rename memory");
+                strcpy(fpa, fp);
+                char* fpb = full_path((void*)sp[0]);
+                a.i = fs_rename(fpa, fpb);
+                sys_free(fpa);
+                break;
+            case SYSC_remove:
+                a.i = fs_remove(full_path((void*)sp[0]));
+                break;
             // time
             case SYSC_time_us_32: // SDK
                 a.i = time_us_32();
                 break;
             case SYSC_sleep_us:
                 unsigned us = *sp;
-                while (us > 500000) {
-                    sleep_ms(500);
-                    us -= 500000;
-                    key = getchar_timeout_us(0);
-                    if (key != PICO_ERROR_TIMEOUT)
-                        if ((key == 27) || (key == 3)) // check for escape
-                            run_die("\nuser interrupted!!\n");
+                while (us > 10000) {
+                    sleep_ms(10000);
+                    check_kbd_halt();
+                    us -= 10000;
                 }
                 sleep_us(us);
                 break;
             case SYSC_sleep_ms:
                 unsigned ms = *sp;
-                while (ms > 500) {
-                    sleep_ms(500);
-                    ms -= 500;
-                    key = getchar_timeout_us(0);
-                    if (key != PICO_ERROR_TIMEOUT)
-                        if ((key == 27) || (key == 3)) // check for escape
-                            run_die("\nuser interrupted!!\n");
+                while (ms > 10) {
+                    sleep_ms(10);
+                    check_kbd_halt();
+                    ms -= 10;
                 }
                 sleep_ms(ms);
                 break;
@@ -4025,7 +4099,8 @@ int cc(int run_mode, int argc, char** argv) {
             }
             break;
         case EXIT:
-            run_die("\nCC=%d\n", a);
+            printf("\nCC=%d\n", a);
+            goto done;
         case IRET:
             run_die("return from interrupt not yet implemented");
         default:
@@ -4046,6 +4121,10 @@ int cc(int run_mode, int argc, char** argv) {
 done:
     if (fd)
         fs_file_close(fd);
+    while (file_list) {
+        fs_file_close(&file_list->file);
+        file_list = file_list->next;
+    }
     while (malloc_list) {
         // printf("%08x %d\n", (int)malloc_list, *((int*)malloc_list + 1));
         sys_free(malloc_list + 8);
