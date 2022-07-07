@@ -566,8 +566,9 @@ static char* append_strtab(char** strtab, char* str) {
 }
 #define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
-static void die_func(const char* func, int line, const char* fmt, ...) {
-    printf("error at %p in %s: %s:%d\n", __builtin_return_address(0), func, line);
+static void die_func(const char* func, int lne, const char* fmt, ...) {
+    printf("error in compiler function %s at line %d\n", func, lne);
+    printf("C source line %d : ", line);
     va_list ap;
     va_start(ap, fmt);
     vprintf(fmt, ap);
