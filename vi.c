@@ -20,7 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "pico/stdlib.h"
+#include "hardware/timer.h"
+
+#include "pico/stdio.h"
 
 #include "fs.h"
 #include "vi.h"
@@ -321,6 +323,9 @@ struct globals {
     char* undo_queue_spos; // Start position of queued operation
     int undo_q;
     char undo_queue[VI_UNDO_QUEUE_MAX];
+
+    char ring[8];
+    int ring_count, ring_head, ring_tail;
 };
 
 #define text (G.text)
@@ -383,14 +388,12 @@ struct globals {
 #define undo_queue (G.undo_queue)
 #define undo_queue_spos (G.undo_queue_spos)
 
-static struct globals G;
+#define ring (G.ring)
+#define ring_count (G.ring_count)
+#define ring_head (G.ring_head)
+#define ring_tail (G.ring_tail)
 
-// sleep for 'h' 1/100 seconds, return 1/0 if stdin is (ready for read)/(not ready)
-static int sleep(int ms) {
-    if (ms)
-        busy_wait_us_32(ms * 1000);
-    return uart_is_readable(uart_default) ? 1 : 0;
-}
+static struct globals G;
 
 //----- Terminal Drawing ---------------------------------------
 // The terminal is made up of 'rows' line of 'columns' columns.
@@ -808,13 +811,44 @@ static void refresh(int full_screen) {
     refresh_old_offset = offset;
 }
 
+static char vi_getchar(void) {
+    if (ring_count == 0)
+        return getchar();
+    ring_count--;
+    char c = ring[ring_tail++];
+    ring_tail &= 7;
+    return c;
+}
+
+static int vi_getchar_timeout_us(int ms) {
+    if (ring_count) {
+        ring_count--;
+        char c = ring[ring_tail++];
+        ring_tail &= 7;
+        return c;
+    }
+    return getchar_timeout_us(1000);
+}
+
+// sleep for 'h' 1/100 seconds, return 1/0 if stdin is (ready for read)/(not ready)
+static int sleep(int ms) {
+    while (ms--) {
+        int c = getchar_timeout_us(1000);
+        if (c != PICO_ERROR_TIMEOUT) {
+            ring[ring_head++] = c;
+            ring_head &= 7;
+            ring_count++;
+        }
+    }
+    return ring_count;
+}
+
 static int safe_poll(uint8_t* buffer, int ms) {
     int c;
-    absolute_time_t t;
     if (ms < 0)
-        c = getchar();
+        c = vi_getchar();
     else {
-        c = getchar_timeout_us(ms * 1000);
+        c = vi_getchar_timeout_us(ms * 1000);
         if (c == PICO_ERROR_TIMEOUT)
             return 0;
     }

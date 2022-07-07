@@ -20,7 +20,6 @@
 #include "hardware/watchdog.h"
 
 #include "pico/bootrom.h"
-#include "pico/stdio.h"
 #include "pico/stdlib.h"
 #include "pico/sync.h"
 
