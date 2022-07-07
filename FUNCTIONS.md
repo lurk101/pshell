@@ -1,4 +1,7 @@
 ```
+	// NOTE: All of these functions can be used in the same fashion as their equivalent
+	// libc or Pico SDK functions. Consult those relevant docs.
+
     // SDK PRINT
  
     printf sprintf
@@ -32,12 +35,16 @@
     gpio_set_function gpio_get_function gpio_set_pulls gpio_pull_up gpio_is_pulled_up
     gpio_pull_down gpio_is_pulled_down gpio_disable_pulls gpio_set_irqover gpio_set_outover
     gpio_set_inover gpio_set_oeover gpio_set_input_enabled gpio_set_input_hysteresis_enabled
-    gpio_is_input_hysteresis_enabled gpio_set_slew_rate gpio_get_slew_rate gpio_set_drive_strength
-    gpio_get_drive_strength gpio_set_irq_enabled gpio_set_irq_enabled_with_callback
-    gpio_set_dormant_irq_enabled gpio_acknowledge_irq gpio_init gpio_deinit gpio_init_mask
-    gpio_get gpio_get_all gpio_set_mask gpio_clr_mask gpio_xor_mask gpio_put_masked
-    gpio_put_all gpio_put gpio_get_out_level gpio_set_dir_out_masked gpio_set_dir_in_masked
-    gpio_set_dir_masked gpio_set_dir_all_bits gpio_set_dir gpio_is_dir_out gpio_get_dir
+    gpio_is_input_hysteresis_enabled gpio_set_slew_rate gpio_get_slew_rate
+	gpio_set_drive_strength gpio_get_drive_strength gpio_set_irq_enabled gpio_set_irq_callback
+    gpio_set_irq_enabled_with_callback gpio_set_dormant_irq_enabled gpio_get_irq_event_mask
+    gpio_acknowledge_irq gpio_add_raw_irq_handler_with_order_priority_masked
+    gpio_add_raw_irq_handler_with_order_priority gpio_add_raw_irq_handler_masked
+    gpio_add_raw_irq_handler gpio_remove_raw_irq_handler_masked gpio_remove_raw_irq_handler
+    gpio_init gpio_deinit gpio_init_mask gpio_get gpio_get_all gpio_set_mask gpio_clr_mask
+    gpio_xor_mask gpio_put_masked gpio_put_all gpio_put gpio_get_out_level gpio_set_dir_out_masked
+    gpio_set_dir_in_masked gpio_set_dir_masked gpio_set_dir_all_bits gpio_set_dir gpio_is_dir_out
+    gpio_get_dir
 
     // SDK PWM
 
@@ -49,4 +56,10 @@
     pwm_set_output_polarity pwm_set_clkdiv_mode pwm_set_phase_correct pwm_set_enabled
     pwm_set_mask_enabled pwm_set_irq_enabled pwm_set_irq_mask_enabled pwm_clear_irq
     pwm_get_irq_status_mask pwm_force_irq pwm_get_dreq
+
+	// SDK ADC
+
+    adc_init adc_gpio_init adc_select_input adc_get_selected_input adc_set_round_robin
+    adc_set_temp_sensor_enabled adc_read adc_run adc_set_clkdiv adc_fifo_setup adc_fifo_is_empty
+    adc_fifo_get_level adc_fifo_get adc_fifo_get_blocking adc_fifo_drain adc_irq_set_enabled
 ```

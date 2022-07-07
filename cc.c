@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <hardware/adc.h>
 #include <hardware/gpio.h>
 #include <hardware/pwm.h>
 
@@ -439,9 +440,17 @@ enum {
     SYSC_gpio_set_drive_strength,
     SYSC_gpio_get_drive_strength,
     SYSC_gpio_set_irq_enabled,
+    SYSC_gpio_set_irq_callback,
     SYSC_gpio_set_irq_enabled_with_callback,
     SYSC_gpio_set_dormant_irq_enabled,
+    SYSC_gpio_get_irq_event_mask,
     SYSC_gpio_acknowledge_irq,
+    SYSC_gpio_add_raw_irq_handler_with_order_priority_masked,
+    SYSC_gpio_add_raw_irq_handler_with_order_priority,
+    SYSC_gpio_add_raw_irq_handler_masked,
+    SYSC_gpio_add_raw_irq_handler,
+    SYSC_gpio_remove_raw_irq_handler_masked,
+    SYSC_gpio_remove_raw_irq_handler,
     SYSC_gpio_init,
     SYSC_gpio_deinit,
     SYSC_gpio_init_mask,
@@ -493,49 +502,172 @@ enum {
     SYSC_pwm_clear_irq,
     SYSC_pwm_get_irq_status_mask,
     SYSC_pwm_force_irq,
-    SYSC_pwm_get_dreq
+    SYSC_pwm_get_dreq,
+    // ADC
+    SYSC_adc_init,
+    SYSC_adc_gpio_init,
+    SYSC_adc_select_input,
+    SYSC_adc_get_selected_input,
+    SYSC_adc_set_round_robin,
+    SYSC_adc_set_temp_sensor_enabled,
+    SYSC_adc_read,
+    SYSC_adc_run,
+    SYSC_adc_set_clkdiv,
+    SYSC_adc_fifo_setup,
+    SYSC_adc_fifo_is_empty,
+    SYSC_adc_fifo_get_level,
+    SYSC_adc_fifo_get,
+    SYSC_adc_fifo_get_blocking,
+    SYSC_adc_fifo_drain,
+    SYSC_adc_irq_set_enabled
 };
 
-static const char* extern_name[] = {
+static const struct {
+    char* name;
+    char nargs;
+} externs[] = {
     // varargs
-    "printf", "sprintf",
+    {"printf", 1},
+    {"sprintf", 1},
     // memory
-    "malloc", "free",
+    {"malloc", 1},
+    {"free", 1},
     // string
-    "strlen", "strcpy", "strcmp", "strcat", "strdup", "memcmp",
+    {"strlen", 1},
+    {"strcpy", 2},
+    {"strcmp", 2},
+    {"strcat", 2},
+    {"strdup", 1},
+    {"memcmp", 2},
     // math
-    "atoi", "sqrtf", "sinf", "cosf", "tanf", "logf", "powf",
+    {"atoi", 1},
+    {"sqrtf", 1},
+    {"sinf", 1},
+    {"cosf", 1},
+    {"tanf", 1},
+    {"logf", 1},
+    {"powf", 2},
     // miscellaneous
-    "rand", "srand",
+    {"rand", 0},
+    {"srand", 1},
     // io
-    "getchar", "getchar_timeout_us", "putchar", "open", "close", "read", "write", "lseek", "rename",
-    "remove",
+    {"getchar", 0},
+    {"getchar_timeout_us", 1},
+    {"putchar", 1},
+    {"open", 2},
+    {"close", 1},
+    {"read", 3},
+    {"write", 3},
+    {"lseek", 3},
+    {"rename", 2},
+    {"remove", 1},
     // time
-    "time_us_32", "sleep_us", "sleep_ms",
+    {"time_us_32", 0},
+    {"sleep_us", 1},
+    {"sleep_ms", 1},
     // gpio
-    "gpio_set_function", "gpio_get_function", "gpio_set_pulls", "gpio_pull_up", "gpio_is_pulled_up",
-    "gpio_pull_down", "gpio_is_pulled_down", "gpio_disable_pulls", "gpio_set_irqover",
-    "gpio_set_outover", "gpio_set_inover", "gpio_set_oeover", "gpio_set_input_enabled",
-    "gpio_set_input_hysteresis_enabled", "gpio_is_input_hysteresis_enabled", "gpio_set_slew_rate",
-    "gpio_slew_rate", "gpio_set_drive_strength", "gpio_get_drive_strength", "gpio_set_irq_enabled",
-    "gpio_set_irq_enabled_with_callback", "gpio_set_dormant_irq_enabled", "gpio_acknowledge_irq",
-    "gpio_init", "gpio_deinit", "gpio_init_mask", "gpio_get", "gpio_get_all", "gpio_set_mask",
-    "gpio_clr_mask", "gpio_xor_mask", "gpio_put_masked", "gpio_put_all", "gpio_put",
-    "gpio_get_out_level", "gpio_set_dir_out_masked", "gpio_set_dir_in_masked",
-    "gpio_set_dir_masked", "gpio_set_dir_all_bits", "gpio_set_dir", "gpio_is_dir_out",
-    "gpio_get_dir",
+    {"gpio_set_function", 2},
+    {"gpio_get_function", 1},
+    {"gpio_set_pulls", 3},
+    {"gpio_pull_up", 1},
+    {"gpio_is_pulled_up", 1},
+    {"gpio_pull_down", 1},
+    {"gpio_is_pulled_down", 1},
+    {"gpio_disable_pulls", 1},
+    {"gpio_set_irqover", 2},
+    {"gpio_set_outover", 2},
+    {"gpio_set_inover", 2},
+    {"gpio_set_oeover", 2},
+    {"gpio_set_input_enabled", 2},
+    {"gpio_set_input_hysteresis_enabled", 2},
+    {"gpio_is_input_hysteresis_enabled", 1},
+    {"gpio_set_slew_rate", 2},
+    {"gpio_get_slew_rate", 1},
+    {"gpio_set_drive_strength", 2},
+    {"gpio_get_drive_strength", 1},
+    {"gpio_set_irq_enabled", 3},
+    {"gpio_set_irq_callback", 1},
+    {"gpio_set_irq_enabled_with_callback", 4},
+    {"gpio_set_dormant_irq_enabled", 3},
+    {"gpio_get_irq_event_mask", 1},
+    {"gpio_acknowledge_irq", 2},
+    {"gpio_add_raw_irq_handler_with_order_priority_masked", 3},
+    {"gpio_add_raw_irq_handler_with_order_priority", 3},
+    {"gpio_add_raw_irq_handler_masked", 2},
+    {"gpio_add_raw_irq_handler", 2},
+    {"gpio_remove_raw_irq_handler_masked", 2},
+    {"gpio_remove_raw_irq_handler", 2},
+    {"gpio_init", 1},
+    {"gpio_deinit", 1},
+    {"gpio_init_mask", 1},
+    {"gpio_get", 1},
+    {"gpio_get_all", 0},
+    {"gpio_set_mask", 1},
+    {"gpio_clr_mask", 1},
+    {"gpio_xor_mask", 1},
+    {"gpio_put_masked", 2},
+    {"gpio_put_all", 1},
+    {"gpio_put", 2},
+    {"gpio_get_out_level", 1},
+    {"gpio_set_dir_out_masked", 1},
+    {"gpio_set_dir_in_masked", 1},
+    {"gpio_set_dir_masked", 2},
+    {"gpio_set_dir_all_bits", 1},
+    {"gpio_set_dir", 2},
+    {"gpio_is_dir_out", 1},
+    {"gpio_get_dir", 1},
     // PWM
-    "pwm_gpio_to_slice_num", "pwm_gpio_to_channel", "pwm_config_set_phase_correct",
-    "pwm_config_set_clkdiv", "pwm_config_set_clkdiv_int_frac", "pwm_config_set_clkdiv_int",
-    "pwm_config_set_clkdiv_mode", "pwm_config_set_output_polarity", "pwm_config_set_wrap",
-    "pwm_init", "pwm_get_default_config", "pwm_set_wrap", "pwm_set_chan_level",
-    "pwm_set_both_levels", "pwm_set_gpio_level", "pwm_get_counter", "pwm_set_counter",
-    "pwm_advance_count", "pwm_retard_count", "pwm_set_clkdiv_int_frac", "pwm_set_clkdiv",
-    "pwm_set_output_polarity", "pwm_set_clkdiv_mode", "pwm_set_phase_correct", "pwm_set_enabled",
-    "pwm_set_mask_enabled", "pwm_set_irq_enabled", "pwm_set_irq_mask_enabled", "pwm_clear_irq",
-    "pwm_get_irq_status_mask", "pwm_force_irq", "pwm_get_dreq"};
+    {"pwm_gpio_to_slice_num", 1},
+    {"pwm_gpio_to_channel", 1},
+    {"pwm_config_set_phase_correct", 2},
+    {"pwm_config_set_clkdiv", 2},
+    {"pwm_config_set_clkdiv_int_frac", 3},
+    {"pwm_config_set_clkdiv_int", 2},
+    {"pwm_config_set_clkdiv_mode", 2},
+    {"pwm_config_set_output_polarity", 3},
+    {"pwm_config_set_wrap", 2},
+    {"pwm_init", 3},
+    {"pwm_get_default_config", 0},
+    {"pwm_set_wrap", 2},
+    {"pwm_set_chan_level", 3},
+    {"pwm_set_both_levels", 3},
+    {"pwm_set_gpio_level", 2},
+    {"pwm_get_counter", 1},
+    {"pwm_set_counter", 2},
+    {"pwm_advance_count", 1},
+    {"pwm_retard_count", 1},
+    {"pwm_set_clkdiv_int_frac", 3},
+    {"pwm_set_clkdiv", 2},
+    {"pwm_set_output_polarity", 3},
+    {"pwm_set_clkdiv_mode", 2},
+    {"pwm_set_phase_correct", 2},
+    {"pwm_set_enabled", 2},
+    {"pwm_set_mask_enabled", 1},
+    {"pwm_set_irq_enabled", 2},
+    {"pwm_set_irq_mask_enabled", 2},
+    {"pwm_clear_irq", 1},
+    {"pwm_get_irq_status_mask", 0},
+    {"pwm_force_irq", 1},
+    {"pwm_get_dreq", 1},
+    // ADC
+    {"adc_init", 0},
+    {"adc_gpio_init", 1},
+    {"adc_select_input", 1},
+    {"adc_get_selected_input", 0},
+    {"adc_set_round_robin", 1},
+    {"adc_set_temp_sensor_enabled", 1},
+    {"adc_read", 0},
+    {"adc_run", 1},
+    {"adc_set_clkdiv", 1},
+    {"adc_fifo_setup", 5},
+    {"adc_fifo_is_empty", 0},
+    {"adc_fifo_get_level", 0},
+    {"adc_fifo_get", 0},
+    {"adc_fifo_get_blocking", 0},
+    {"adc_fifo_drain", 0},
+    {"adc_irq_set_enabled", 1}};
 
-static const int extern_count = sizeof(extern_name) / sizeof(extern_name[0]);
+static const int extern_count = sizeof(externs) / sizeof(externs[0]);
 
 static struct {
     int text_size, data_size;
@@ -593,11 +725,12 @@ static void die_func(const char* func, int lne, const char* fmt, ...) {
 }
 
 static void run_die(const char* fmt, ...) {
-    printf("run time error : ");
+    printf("\nrun time error : ");
     va_list ap;
     va_start(ap, fmt);
     vprintf(fmt, ap);
     va_end(ap);
+    printf("\n");
     longjmp(done_jmp, 1);
 }
 
@@ -638,7 +771,7 @@ static int extern_getidx(char* name) // get cache index of external function
 {
     int i, ext_addr = 0x1234;
     for (i = 0; i < extern_count; ++i)
-        if (!strcmp(extern_name[i], name))
+        if (!strcmp(externs[i].name, name))
             return i;
     return -1;
 }
@@ -1053,8 +1186,8 @@ static void expr(int lev) {
                 } else if (tk != ')')
                     die("missing comma in function call");
             }
-            if (t > 22)
-                die("maximum of 22 function parameters");
+            if (t > 14)
+                die("maximum of 14 function parameters");
             tt = (tt << 10) + (nf << 5) + t; // func etype not like other etype
             if (d->etype && (d->etype != tt))
                 die("argument type mismatch");
@@ -2894,7 +3027,7 @@ static void stmt(int ctx) {
                             ++le;
                             printf(" %d\n", *le & 0xf);
                         } else if (*le == SYSC) {
-                            printf(" %s\n", extern_name[*(++le)]);
+                            printf(" %s\n", externs[*(++le)].name);
                         } else
                             printf("\n");
                     }
@@ -3307,17 +3440,33 @@ static int common_print_wrap(int n_parms, int sflag, int* sp) {
 
 static inline void check_kbd_halt(void) {
     int key = getchar_timeout_us(0);
-    if (key != PICO_ERROR_TIMEOUT)
-        if ((key == 27) || (key == 3)) // check for escape
-            run_die("\nuser interrupted!!\n");
+    if ((key == 27) || (key == 3)) // check for escape
+        run_die("user interrupted!!");
 }
+
+static int *bp, *pc, *sp;
+
+static inline float pop_float(void) { return *((float*)sp++); }
+
+static inline int* pop_ptr(void) { return (int*)*sp++; }
+
+static inline int pop_int(void) { return *sp++; }
+
+static inline void push_ptr(void* p) { *(--sp) = (int)p; }
+
+static inline void push_int(int i) { *(--sp) = i; }
+
+static inline void push_float(float f) { *((float*)--sp) = f; }
+
+static inline void push_n(int n) { sp -= n; }
+
+static inline void pop_n(int n) { sp += n; }
 
 int cc(int run_mode, int argc, char** argv) {
     clear_globals();
 
     int i;
     char* ofn = NULL;
-    int *bp, *pc, *sp;
 
     if (setjmp(done_jmp))
         goto done;
@@ -3522,12 +3671,12 @@ int cc(int run_mode, int argc, char** argv) {
     if (!(base_sp = bp = sp = (int*)sys_malloc(STACK_BYTES)))
         die("could not allocate stack area");
     bp = sp = (int*)((int)sp + STACK_BYTES - 4);
-    *(--sp) = EXIT; // call exit if main returns
-    *(--sp) = PSH;
+    push_int(EXIT); // call exit if main returns
+    push_int(PSH);
     int* t = sp;
-    *(--sp) = argc;
-    *(--sp) = (int)argv;
-    *(--sp) = (int)t;
+    push_int(argc);
+    push_ptr(argv);
+    push_ptr(t);
 
     // run...
     int cycle = 0;
@@ -3566,7 +3715,7 @@ int cc(int run_mode, int argc, char** argv) {
             pc = (int*)*pc; // jump
             break;
         case JSR: // jump to subroutine
-            *(--sp) = (int)(pc + 1);
+            push_ptr(pc + 1);
             pc = (int*)*pc;
             break;
         case BZ:
@@ -3577,18 +3726,18 @@ int cc(int run_mode, int argc, char** argv) {
             break;
         // enter subroutine
         case ENT:
-            *(--sp) = (int)bp;
+            push_ptr(bp);
             bp = sp;
-            sp = sp - *pc++;
+            push_n(*pc++);
             break;
         case ADJ:
-            sp += *pc++ & 0xf; // stack adjust
+            pop_n(*pc++ & 0xf); // stack adjust
             break;
         // leave subroutine
         case LEV:
             sp = bp;
-            bp = (int*)*sp++;
-            pc = (int*)*sp++;
+            bp = pop_ptr();
+            pc = pop_ptr();
             break;
         case LI:
             a.i = *(int*)a.i; // load int
@@ -3600,99 +3749,99 @@ int cc(int run_mode, int argc, char** argv) {
             a.i = *(char*)a.i; // load char
             break;
         case SI:
-            *(int*)*sp++ = a.i; // store int
+            *((int*)pop_ptr()) = a.i; // store int
             break;
         case SF:
-            *(float*)*sp++ = a.f; // store float
+            *((float*)pop_ptr()) = a.f; // store float
             break;
         case SC:
-            a.i = *(char*)* sp++ = a.i; // store char
+            *((char*)pop_ptr()) = a.i; // store char
             break;
 
         case PSH:
-            *(--sp) = a.i; // push
+            push_int(a.i); // push
             break;
         case PSHF:
-            *((float*)--sp) = a.f;
+            push_float(a.f);
             break;
 
         case OR:
-            a.i = *sp++ | a.i;
+            a.i = pop_int() | a.i;
             break;
         case XOR:
-            a.i = *sp++ ^ a.i;
+            a.i = pop_int() ^ a.i;
             break;
         case AND:
-            a.i = *sp++ & a.i;
+            a.i = pop_int() & a.i;
             break;
         case EQ:
-            a.i = *sp++ == a.i;
+            a.i = pop_int() == a.i;
             break;
         case EQF:
-            a.i = *((float*)sp++) == a.f;
+            a.i = pop_float() == a.f;
             break;
         case NE:
-            a.i = *sp++ != a.i;
+            a.i = pop_int() != a.i;
             break;
         case NEF:
-            a.i = *((float*)sp++) != a.f;
+            a.i = pop_float() != a.f;
             break;
         case LT:
-            a.i = *sp++ < a.i;
+            a.i = pop_int() < a.i;
             break;
         case LTF:
-            a.i = *((float*)sp++) < a.f;
+            a.i = pop_float() < a.f;
             break;
         case GT:
-            a.i = *sp++ > a.i;
+            a.i = pop_int() > a.i;
             break;
         case GTF:
-            a.i = *((float*)sp++) > a.f;
+            a.i = pop_float() > a.f;
             break;
         case LE:
-            a.i = *sp++ <= a.i;
+            a.i = pop_int() <= a.i;
             break;
         case LEF:
-            a.i = *((float*)sp++) <= a.f;
+            a.i = pop_float() <= a.f;
             break;
         case GE:
-            a.i = *sp++ >= a.i;
+            a.i = pop_int() >= a.i;
             break;
         case GEF:
-            a.i = *((float*)sp++) == a.f;
+            a.i = pop_float() == a.f;
             break;
         case SHL:
-            a.i = *sp++ << a.i;
+            a.i = pop_int() << a.i;
             break;
         case SHR:
-            a.i = *sp++ >> a.i;
+            a.i = pop_int() >> a.i;
             break;
         case ADD:
-            a.i = *sp++ + a.i;
+            a.i = pop_int() + a.i;
             break;
         case ADDF:
-            a.f = *((float*)sp++) + a.f;
+            a.f = pop_float() + a.f;
             break;
         case SUB:
-            a.i = *sp++ - a.i;
+            a.i = pop_int() - a.i;
             break;
         case SUBF:
-            a.f = *((float*)sp++) - a.f;
+            a.f = pop_float() - a.f;
             break;
         case MUL:
-            a.i = *sp++ * a.i;
+            a.i = pop_int() * a.i;
             break;
         case MULF:
-            a.f = *((float*)sp++) * a.f;
+            a.f = pop_float() * a.f;
             break;
         case DIV:
-            a.i = *sp++ / a.i;
+            a.i = pop_int() / a.i;
             break;
         case DIVF:
-            a.f = *((float*)sp++) / a.f;
+            a.f = pop_float() / a.f;
             break;
         case MOD:
-            a.i = *sp++ % a.i;
+            a.i = pop_int() % a.i;
             break;
         case ITOF:
             a.f = (float)a.i;
@@ -3711,10 +3860,10 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             // memory management
             case SYSC_malloc:
-                a.i = (int)sys_malloc(*sp);
+                a.i = (int)sys_malloc(sp[0]);
                 break;
             case SYSC_free:
-                sys_free((void*)(*sp));
+                sys_free((void*)(sp[0]));
                 break;
             // string
             case SYSC_strlen:
@@ -3742,7 +3891,7 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             // math
             case SYSC_atoi:
-                a.i = atoi((char*)*sp);
+                a.i = atoi((char*)sp[0]);
                 break;
             case SYSC_sqrtf:
                 a.f = sqrtf(*((float*)sp));
@@ -3845,7 +3994,7 @@ int cc(int run_mode, int argc, char** argv) {
                 a.i = time_us_32();
                 break;
             case SYSC_sleep_us:
-                unsigned us = *sp;
+                unsigned us = sp[0];
                 while (us > 10000) {
                     sleep_ms(10000);
                     check_kbd_halt();
@@ -3854,7 +4003,7 @@ int cc(int run_mode, int argc, char** argv) {
                 sleep_us(us);
                 break;
             case SYSC_sleep_ms:
-                unsigned ms = *sp;
+                unsigned ms = sp[0];
                 while (ms > 10) {
                     sleep_ms(10);
                     check_kbd_halt();
@@ -3864,136 +4013,169 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             // SDK gpio
             case SYSC_gpio_set_function:
-                gpio_set_function(*(sp + 1), *sp);
+                gpio_set_function(sp[1], sp[0]);
                 break;
             case SYSC_gpio_get_function:
-                gpio_get_function(*sp);
+                a.i = gpio_get_function(sp[0]);
                 break;
             case SYSC_gpio_set_pulls:
-                gpio_set_pulls(*(sp + 2), *(sp + 1), *sp);
+                gpio_set_pulls(sp[2], sp[1], sp[0]);
                 break;
             case SYSC_gpio_pull_up:
-                gpio_pull_up(*sp);
+                gpio_pull_up(sp[0]);
                 break;
             case SYSC_gpio_is_pulled_up:
-                gpio_is_pulled_up(*sp);
+                a.i = gpio_is_pulled_up(sp[0]);
                 break;
             case SYSC_gpio_pull_down:
-                gpio_pull_down(*sp);
+                gpio_pull_down(sp[0]);
                 break;
             case SYSC_gpio_is_pulled_down:
-                gpio_is_pulled_down(*sp);
+                a.i = gpio_is_pulled_down(sp[0]);
                 break;
             case SYSC_gpio_disable_pulls:
-                gpio_disable_pulls(*sp);
+                gpio_disable_pulls(sp[0]);
                 break;
             case SYSC_gpio_set_irqover:
-                run_die("interrupt support not there yet");
                 gpio_set_irqover(sp[1], sp[0]);
                 break;
             case SYSC_gpio_set_outover:
-                gpio_set_outover(*(sp + 1), *sp);
+                gpio_set_outover(sp[1], sp[0]);
                 break;
             case SYSC_gpio_set_inover:
-                gpio_set_inover(*(sp + 1), *sp);
+                gpio_set_inover(sp[1], sp[0]);
                 break;
             case SYSC_gpio_set_oeover:
-                gpio_set_oeover(*(sp + 1), *sp);
+                gpio_set_oeover(sp[1], sp[0]);
                 break;
             case SYSC_gpio_set_input_enabled:
-                gpio_set_input_enabled(*(sp + 1), *sp);
+                gpio_set_input_enabled(sp[1], sp[0]);
                 break;
             case SYSC_gpio_set_input_hysteresis_enabled:
-                gpio_set_input_hysteresis_enabled(*(sp + 1), *sp);
+                gpio_set_input_hysteresis_enabled(sp[1], sp[0]);
                 break;
             case SYSC_gpio_is_input_hysteresis_enabled:
-                gpio_is_input_hysteresis_enabled(*sp);
+                a.i = gpio_is_input_hysteresis_enabled(sp[0]);
                 break;
             case SYSC_gpio_set_slew_rate:
-                gpio_set_slew_rate(*(sp + 1), *sp);
+                gpio_set_slew_rate(sp[1], sp[0]);
                 break;
             case SYSC_gpio_get_slew_rate:
-                gpio_get_slew_rate(*sp);
+                a.i = gpio_get_slew_rate(sp[0]);
                 break;
             case SYSC_gpio_set_drive_strength:
-                gpio_set_drive_strength(*(sp + 1), *sp);
+                gpio_set_drive_strength(sp[1], sp[0]);
                 break;
             case SYSC_gpio_get_drive_strength:
-                gpio_get_drive_strength(*sp);
+                a.i = gpio_get_drive_strength(sp[0]);
                 break;
             case SYSC_gpio_set_irq_enabled:
                 run_die("interrupt support not there yet");
-                gpio_set_irq_enabled(*(sp + 2), *(sp + 1), *sp);
+                gpio_set_irq_enabled(sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_gpio_set_irq_callback:
+                run_die("interrupt support not there yet");
+                gpio_set_irq_callback((gpio_irq_callback_t)sp[0]);
                 break;
             case SYSC_gpio_set_irq_enabled_with_callback:
                 run_die("interrupt support not there yet");
-                gpio_set_irq_enabled_with_callback(*(sp + 3), *(sp + 2), *(sp + 1), (void*)*sp);
+                gpio_set_irq_enabled_with_callback(sp[3], sp[2], sp[1], (gpio_irq_callback_t)sp[0]);
                 break;
             case SYSC_gpio_set_dormant_irq_enabled:
                 run_die("interrupt support not there yet");
-                gpio_set_dormant_irq_enabled(*(sp + 2), *(sp + 1), *sp);
+                gpio_set_dormant_irq_enabled(sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_gpio_get_irq_event_mask:
+                run_die("interrupt support not there yet");
+                a.i = gpio_get_irq_event_mask(sp[0]);
                 break;
             case SYSC_gpio_acknowledge_irq:
                 run_die("interrupt support not there yet");
-                gpio_acknowledge_irq(*(sp + 1), *sp);
+                gpio_acknowledge_irq(sp[1], sp[0]);
+                break;
+            case SYSC_gpio_add_raw_irq_handler_with_order_priority_masked:
+                run_die("interrupt support not there yet");
+                gpio_add_raw_irq_handler_with_order_priority_masked(sp[2], (irq_handler_t)sp[1],
+                                                                    sp[0]);
+                break;
+            case SYSC_gpio_add_raw_irq_handler_with_order_priority:
+                run_die("interrupt support not there yet");
+                gpio_add_raw_irq_handler_with_order_priority(sp[2], (irq_handler_t)sp[1], sp[0]);
+                break;
+            case SYSC_gpio_add_raw_irq_handler_masked:
+                run_die("interrupt support not there yet");
+                gpio_add_raw_irq_handler_masked(sp[1], (irq_handler_t)sp[0]);
+                break;
+            case SYSC_gpio_add_raw_irq_handler:
+                run_die("interrupt support not there yet");
+                gpio_add_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
+                break;
+            case SYSC_gpio_remove_raw_irq_handler_masked:
+                run_die("interrupt support not there yet");
+                gpio_remove_raw_irq_handler_masked(sp[1], (irq_handler_t)sp[0]);
+                break;
+            case SYSC_gpio_remove_raw_irq_handler:
+                run_die("interrupt support not there yet");
+                gpio_remove_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
                 break;
             case SYSC_gpio_init:
-                gpio_init(*sp);
+                gpio_init(sp[0]);
                 break;
             case SYSC_gpio_deinit:
-                gpio_deinit(*sp);
+                gpio_deinit(sp[0]);
                 break;
             case SYSC_gpio_init_mask:
-                gpio_init_mask(*sp);
+                gpio_init_mask(sp[0]);
                 break;
             case SYSC_gpio_get:
-                a.i = gpio_get(*sp);
+                a.i = gpio_get(sp[0]);
                 break;
             case SYSC_gpio_get_all:
                 a.i = gpio_get_all();
                 break;
             case SYSC_gpio_set_mask:
-                gpio_set_mask(*sp);
+                gpio_set_mask(sp[0]);
                 break;
             case SYSC_gpio_clr_mask:
-                gpio_clr_mask(*sp);
+                gpio_clr_mask(sp[0]);
                 break;
             case SYSC_gpio_xor_mask:
-                gpio_xor_mask(*sp);
+                gpio_xor_mask(sp[0]);
                 break;
             case SYSC_gpio_put_masked:
-                gpio_put_masked(*(sp + 1), *sp);
+                gpio_put_masked(sp[1], sp[0]);
                 break;
             case SYSC_gpio_put_all:
-                gpio_put_all(*sp);
+                gpio_put_all(sp[0]);
                 break;
             case SYSC_gpio_put:
-                gpio_put(*(sp + 1), *sp);
+                gpio_put(sp[1], sp[0]);
                 break;
             case SYSC_gpio_get_out_level:
-                a.i = gpio_get_out_level(*sp);
+                a.i = gpio_get_out_level(sp[0]);
                 break;
             case SYSC_gpio_set_dir_out_masked:
-                gpio_set_dir_out_masked(*sp);
+                gpio_set_dir_out_masked(sp[0]);
                 break;
             case SYSC_gpio_set_dir_in_masked:
-                gpio_set_dir_in_masked(*sp);
+                gpio_set_dir_in_masked(sp[0]);
                 break;
             case SYSC_gpio_set_dir_masked:
-                gpio_set_dir_masked(*(sp + 1), *sp);
+                gpio_set_dir_masked(sp[1], sp[0]);
                 break;
             case SYSC_gpio_set_dir_all_bits:
-                gpio_set_dir_all_bits(*sp);
+                gpio_set_dir_all_bits(sp[0]);
                 break;
             case SYSC_gpio_set_dir:
-                gpio_set_dir(*(sp + 1), *sp);
+                gpio_set_dir(sp[1], sp[0]);
                 break;
             case SYSC_gpio_is_dir_out:
-                a.i = gpio_is_dir_out(*sp);
+                a.i = gpio_is_dir_out(sp[0]);
                 break;
             case SYSC_gpio_get_dir:
-                a.i = gpio_get_dir(*sp);
+                a.i = gpio_get_dir(sp[0]);
                 break;
+            // PWM
             case SYSC_pwm_gpio_to_slice_num:
                 a.i = pwm_gpio_to_slice_num(sp[0]);
                 break;
@@ -4004,7 +4186,7 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_config_set_phase_correct((void*)sp[1], sp[0]);
                 break;
             case SYSC_pwm_config_set_clkdiv:
-                pwm_config_set_clkdiv((void*)sp[1], sp[0]);
+                pwm_config_set_clkdiv((void*)sp[1], *((float*)sp));
                 break;
             case SYSC_pwm_config_set_clkdiv_int_frac:
                 pwm_config_set_clkdiv_int_frac((void*)sp[2], sp[1], sp[0]);
@@ -4055,7 +4237,7 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_set_clkdiv_int_frac(sp[2], sp[1], sp[0]);
                 break;
             case SYSC_pwm_set_clkdiv:
-                pwm_set_clkdiv(sp[1], sp[0]);
+                pwm_set_clkdiv(sp[1], *((float*)sp));
                 break;
             case SYSC_pwm_set_output_polarity:
                 pwm_set_output_polarity(sp[2], sp[1], sp[0]);
@@ -4094,6 +4276,55 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_pwm_get_dreq:
                 a.i = pwm_get_dreq(sp[0]);
+                break;
+                // ADC
+            case SYSC_adc_init:
+                adc_init();
+                break;
+            case SYSC_adc_gpio_init:
+                adc_gpio_init(sp[0]);
+                break;
+            case SYSC_adc_select_input:
+                adc_select_input(sp[0]);
+                break;
+            case SYSC_adc_get_selected_input:
+                a.i = adc_get_selected_input();
+                break;
+            case SYSC_adc_set_round_robin:
+                adc_set_round_robin(sp[0]);
+                break;
+            case SYSC_adc_set_temp_sensor_enabled:
+                adc_set_temp_sensor_enabled(sp[0]);
+                break;
+            case SYSC_adc_read:
+                a.i = adc_read();
+                break;
+            case SYSC_adc_run:
+                adc_run(sp[0]);
+                break;
+            case SYSC_adc_set_clkdiv:
+                adc_set_clkdiv(*(float*)sp);
+                break;
+            case SYSC_adc_fifo_setup:
+                adc_fifo_setup(sp[4], sp[3], sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_adc_fifo_is_empty:
+                a.i = adc_fifo_is_empty();
+                break;
+            case SYSC_adc_fifo_get_level:
+                a.i = adc_fifo_get_level();
+                break;
+            case SYSC_adc_fifo_get:
+                a.i = adc_fifo_get();
+                break;
+            case SYSC_adc_fifo_get_blocking:
+                a.i = adc_fifo_get_blocking();
+                break;
+            case SYSC_adc_fifo_drain:
+                adc_fifo_drain();
+                break;
+            case SYSC_adc_irq_set_enabled:
+                adc_irq_set_enabled(sp[0]);
                 break;
             default:
                 run_die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);

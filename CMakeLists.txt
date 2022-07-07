@@ -66,7 +66,7 @@ endif()
 target_link_libraries(${PSHELL} PUBLIC littlefs stdinit-lib
     pico_stdlib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
-	hardware_pwm)
+	hardware_pwm hardware_adc)
 
 pico_add_extra_outputs(${PSHELL})
 
