@@ -604,8 +604,8 @@ static const char* search_cmds(int len) {
 
 static bool screen_size(void) {
     int rc = false;
-	screen_x = 80;
-	screen_y = 24;
+    screen_x = 80;
+    screen_y = 24;
     do {
 #if LIB_PICO_STDIO_UART
         stdio_set_translate_crlf(&stdio_uart, false);
@@ -625,8 +625,8 @@ static bool screen_size(void) {
                 break;
             *cp++ = k;
         }
-		if (cp == cmd_buffer)
-			break;
+        if (cp == cmd_buffer)
+            break;
 #if LIB_PICO_STDIO_UART
         stdio_set_translate_crlf(&stdio_uart, true);
 #endif
@@ -701,9 +701,9 @@ int main(void) {
                     "enter command, hit return for help\n\n",
            git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, uart ? "UART" : "USB",
            screen_x, screen_y);
-	if (!detected)
-		printf("\nYour terminal does not respond to standard VT100 escape sequences"
-			"\nsequences. The editor will likely not work at all!");
+    if (!detected)
+        printf("\nYour terminal does not respond to standard VT100 escape sequences"
+               "\nsequences. The editor will likely not work at all!");
 
     if (fs_mount() != LFS_ERR_OK) {
         printf("The flash file system appears corrupt or unformatted!\n"

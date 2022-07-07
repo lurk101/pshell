@@ -3688,12 +3688,12 @@ int cc(int run_mode, int argc, char** argv) {
                 a.i = (int)strcat((void*)sp[1], (void*)sp[0]);
                 break;
             case SYSC_strdup:
-				int strl = strlen((void*)sp[0]);
-				void* strp;
-				if (!(strp = sys_malloc(strl + 1)))
-					die("no strdum memory");
-				strcpy(strp, (void*)sp[0]);
-				a.i = (int)strp;
+                int strl = strlen((void*)sp[0]);
+                void* strp;
+                if (!(strp = sys_malloc(strl + 1)))
+                    die("no strdum memory");
+                strcpy(strp, (void*)sp[0]);
+                a.i = (int)strp;
                 break;
             case SYSC_memcmp:
                 a.i = memcmp((void*)sp[2], (void*)sp[1], sp[0]);
