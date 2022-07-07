@@ -564,18 +564,16 @@ typedef struct {
 
 // clang-format off
 static cmd_t cmd_table[] = {
-    {"cat",     cat_cmd,        "display file"},
+    {"cat",     cat_cmd,        "display text file"},
     {"cc",      cc_cmd,         "compile C source file"},
     {"cd",      cd_cmd,         "change directory"},
     {"clear",   clear_cmd,      "clear the screen"},
     {"cp",      cp_cmd,         "copy a file"},
     {"format",  format_cmd,     "format the filesystem"},
-    {"get",     get_cmd,        "get file (xmodem)"},
     {"ls",      ls_cmd,         "list directory"},
     {"mkdir",   mkdir_cmd,      "create directory"},
     {"mount",   mount_cmd,      "mount filesystem"},
     {"mv",      mv_cmd,         "rename file or directory"},
-    {"put",     put_cmd,        "put file (xmodem)"},
     {"quit",    quit_cmd,       "shutdown system"},
     {"reboot",  reboot_cmd,     "Restart system"},
     {"rm",      rm_cmd,         "remove file or directory"},
@@ -584,7 +582,9 @@ static cmd_t cmd_table[] = {
 #if LIB_PICO_STDIO_USB
     {"usbboot", usbboot_cmd,    "Reboot to USB flash mode"},
 #endif
-    {"vi",      vi_cmd,         "editor"}
+    {"vi",      vi_cmd,         "editor"},
+    {"xget",    get_cmd,        "get file (xmodem)"},
+    {"xput",    put_cmd,        "put file (xmodem)"}
 };
 // clang-format on
 
@@ -604,6 +604,8 @@ static const char* search_cmds(int len) {
 
 static bool screen_size(void) {
     int rc = false;
+	screen_x = 80;
+	screen_y = 24;
     do {
 #if LIB_PICO_STDIO_UART
         stdio_set_translate_crlf(&stdio_uart, false);
@@ -623,6 +625,8 @@ static bool screen_size(void) {
                 break;
             *cp++ = k;
         }
+		if (cp == cmd_buffer)
+			break;
 #if LIB_PICO_STDIO_UART
         stdio_set_translate_crlf(&stdio_uart, true);
 #endif
@@ -684,7 +688,7 @@ int main(void) {
 #if LIB_PICO_STDIO_UART
     uart = true;
 #endif
-    screen_size();
+    bool detected = screen_size();
     const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
     const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
     printf(VT_CLEAR "\n"
@@ -692,11 +696,14 @@ int main(void) {
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
-                    "pico shell v" PS_VERSION " [%s %s], LittleFS v%d.%d\n\n"
+                    "pico shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, " BB_VER "\n\n"
                     "console on %s [%u X %u]\n\n"
                     "enter command, hit return for help\n\n",
            git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, uart ? "UART" : "USB",
            screen_x, screen_y);
+	if (!detected)
+		printf("\nYour terminal does not respond to standard VT100 escape sequences"
+			"\nsequences. The editor will likely not work at all!");
 
     if (fs_mount() != LFS_ERR_OK) {
         printf("The flash file system appears corrupt or unformatted!\n"

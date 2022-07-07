@@ -55,8 +55,13 @@ add_executable(${PSHELL}
     cc_printf.S
     version.h)
 
-pico_enable_stdio_uart(${PSHELL} 0)
-pico_enable_stdio_usb(${PSHELL} 1)
+if (USB_CONSOLE)
+  pico_enable_stdio_uart(${PSHELL} 0)
+  pico_enable_stdio_usb(${PSHELL} 1)
+else()
+  pico_enable_stdio_uart(${PSHELL} 1)
+  pico_enable_stdio_usb(${PSHELL} 0)
+endif()
 
 target_link_libraries(${PSHELL} PUBLIC pico_stdlib littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio

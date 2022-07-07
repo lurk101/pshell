@@ -23,11 +23,11 @@
 #include "pico/stdlib.h"
 
 #include "fs.h"
+#include "vi.h"
 
 extern char* full_path(const char* name);
 
 #define ARRAY_SIZE(x) ((uint32_t)(sizeof(x) / sizeof((x)[0])))
-#define BB_VER ("Pico Vi 0.9 - " __DATE__)
 
 static int argc, optind;
 static jmp_buf die_jmp;

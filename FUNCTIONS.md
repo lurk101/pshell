@@ -9,7 +9,7 @@
 
     // LIBC STRING
 
-    strlen strcpy strcmp memcmp
+    strlen strcpy strcmp strcat strdup memcmp
 
     // LIBC MATH
 
