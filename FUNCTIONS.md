@@ -21,7 +21,7 @@
 
 	// IO
 
-	getchar, getchar_timeout_us, putchar, open, close, read, write, lseek, rename, remove,
+	getchar, getchar_timeout_us, putchar, open, close, read, write, lseek, rename, remove
 
     // SDK TIME
 

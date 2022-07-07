@@ -1,3 +1,7 @@
+What's new in version 1.0.6
+
+- file io functions open close read write lseek rename remove
+
 What's new in version 1.0.5
 
 - use float functions sqrtf sinf cosf tanf logf powf instead of double versions
