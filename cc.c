@@ -564,11 +564,21 @@ static char* append_strtab(char** strtab, char* str) {
     *strtab = res + nbytes;
     return res;
 }
+#define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
-static void die(const char* f, ...) {
+static void die_func(const char* func, int line, const char* fmt, ...) {
+    printf("error at %p in %s: %s:%d\n", __builtin_return_address(0), func, line);
     va_list ap;
-    va_start(ap, f);
-    vprintf(f, ap);
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    longjmp(done_jmp, 1);
+}
+
+static void run_die(const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
     va_end(ap);
     longjmp(done_jmp, 1);
 }
@@ -3509,7 +3519,7 @@ int cc(int run_mode, int argc, char** argv) {
             key = getchar_timeout_us(0);
             if (key != PICO_ERROR_TIMEOUT)
                 if ((key == 27) || (key == 3)) // check for escape
-                    die("\nuser interrupted!!\n");
+                    run_die("\nuser interrupted!!\n");
             last_esc = t;
         }
         i = *pc++;
@@ -3702,7 +3712,7 @@ int cc(int run_mode, int argc, char** argv) {
                 int strl = strlen((void*)sp[0]);
                 void* strp;
                 if (!(strp = sys_malloc(strl + 1)))
-                    die("no strdum memory");
+                    run_die("no strdup memory");
                 strcpy(strp, (void*)sp[0]);
                 a.i = (int)strp;
                 break;
@@ -3759,7 +3769,7 @@ int cc(int run_mode, int argc, char** argv) {
                     key = getchar_timeout_us(0);
                     if (key != PICO_ERROR_TIMEOUT)
                         if ((key == 27) || (key == 3)) // check for escape
-                            die("\nuser interrupted!!\n");
+                            run_die("\nuser interrupted!!\n");
                 }
                 sleep_us(us);
                 break;
@@ -3771,7 +3781,7 @@ int cc(int run_mode, int argc, char** argv) {
                     key = getchar_timeout_us(0);
                     if (key != PICO_ERROR_TIMEOUT)
                         if ((key == 27) || (key == 3)) // check for escape
-                            die("\nuser interrupted!!\n");
+                            run_die("\nuser interrupted!!\n");
                 }
                 sleep_ms(ms);
                 break;
@@ -3801,7 +3811,7 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_disable_pulls(*sp);
                 break;
             case SYSC_gpio_set_irqover:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 gpio_set_irqover(sp[1], sp[0]);
                 break;
             case SYSC_gpio_set_outover:
@@ -3835,19 +3845,19 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_get_drive_strength(*sp);
                 break;
             case SYSC_gpio_set_irq_enabled:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 gpio_set_irq_enabled(*(sp + 2), *(sp + 1), *sp);
                 break;
             case SYSC_gpio_set_irq_enabled_with_callback:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 gpio_set_irq_enabled_with_callback(*(sp + 3), *(sp + 2), *(sp + 1), (void*)*sp);
                 break;
             case SYSC_gpio_set_dormant_irq_enabled:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 gpio_set_dormant_irq_enabled(*(sp + 2), *(sp + 1), *sp);
                 break;
             case SYSC_gpio_acknowledge_irq:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 gpio_acknowledge_irq(*(sp + 1), *sp);
                 break;
             case SYSC_gpio_init:
@@ -3986,39 +3996,39 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_set_mask_enabled(sp[0]);
                 break;
             case SYSC_pwm_set_irq_enabled:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 pwm_set_irq_enabled(sp[1], sp[0]);
                 break;
             case SYSC_pwm_set_irq_mask_enabled:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 pwm_set_irq_mask_enabled(sp[1], sp[0]);
                 break;
             case SYSC_pwm_clear_irq:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 pwm_clear_irq(sp[0]);
                 break;
             case SYSC_pwm_get_irq_status_mask:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 a.i = pwm_get_irq_status_mask();
                 break;
             case SYSC_pwm_force_irq:
-                die("interrupt support not there yet");
+                run_die("interrupt support not there yet");
                 pwm_force_irq(sp[0]);
                 break;
             case SYSC_pwm_get_dreq:
                 a.i = pwm_get_dreq(sp[0]);
                 break;
             default:
-                die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
+                run_die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
                 break;
             }
             break;
         case EXIT:
-            die("\nCC=%d\n", a);
+            run_die("\nCC=%d\n", a);
         case IRET:
-            die("return from interrupt not yet implemented");
+            run_die("return from interrupt not yet implemented");
         default:
-            die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
+            run_die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         }
         if (trc) {
             printf("acc    %12f 0x%08x %12d\n", a.f, a.i, a.i);
