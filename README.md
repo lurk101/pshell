@@ -11,10 +11,11 @@ Credit where credit is due...
 
 - The vi code is ported from the [BusyBox] source code.
 - The compiler code is a remix of the [amacc compiler] parser generator
-and the [c4 virtual machine]. Floating point support was taken fom
+and the [c4 virtual machine]. Many important amacc enhancements such as
+floating point, array, struct and type checking support were taken fom
 the [Squint] project.
 
-[What's new]
+[What's new] in pshell
 
 About the compiler, briefly…
 
