@@ -400,6 +400,13 @@ enum {
     SYSC_tan,
     SYSC_log,
     SYSC_pow,
+    // miscellaneous
+    SYSC_rand,
+    SYSC_srand,
+    // LIBC IO
+    SYSC_getchar,
+    SYSC_getchar_timeout_us,
+    SYSC_putchar,
     // SDK functions
     SYSC_time_us_32,
     SYSC_sleep_us,
@@ -491,6 +498,10 @@ static const char* extern_name[] = {
     "strlen", "strcpy", "strcmp", "strcat", "strdup", "memcmp",
     // math
     "atoi", "sqrt", "sin", "cos", "tan", "log", "pow",
+    // miscellaneous
+    "rand", "srand",
+    // io
+    "getchar", "getchar_timeout_us", "putchar",
     // time
     "time_us_32", "sleep_us", "sleep_ms",
     // gpio
@@ -3719,6 +3730,22 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_pow:
                 a.f = pow(*((float*)sp + 1), *((float*)sp));
+                break;
+            case SYSC_rand:
+                a.i = rand();
+                break;
+            case SYSC_srand:
+                srand(sp[0]);
+                break;
+            // io
+            case SYSC_getchar:
+                a.i = getchar();
+                break;
+            case SYSC_getchar_timeout_us:
+                a.i = getchar_timeout_us(sp[0]);
+                break;
+            case SYSC_putchar:
+                putchar(sp[0]);
                 break;
             // time
             case SYSC_time_us_32: // SDK
