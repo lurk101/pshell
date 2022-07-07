@@ -13,7 +13,7 @@
 
     // LIBC MATH
 
-    atoi sqrt sin cos tan log pow
+    atoi sqrtf sinf cosf tanf logf powf
 
     // SDK TIME
 

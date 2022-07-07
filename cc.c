@@ -394,12 +394,12 @@ enum {
     SYSC_memcmp,
     // math functions
     SYSC_atoi,
-    SYSC_sqrt,
-    SYSC_sin,
-    SYSC_cos,
-    SYSC_tan,
-    SYSC_log,
-    SYSC_pow,
+    SYSC_sqrtf,
+    SYSC_sinf,
+    SYSC_cosf,
+    SYSC_tanf,
+    SYSC_logf,
+    SYSC_powf,
     // miscellaneous
     SYSC_rand,
     SYSC_srand,
@@ -497,7 +497,7 @@ static const char* extern_name[] = {
     // string
     "strlen", "strcpy", "strcmp", "strcat", "strdup", "memcmp",
     // math
-    "atoi", "sqrt", "sin", "cos", "tan", "log", "pow",
+    "atoi", "sqrtf", "sinf", "cosf", "tanf", "logf", "powf",
     // miscellaneous
     "rand", "srand",
     // io
@@ -999,7 +999,7 @@ static void expr(int lev) {
                 d->val = extern_getidx(d->name);
                 if (d->val < 0)
                     die("Unknown external function %s", d->name);
-                d->type = (d->val >= SYSC_sqrt) && (d->val <= SYSC_pow) ? FLOAT : INT;
+                d->type = (d->val >= SYSC_sqrtf) && (d->val <= SYSC_powf) ? FLOAT : INT;
 
                 d->name[namelen] = ch;
             }
@@ -3713,23 +3713,23 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_atoi:
                 a.i = atoi((char*)*sp);
                 break;
-            case SYSC_sqrt:
-                a.f = sqrt(*((float*)sp));
+            case SYSC_sqrtf:
+                a.f = sqrtf(*((float*)sp));
                 break;
-            case SYSC_sin:
-                a.f = sin(*((float*)sp));
+            case SYSC_sinf:
+                a.f = sinf(*((float*)sp));
                 break;
-            case SYSC_cos:
-                a.f = cos(*((float*)sp));
+            case SYSC_cosf:
+                a.f = cosf(*((float*)sp));
                 break;
-            case SYSC_tan:
-                a.f = tan(*((float*)sp));
+            case SYSC_tanf:
+                a.f = tanf(*((float*)sp));
                 break;
-            case SYSC_log:
-                a.f = log(*((float*)sp));
+            case SYSC_logf:
+                a.f = logf(*((float*)sp));
                 break;
-            case SYSC_pow:
-                a.f = pow(*((float*)sp + 1), *((float*)sp));
+            case SYSC_powf:
+                a.f = powf(*((float*)sp + 1), *((float*)sp));
                 break;
             case SYSC_rand:
                 a.i = rand();
