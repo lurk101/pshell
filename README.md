@@ -42,6 +42,10 @@ Starting with version 1.0.4 all development will occur on the dev branch. To bui
 ```
 git checkout dev
 ```
+To build for USB:
+```
+cmake .. -DUSB_CONSOLE=1
+```
 
 Example (somewhat dated) log.
 

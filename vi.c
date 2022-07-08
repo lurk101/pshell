@@ -16,17 +16,17 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "hardware/timer.h"
 
-#include "pico/stdio.h"
 #include "pico/time.h"
+#include "pico/stdio.h"
 
 #include "fs.h"
 #include "vi.h"
+#include "io.h"
 
 extern char* full_path(const char* name);
 
@@ -37,7 +37,7 @@ static jmp_buf die_jmp;
 
 static inline void puts_no_eol(const char* s) {
     while (*s)
-        putchar_raw(*s++);
+        putchar(*s++);
 }
 
 static int index_in_strings(const char* strings, const char* key) {
@@ -106,9 +106,8 @@ static void error_msg_and_die(const char* s, ...) {
 
     va_start(p, s);
     vprintf(s, p);
-    putchar_raw('\n');
-    fflush(stdout);
     va_end(p);
+    putchar('\n');
     longjmp(die_jmp, 1);
 }
 
@@ -325,7 +324,7 @@ struct globals {
     int undo_q;
     char undo_queue[VI_UNDO_QUEUE_MAX];
 
-    char ring_buf[8];
+    char ring_buf[16 * 1024];
     int ring_count, ring_head, ring_tail;
 };
 
@@ -812,47 +811,19 @@ static void refresh(int full_screen) {
     refresh_old_offset = offset;
 }
 
-static char vi_getchar(void) {
-    if (ring_count == 0)
-        return getchar();
-    ring_count--;
-    char c = ring_buf[ring_tail++];
-    ring_tail &= sizeof(ring_buf) - 1;
-    return c;
-}
-
-static int vi_getchar_timeout_us(int ms) {
-    if (ring_count) {
-        ring_count--;
-        char c = ring_buf[ring_tail++];
-        ring_tail &= sizeof(ring_buf) - 1;
-        return c;
-    }
-    return getchar_timeout_us(1000);
-}
-
 // sleep for 'h' 1/100 seconds, return 1/0 if stdin is (ready for read)/(not ready)
 static int sleep(int ms) {
-    while (ms--) {
-        if (ring_count < sizeof(ring_buf)) {
-            int c = getchar_timeout_us(1000);
-            if (c != PICO_ERROR_TIMEOUT) {
-                ring_buf[ring_head++] = c;
-                ring_head &= sizeof(ring_buf) - 1;
-                ring_count++;
-            }
-        } else
-            break;
-    }
-    return ring_count;
+	if (ms)
+    	sleep_ms(ms);
+    return nextchar();
 }
 
 static int safe_poll(uint8_t* buffer, int ms) {
     int c;
     if (ms < 0)
-        c = vi_getchar();
+        c = x_getchar();
     else {
-        c = vi_getchar_timeout_us(ms * 1000);
+        c = x_getchar_timeout_us(ms * 1000);
         if (c == PICO_ERROR_TIMEOUT)
             return 0;
     }
@@ -1114,7 +1085,7 @@ static char* get_input_line(const char* prompt) {
         } else if (c > 0 && c < 256) { // exclude Unicode
             get_input_line_buf[i] = c;
             get_input_line_buf[++i] = '\0';
-            putchar_raw(c);
+            putchar(c);
         }
     }
     refresh(false);
@@ -2501,7 +2472,7 @@ static void colon(char* buf) {
             r = end_line(dot);
         }
         go_bottom_and_clear_to_eol();
-        puts("\r");
+        printf("\r");
         for (; q <= r; q++) {
             int c_is_no_print;
 
@@ -2514,13 +2485,13 @@ static void colon(char* buf) {
             if (c == '\n') {
                 puts_no_eol("$\r");
             } else if (c < ' ' || c == 127) {
-                putchar_raw('^');
+                putchar('^');
                 if (c == 127)
                     c = '?';
                 else
                     c += '@';
             }
-            putchar_raw(c);
+            putchar(c);
             if (c_is_no_print)
                 standout_end();
         }
@@ -2723,7 +2694,7 @@ static void colon(char* buf) {
                 status_line("%d substitutions on %d lines", subs, lines);
         }
     } else if (strncmp(cmd, "version", i) == 0) { // show software version
-        status_line(BB_VER);
+        status_line("vi " VI_VER);
     } else if (strncmp(cmd, "write", i) == 0 // write text to file
                || strcmp(cmd, "wq") == 0 || strcmp(cmd, "wn") == 0 || (cmd[0] == 'x' && !cmd[1])) {
         int size;
@@ -3807,7 +3778,7 @@ static void edit_file(char* fn) {
         // poll to see if there is input already waiting. if we are
         // not able to display output fast enough to keep up, skip
         // the display update until we catch up with input.
-        if (!readbuffer[0] && sleep(0) == 0) {
+        if (!readbuffer[0] && sleep(0) == PICO_ERROR_TIMEOUT) {
             // no input pending - so update output
             refresh(false);
             show_status_line();
@@ -3817,8 +3788,6 @@ static void edit_file(char* fn) {
 
     go_bottom_and_clear_to_eol();
 }
-
-#define VI_OPTSTR "c:*"
 
 static void* xmalloc_open_read_close(const char* filename) {
     lfs_file_t fd;

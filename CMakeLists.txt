@@ -52,6 +52,7 @@ add_executable(${PSHELL}
     fs.c fs.h
     vi.c vi.h
     cc.c cc.h
+    io.c io.h
     cc_printf.S
     version.h)
 
@@ -63,10 +64,18 @@ else()
   pico_enable_stdio_usb(${PSHELL} 0)
 endif()
 
-target_link_libraries(${PSHELL} PUBLIC littlefs stdinit-lib
+set(LINK_LIST)
+list(APPEND LINK_LIST
     pico_stdlib
+    littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
-	hardware_pwm hardware_adc hardware_clocks)
+    hardware_pwm hardware_adc hardware_clocks hardware_uart)
+
+if (NOT USB_CONSOLE)
+    list(APPEND LINK_LIST hardware_uart hardware_irq)
+endif()
+
+target_link_libraries(${PSHELL} PUBLIC ${LINK_LIST})
 
 pico_add_extra_outputs(${PSHELL})
 

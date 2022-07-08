@@ -1,14 +1,12 @@
 /* vi: set sw=4 ts=4: */
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <stdio.h>
 #include <string.h>
-
-#include "pico/stdio.h"
 
 #include "crc16.h"
 #include "xcommon.h"
 #include "xtransmit.h"
+#include "io.h"
 
 int xmodemTransmit(uint8_t* src, int srcsz) {
     uint8_t xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */

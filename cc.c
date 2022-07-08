@@ -1,3 +1,4 @@
+
 /*
  * mc is capable of compiling a (subset of) C source files
  * There is no preprocessor.
@@ -16,20 +17,20 @@
 #include <math.h>
 #include <setjmp.h>
 #include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <hardware/adc.h>
 #include <hardware/clocks.h>
 #include <hardware/gpio.h>
 #include <hardware/pwm.h>
 
-#include <pico/stdio.h>
 #include <pico/time.h>
+#include <pico/stdio.h>
 
 #include "cc.h"
 #include "fs.h"
+#include "io.h"
 
 #define K 1024
 
@@ -40,6 +41,12 @@
 #define AST_TBL_BYTES (16 * K)
 #define MEMBER_DICT_BYTES (1 * K)
 #define STACK_BYTES (16 * K)
+
+#if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
+#define SDK14 1
+#else
+#define SDK14 0
+#endif
 
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
@@ -441,17 +448,23 @@ enum {
     SYSC_gpio_set_drive_strength,
     SYSC_gpio_get_drive_strength,
     SYSC_gpio_set_irq_enabled,
+#if SDK14
     SYSC_gpio_set_irq_callback,
+#endif
     SYSC_gpio_set_irq_enabled_with_callback,
     SYSC_gpio_set_dormant_irq_enabled,
+#if SDK14
     SYSC_gpio_get_irq_event_mask,
+#endif
     SYSC_gpio_acknowledge_irq,
+#if SDK14
     SYSC_gpio_add_raw_irq_handler_with_order_priority_masked,
     SYSC_gpio_add_raw_irq_handler_with_order_priority,
     SYSC_gpio_add_raw_irq_handler_masked,
     SYSC_gpio_add_raw_irq_handler,
     SYSC_gpio_remove_raw_irq_handler_masked,
     SYSC_gpio_remove_raw_irq_handler,
+#endif
     SYSC_gpio_init,
     SYSC_gpio_deinit,
     SYSC_gpio_init_mask,
@@ -598,17 +611,23 @@ static const struct {
     {"gpio_set_drive_strength", 2},
     {"gpio_get_drive_strength", 1},
     {"gpio_set_irq_enabled", 3},
+#if SDK14
     {"gpio_set_irq_callback", 1},
+#endif
     {"gpio_set_irq_enabled_with_callback", 4},
     {"gpio_set_dormant_irq_enabled", 3},
+#if SDK14
     {"gpio_get_irq_event_mask", 1},
+#endif
     {"gpio_acknowledge_irq", 2},
+#if SDK14
     {"gpio_add_raw_irq_handler_with_order_priority_masked", 3},
     {"gpio_add_raw_irq_handler_with_order_priority", 3},
     {"gpio_add_raw_irq_handler_masked", 2},
     {"gpio_add_raw_irq_handler", 2},
     {"gpio_remove_raw_irq_handler_masked", 2},
     {"gpio_remove_raw_irq_handler", 2},
+#endif
     {"gpio_init", 1},
     {"gpio_deinit", 1},
     {"gpio_init_mask", 1},
@@ -696,6 +715,14 @@ static struct {
     char* name;
     int val;
 } defines[] = {
+    // OPEN
+    {"O_RDONLY", LFS_O_RDONLY},
+    {"O_WRONLY", LFS_O_WRONLY},
+    {"O_RDWR", LFS_O_RDWR},
+    {"O_CREAT", LFS_O_CREAT},   // Create a file if it does not exist
+    {"O_EXCL", LFS_O_EXCL},     // Fail if a file already exists
+    {"O_TRUNC", LFS_O_TRUNC},   // Truncate the existing file to zero size
+    {"O_APPEND", LFS_O_APPEND}, // Move to end of file on every write
     // GPIO
     {"GPIO_FUNC_XIP", GPIO_FUNC_XIP},
     {"GPIO_FUNC_SPI", GPIO_FUNC_SPI},
@@ -3523,7 +3550,7 @@ static int common_print_wrap(int n_parms, int sflag, int* sp) {
 }
 
 static inline void check_kbd_halt(void) {
-    int key = getchar_timeout_us(0);
+    int key = x_getchar_timeout_us(0);
     if ((key == 27) || (key == 3)) // check for escape
         run_die("user interrupted!!");
 }
@@ -4011,10 +4038,10 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             // io
             case SYSC_getchar:
-                a.i = getchar();
+                a.i = x_getchar();
                 break;
             case SYSC_getchar_timeout_us:
-                a.i = getchar_timeout_us(sp[0]);
+                a.i = x_getchar_timeout_us(sp[0]);
                 break;
             case SYSC_putchar:
                 putchar(sp[0]);
@@ -4023,15 +4050,7 @@ int cc(int run_mode, int argc, char** argv) {
                 struct file_handle* h = sys_malloc(sizeof(struct file_handle));
                 if (!h)
                     run_die("no file handle memory");
-                int mode;
-                char c = *((char*)sp[0]);
-                if (c == 'r')
-                    mode = LFS_O_RDONLY;
-                else if (c == 'w')
-                    mode = LFS_O_WRONLY | LFS_O_CREAT;
-                else
-                    run_die("invalid file open mode '%c'", c);
-                if (fs_file_open(&h->file, full_path((char*)sp[1]), mode) < LFS_ERR_OK) {
+                if (fs_file_open(&h->file, full_path((char*)sp[1]), sp[0]) < LFS_ERR_OK) {
                     sys_free(h);
                     a.i = 0;
                     break;
@@ -4165,10 +4184,12 @@ int cc(int run_mode, int argc, char** argv) {
                 run_die("interrupt support not there yet");
                 gpio_set_irq_enabled(sp[2], sp[1], sp[0]);
                 break;
+#if SDK14
             case SYSC_gpio_set_irq_callback:
                 run_die("interrupt support not there yet");
                 gpio_set_irq_callback((gpio_irq_callback_t)sp[0]);
                 break;
+#endif
             case SYSC_gpio_set_irq_enabled_with_callback:
                 run_die("interrupt support not there yet");
                 gpio_set_irq_enabled_with_callback(sp[3], sp[2], sp[1], (gpio_irq_callback_t)sp[0]);
@@ -4177,14 +4198,17 @@ int cc(int run_mode, int argc, char** argv) {
                 run_die("interrupt support not there yet");
                 gpio_set_dormant_irq_enabled(sp[2], sp[1], sp[0]);
                 break;
+#if SDK14
             case SYSC_gpio_get_irq_event_mask:
                 run_die("interrupt support not there yet");
                 a.i = gpio_get_irq_event_mask(sp[0]);
                 break;
+#endif
             case SYSC_gpio_acknowledge_irq:
                 run_die("interrupt support not there yet");
                 gpio_acknowledge_irq(sp[1], sp[0]);
                 break;
+#if SDK14
             case SYSC_gpio_add_raw_irq_handler_with_order_priority_masked:
                 run_die("interrupt support not there yet");
                 gpio_add_raw_irq_handler_with_order_priority_masked(sp[2], (irq_handler_t)sp[1],
@@ -4210,6 +4234,7 @@ int cc(int run_mode, int argc, char** argv) {
                 run_die("interrupt support not there yet");
                 gpio_remove_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
                 break;
+#endif
             case SYSC_gpio_init:
                 gpio_init(sp[0]);
                 break;
@@ -4472,7 +4497,7 @@ int cc(int run_mode, int argc, char** argv) {
                    *((float*)sp + 2), *((float*)sp + 3));
         }
         if (trc > 1)
-            getchar();
+            x_getchar();
     }
 done:
     if (fd)

@@ -15,13 +15,12 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "hardware/watchdog.h"
 
 #include "pico/bootrom.h"
-#include "pico/stdlib.h"
 #include "pico/sync.h"
+#include "pico/stdio.h"
 
 #include "cc.h"
 #include "fs.h"
@@ -30,14 +29,18 @@
 #include "vi.h"
 #include "xreceive.h"
 #include "xtransmit.h"
+#include "io.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
-#define MAX_ARGS 4
+#define MAX_ARGS 16
 
 #define VT_ESC "\033"
 #define VT_CLEAR VT_ESC "[H" VT_ESC "[J"
+#define VT_BLINK VT_ESC "[5m"
+#define VT_BOLD VT_ESC "[1m"
+#define VT_NORMAL VT_ESC "[m"
 
 typedef char buf_t[128];
 
@@ -64,7 +67,7 @@ static void parse_cmd(void) {
     char* cp_end = cp + sizeof(cmd_buffer);
     char c;
     do {
-        c = getchar();
+        c = x_getchar();
         if (c == '\t') {
             bool infirst = true;
             for (char* p = cmd_buffer; p < cp; p++)
@@ -159,19 +162,9 @@ static void put_cmd(void) {
         strcpy(result, "Can't create file");
         return;
     }
-#if LIB_PICO_STDIO_UART
-    stdio_set_translate_crlf(&stdio_uart, false);
-#endif
-#if LIB_PICO_STDIO_USB
-    stdio_set_translate_crlf(&stdio_usb, false);
-#endif
+	set_translate_crlf(false);
     xmodemReceive(xmodem_cb);
-#if LIB_PICO_STDIO_UART
-    stdio_set_translate_crlf(&stdio_uart, true);
-#endif
-#if LIB_PICO_STDIO_USB
-    stdio_set_translate_crlf(&stdio_usb, true);
-#endif
+	set_translate_crlf(true);
     int pos = fs_file_seek(&file, 0, LFS_SEEK_END);
     fs_file_close(&file);
     sprintf(result, "\nfile transfered, size: %d\n", pos);
@@ -336,19 +329,9 @@ static void get_cmd(void) {
         strcpy(result, "error reading file");
         goto err1;
     }
-#if LIB_PICO_STDIO_UART
-    stdio_set_translate_crlf(&stdio_uart, false);
-#endif
-#if LIB_PICO_STDIO_USB
-    stdio_set_translate_crlf(&stdio_usb, false);
-#endif
+	set_translate_crlf(false);
     xmodemTransmit(buf, len);
-#if LIB_PICO_STDIO_UART
-    stdio_set_translate_crlf(&stdio_uart, true);
-#endif
-#if LIB_PICO_STDIO_USB
-    stdio_set_translate_crlf(&stdio_usb, true);
-#endif
+	set_translate_crlf(true);
     printf("\nfile transfered, size: %d\n", len);
 err1:
     free(buf);
@@ -526,7 +509,8 @@ static void vi_cmd(void) {
 }
 
 static void clear_cmd(void) {
-    vi(screen_x, screen_y, argc - 1, argv + 1);
+    printf(VT_CLEAR);
+    fflush(stdout);
     strcpy(result, VT_CLEAR "\n");
 }
 
@@ -605,32 +589,21 @@ static bool screen_size(void) {
     screen_x = 80;
     screen_y = 24;
     do {
-#if LIB_PICO_STDIO_UART
-        stdio_set_translate_crlf(&stdio_uart, false);
-#endif
-#if LIB_PICO_STDIO_USB
-        stdio_set_translate_crlf(&stdio_usb, false);
-#endif
+		set_translate_crlf(false);
         printf(VT_ESC "[999;999H" VT_ESC "[6n");
-        fflush(stdout);
-        int k = getchar_timeout_us(100000);
+        int k = x_getchar_timeout_us(100000);
         if (k == PICO_ERROR_TIMEOUT)
             break;
         char* cp = cmd_buffer;
         while (cp < cmd_buffer + sizeof cmd_buffer) {
-            k = getchar_timeout_us(100000);
+            k = x_getchar_timeout_us(100000);
             if (k == PICO_ERROR_TIMEOUT)
                 break;
             *cp++ = k;
         }
         if (cp == cmd_buffer)
             break;
-#if LIB_PICO_STDIO_UART
-        stdio_set_translate_crlf(&stdio_uart, true);
-#endif
-#if LIB_PICO_STDIO_USB
-        stdio_set_translate_crlf(&stdio_usb, true);
-#endif
+		set_translate_crlf(true);
         if (cmd_buffer[0] != '[')
             break;
         *cp = 0;
@@ -669,9 +642,10 @@ static void help(void) {
 extern int ram_vector_table[48];
 
 static void HardFault_Handler(void) {
-    static const char* clear = "\n\n*** CRASH - Rebooting ***\r\n\n";
+    static const char* clear = "\n\n" VT_BOLD "*** " VT_BLINK "CRASH" VT_NORMAL VT_BOLD
+                               " - Rebooting in 5 seconds ***" VT_NORMAL "\r\n\n";
     for (const char* cp = clear; *cp; cp++)
-        putchar_raw(*cp);
+        putchar(*cp);
     watchdog_reboot(0, 0, 5000);
     for (;;)
         ;
@@ -680,8 +654,13 @@ static void HardFault_Handler(void) {
 // application entry point
 int main(void) {
     // initialize the pico SDK
+    if (ioinit() < 0) {
+        printf("no keyboard memory");
+        exit(-1);
+    }
     ram_vector_table[3] = (int)HardFault_Handler;
-    stdio_init();
+	x_getchar_timeout_us(1000);
+	set_translate_crlf(1);
     bool uart = false;
 #if LIB_PICO_STDIO_UART
     uart = true;
@@ -694,11 +673,13 @@ int main(void) {
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
-                    "pico shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, " BB_VER "\n\n"
+                    "Pico Shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, vi " VI_VER
+                    ", SDK %d.%d.%d\n\n"
                     "console on %s [%u X %u]\n\n"
                     "enter command, hit return for help\n\n",
-           git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, uart ? "UART" : "USB",
-           screen_x, screen_y);
+           git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR,
+           PICO_SDK_VERSION_MINOR, PICO_SDK_VERSION_REVISION, uart ? "UART" : "USB", screen_x,
+           screen_y);
     if (!detected)
         printf("\nYour terminal does not respond to standard VT100 escape sequences"
                "\nsequences. The editor will likely not work at all!");
@@ -707,9 +688,9 @@ int main(void) {
         printf("The flash file system appears corrupt or unformatted!\n"
                " would you like to format it (Y/n) ? ");
         fflush(stdout);
-        char c = getchar();
+        char c = x_getchar();
         while (c != 'y' && c != 'Y' && c != 'N' && c != 'n' && c != '\r')
-            c = getchar();
+            c = x_getchar();
         putchar(c);
         if (c != '\r')
             echo_key('\r');
@@ -737,6 +718,8 @@ int main(void) {
         result[0] = 0;
         bool found = false;
         if (argc) {
+            if (!strcmp(argv[0], "q"))
+                quit_cmd();
             for (i = 0; i < sizeof cmd_table / sizeof cmd_table[0]; i++)
                 if (strcmp(argv[0], cmd_table[i].name) == 0) {
                     cmd_table[i].func();

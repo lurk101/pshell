@@ -1,14 +1,14 @@
 /* vi: set sw=4 ts=4: */
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <stdio.h>
 #include <string.h>
-
-#include "pico/stdio.h"
 
 #include "crc16.h"
 #include "xcommon.h"
 #include "xreceive.h"
+#include "io.h"
+
+#include "pico/stdio.h"
 
 static xmodem_cb_t callback = NULL;
 
@@ -29,15 +29,15 @@ static bool check(bool crc, const uint8_t* buf, int sz) {
         uint16_t crc = crc16_ccitt(buf, sz);
         uint16_t tcrc = (buf[sz] << 8) + buf[sz + 1];
         if (crc == tcrc)
-            return true;
+            return 1;
     } else {
         uint8_t cks = 0;
         for (int i = 0; i < sz; ++i)
             cks += buf[i];
         if (cks == buf[sz])
-            return true;
+            return 1;
     }
-    return false;
+    return 0;
 }
 
 void flushreceive(void) {
@@ -50,7 +50,7 @@ static uint8_t xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul *
 int xmodemReceive(xmodem_cb_t cb) {
     uint8_t* p;
     int bufsz;
-    bool crc = false;
+    bool crc = 0;
     uint8_t trychar = 'C';
     uint8_t packetno = 1;
     int i, c, len = 0;
@@ -96,7 +96,7 @@ int xmodemReceive(xmodem_cb_t cb) {
 
     start_recv:
         if (trychar == 'C')
-            crc = true;
+            crc = 1;
         trychar = 0;
         p = xbuff;
         *p++ = c;
