@@ -522,7 +522,7 @@ static void vi_cmd(void) {
     if (check_mount(true))
         return;
     vi(screen_x, screen_y, argc - 1, argv + 1);
-    strcpy(result, VT_CLEAR "\n");
+    result[0] = 0;
 }
 
 static void clear_cmd(void) {

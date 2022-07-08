@@ -23,6 +23,7 @@
 #include "hardware/timer.h"
 
 #include "pico/stdio.h"
+#include "pico/time.h"
 
 #include "fs.h"
 #include "vi.h"
@@ -324,7 +325,7 @@ struct globals {
     int undo_q;
     char undo_queue[VI_UNDO_QUEUE_MAX];
 
-    char ring[8];
+    char ring_buf[8];
     int ring_count, ring_head, ring_tail;
 };
 
@@ -388,7 +389,7 @@ struct globals {
 #define undo_queue (G.undo_queue)
 #define undo_queue_spos (G.undo_queue_spos)
 
-#define ring (G.ring)
+#define ring_buf (G.ring_buf)
 #define ring_count (G.ring_count)
 #define ring_head (G.ring_head)
 #define ring_tail (G.ring_tail)
@@ -815,16 +816,16 @@ static char vi_getchar(void) {
     if (ring_count == 0)
         return getchar();
     ring_count--;
-    char c = ring[ring_tail++];
-    ring_tail &= 7;
+    char c = ring_buf[ring_tail++];
+    ring_tail &= sizeof(ring_buf) - 1;
     return c;
 }
 
 static int vi_getchar_timeout_us(int ms) {
     if (ring_count) {
         ring_count--;
-        char c = ring[ring_tail++];
-        ring_tail &= 7;
+        char c = ring_buf[ring_tail++];
+        ring_tail &= sizeof(ring_buf) - 1;
         return c;
     }
     return getchar_timeout_us(1000);
@@ -833,12 +834,15 @@ static int vi_getchar_timeout_us(int ms) {
 // sleep for 'h' 1/100 seconds, return 1/0 if stdin is (ready for read)/(not ready)
 static int sleep(int ms) {
     while (ms--) {
-        int c = getchar_timeout_us(1000);
-        if (c != PICO_ERROR_TIMEOUT) {
-            ring[ring_head++] = c;
-            ring_head &= 7;
-            ring_count++;
-        }
+        if (ring_count < sizeof(ring_buf)) {
+            int c = getchar_timeout_us(1000);
+            if (c != PICO_ERROR_TIMEOUT) {
+                ring_buf[ring_head++] = c;
+                ring_head &= sizeof(ring_buf) - 1;
+                ring_count++;
+            }
+        } else
+            break;
     }
     return ring_count;
 }
@@ -3838,7 +3842,7 @@ int vi(int x, int y, int ac, char* argv[]) {
     int opts;
     argc = ac;
 
-    memset(&G, 0, sizeof G);
+    memset(&G, 0, sizeof G); // clear the globals
     rows = y;
     columns = x;
     last_modified_count = -1;
