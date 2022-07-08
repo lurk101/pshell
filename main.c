@@ -551,8 +551,7 @@ static void quit_cmd(void) {
     if (mounted)
         fs_unmount();
     printf("\nbye!\n");
-    for (;;)
-        __wfi();
+    exit(0);
 }
 
 typedef struct {

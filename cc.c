@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include <hardware/adc.h>
+#include <hardware/clocks.h>
 #include <hardware/gpio.h>
 #include <hardware/pwm.h>
 
@@ -519,7 +520,18 @@ enum {
     SYSC_adc_fifo_get,
     SYSC_adc_fifo_get_blocking,
     SYSC_adc_fifo_drain,
-    SYSC_adc_irq_set_enabled
+    SYSC_adc_irq_set_enabled,
+    // CLOCK
+    SYSC_clocks_init,
+    SYSC_clock_configure,
+    SYSC_clock_stop,
+    SYSC_clock_get_hz,
+    SYSC_frequency_count_khz,
+    SYSC_clock_set_reported_hz,
+    SYSC_frequency_count_mhz,
+    SYSC_clocks_enable_resus,
+    SYSC_clock_gpio_init,
+    SYSC_clock_configure_gpin
 };
 
 static const struct {
@@ -665,9 +677,78 @@ static const struct {
     {"adc_fifo_get", 0},
     {"adc_fifo_get_blocking", 0},
     {"adc_fifo_drain", 0},
-    {"adc_irq_set_enabled", 1}};
+    {"adc_irq_set_enabled", 1},
+    // CLOCKS
+    {"clocks_init", 0},
+    {"clock_configure", 5},
+    {"clock_stop", 1},
+    {"clock_get_hz", 1},
+    {"frequency_count_khz", 1},
+    {"clock_set_reported_hz", 2},
+    {"frequency_count_mhz", 1},
+    {"clocks_enable_resus", 1},
+    {"clock_gpio_init", 3},
+    {"clock_configure_gpin", 4},
 
-static const int extern_count = sizeof(externs) / sizeof(externs[0]);
+    {0, 0}};
+
+static struct {
+    char* name;
+    int val;
+} defines[] = {
+    // GPIO
+    {"GPIO_FUNC_XIP", GPIO_FUNC_XIP},
+    {"GPIO_FUNC_SPI", GPIO_FUNC_SPI},
+    {"GPIO_FUNC_UART", GPIO_FUNC_UART},
+    {"GPIO_FUNC_I2C", GPIO_FUNC_I2C},
+    {"GPIO_FUNC_PWM", GPIO_FUNC_PWM},
+    {"GPIO_FUNC_SIO", GPIO_FUNC_SIO},
+    {"GPIO_FUNC_PIO0", GPIO_FUNC_PIO0},
+    {"GPIO_FUNC_PIO1", GPIO_FUNC_PIO1},
+    {"GPIO_FUNC_GPCK", GPIO_FUNC_GPCK},
+    {"GPIO_FUNC_USB", GPIO_FUNC_USB},
+    {"GPIO_FUNC_NULL", GPIO_FUNC_NULL},
+    {"GPIO_OUT", GPIO_OUT},
+    {"GPIO_IN", GPIO_IN},
+    {"GPIO_IRQ_LEVEL_LOW", GPIO_IRQ_LEVEL_LOW},
+    {"GPIO_IRQ_LEVEL_HIGH", GPIO_IRQ_LEVEL_HIGH},
+    {"GPIO_IRQ_EDGE_FALL", GPIO_IRQ_EDGE_FALL},
+    {"GPIO_IRQ_EDGE_RISE", GPIO_IRQ_EDGE_RISE},
+    {"GPIO_OVERRIDE_NORMAL", GPIO_OVERRIDE_NORMAL},
+    {"GPIO_OVERRIDE_INVERT", GPIO_OVERRIDE_INVERT},
+    {"GPIO_OVERRIDE_LOW", GPIO_OVERRIDE_LOW},
+    {"GPIO_OVERRIDE_HIGH", GPIO_OVERRIDE_HIGH},
+    {"GPIO_SLEW_RATE_SLOW", GPIO_SLEW_RATE_SLOW},
+    {"GPIO_SLEW_RATE_FAST", GPIO_SLEW_RATE_FAST},
+    {"GPIO_DRIVE_STRENGTH_2MA", GPIO_DRIVE_STRENGTH_2MA},
+    {"GPIO_DRIVE_STRENGTH_4MA", GPIO_DRIVE_STRENGTH_4MA},
+    {"GPIO_DRIVE_STRENGTH_8MA", GPIO_DRIVE_STRENGTH_8MA},
+    {"GPIO_DRIVE_STRENGTH_12MA", GPIO_DRIVE_STRENGTH_12MA},
+    // LED
+    {"PICO_DEFAULT_LED_PIN", PICO_DEFAULT_LED_PIN},
+    // PWM
+    {"PWM_DIV_FREE_RUNNING", PWM_DIV_FREE_RUNNING},
+    {"PWM_DIV_B_HIGH", PWM_DIV_B_HIGH},
+    {"PWM_DIV_B_RISING", PWM_DIV_B_RISING},
+    {"PWM_DIV_B_FALLING", PWM_DIV_B_FALLING},
+    {"PWM_CHAN_A", PWM_CHAN_A},
+    {"PWM_CHAN_B", PWM_CHAN_B},
+    // CLOCKS
+    {"KHZ", KHZ},
+    {"MHZ", MHZ},
+    {"clk_gpout0", clk_gpout0},
+    {"clk_gpout1", clk_gpout1},
+    {"clk_gpout2", clk_gpout2},
+    {"clk_gpout3", clk_gpout3},
+    {"clk_ref", clk_ref},
+    {"clk_sys", clk_sys},
+    {"clk_peri", clk_peri},
+    {"clk_usb", clk_usb},
+    {"clk_adc", clk_adc},
+    {"clk_rtc", clk_rtc},
+    {"CLK_COUNT", CLK_COUNT},
+
+    {0, 0}};
 
 static struct {
     int text_size, data_size;
@@ -770,7 +851,7 @@ static void sys_free(void* p) {
 static int extern_getidx(char* name) // get cache index of external function
 {
     int i, ext_addr = 0x1234;
-    for (i = 0; i < extern_count; ++i)
+    for (i = 0; externs[i].name; ++i)
         if (!strcmp(externs[i].name, name))
             return i;
     return -1;
@@ -1160,7 +1241,10 @@ static void expr(int lev) {
                 d->val = extern_getidx(d->name);
                 if (d->val < 0)
                     die("Unknown external function %s", d->name);
-                d->type = (d->val >= SYSC_sqrtf) && (d->val <= SYSC_powf) ? FLOAT : INT;
+                d->type = (((d->val >= SYSC_sqrtf) && (d->val <= SYSC_powf)) ||
+                           (d->val == SYSC_frequency_count_mhz))
+                              ? FLOAT
+                              : INT;
 
                 d->name[namelen] = ch;
             }
@@ -3565,6 +3649,14 @@ int cc(int run_mode, int argc, char** argv) {
             goto done;
         }
 
+        for (int d = 0; defines[d].name; d++) {
+            p = defines[d].name;
+            next();
+            id->class = Num;
+            id->type = INT;
+            id->val = defines[d].val;
+        }
+
         fp = full_path(*argv);
         if (!fp)
             die("could not allocate file name area");
@@ -4325,6 +4417,37 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_adc_irq_set_enabled:
                 adc_irq_set_enabled(sp[0]);
+                break;
+                // CLOCKS
+            case SYSC_clocks_init:
+                clocks_init();
+                break;
+            case SYSC_clock_configure:
+                a.i = clock_configure(sp[4], sp[3], sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_clock_stop:
+                clock_stop(sp[0]);
+                break;
+            case SYSC_clock_get_hz:
+                a.i = clock_get_hz(sp[0]);
+                break;
+            case SYSC_frequency_count_khz:
+                a.i = frequency_count_khz(sp[0]);
+                break;
+            case SYSC_clock_set_reported_hz:
+                clock_set_reported_hz(sp[1], sp[0]);
+                break;
+            case SYSC_frequency_count_mhz:
+                a.f = frequency_count_mhz(sp[0]);
+                break;
+            case SYSC_clocks_enable_resus:
+                clocks_enable_resus((resus_callback_t)sp[0]);
+                break;
+            case SYSC_clock_gpio_init:
+                clock_gpio_init(sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_clock_configure_gpin:
+                a.i = clock_configure_gpin(sp[3], sp[2], sp[1], sp[0]);
                 break;
             default:
                 run_die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
