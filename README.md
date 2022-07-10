@@ -20,8 +20,8 @@ the [Squint] project.
 About the compiler, briefly…
 
 - Data types: integer, float, char and pointer.
-- Aggregate types: single dimension array, struct and union.
-- Flow control: for, while, if then else, break, continue goto.
+- Aggregate types: array, struct and union.
+- Flow control: for, while, if then else, break, continue and goto.
 - Memory, math and SDK functions. ([list of implemented functions])
 
 Building from source.
