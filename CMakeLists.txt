@@ -69,7 +69,8 @@ list(APPEND LINK_LIST
     pico_stdlib
     littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
-    hardware_pwm hardware_adc hardware_clocks hardware_uart)
+    hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
+    hardware_spi hardware_irq)
 
 if (NOT USB_CONSOLE)
     list(APPEND LINK_LIST hardware_uart hardware_irq)

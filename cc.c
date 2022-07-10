@@ -23,7 +23,10 @@
 #include <hardware/adc.h>
 #include <hardware/clocks.h>
 #include <hardware/gpio.h>
+#include <hardware/i2c.h>
+#include <hardware/irq.h>
 #include <hardware/pwm.h>
+#include <hardware/spi.h>
 
 #include <pico/time.h>
 #include <pico/stdio.h>
@@ -51,11 +54,8 @@
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 
-//#define SMALL_TBL_WRDS 256
-//#define BIG_TBL_BYTES (16 * 1024)
-
-char *p, *lp;           // current position in source code
-char *data_base, *data; // data/bss pointer
+static char *p, *lp;           // current position in source code
+static char *data_base, *data; // data/bss pointer
 
 static int* base_sp;
 static int *e, *le, *text_base; // current position in emitted code
@@ -544,7 +544,72 @@ enum {
     SYSC_frequency_count_mhz,
     SYSC_clocks_enable_resus,
     SYSC_clock_gpio_init,
-    SYSC_clock_configure_gpin
+    SYSC_clock_configure_gpin,
+    // I2C
+    SYSC_i2c_init,
+    SYSC_i2c_deinit,
+    SYSC_i2c_set_baudrate,
+    SYSC_i2c_set_slave_mode,
+    SYSC_i2c_hw_index,
+    SYSC_i2c_get_hw,
+#if 0 // we'd need uint64_ suppot for these
+    SYSC_i2c_write_blocking_until,
+    SYSC_i2c_read_blocking_until,
+#endif
+    SYSC_i2c_write_timeout_us,
+    SYSC_i2c_write_timeout_per_char_us,
+    SYSC_i2c_read_timeout_us,
+    SYSC_i2c_read_timeout_per_char_us,
+    SYSC_i2c_write_blocking,
+    SYSC_i2c_read_blocking,
+    SYSC_i2c_get_write_available,
+    SYSC_i2c_get_read_available,
+    SYSC_i2c_write_raw_blocking,
+    SYSC_i2c_read_raw_blocking,
+    SYSC_i2c_get_dreq,
+    // SPI
+    SYSC_spi_init,
+    SYSC_spi_deinit,
+    SYSC_spi_set_baudrate,
+    SYSC_spi_get_baudrate,
+    SYSC_spi_get_index,
+    SYSC_spi_get_hw,
+    SYSC_spi_get_const_hw,
+    SYSC_spi_set_format,
+    SYSC_spi_set_slave,
+    SYSC_spi_is_writable,
+    SYSC_spi_is_readable,
+    SYSC_spi_is_busy,
+    SYSC_spi_write_read_blocking,
+    SYSC_spi_write_blocking,
+    SYSC_spi_read_blocking,
+    SYSC_spi_write16_read16_blocking,
+    SYSC_spi_write16_blocking,
+    SYSC_spi_read16_blocking,
+    SYSC_spi_get_dreq,
+    // IRQ
+    SYSC_irq_set_priority,
+    SYSC_irq_get_priority,
+    SYSC_irq_set_enabled,
+    SYSC_irq_is_enabled,
+    SYSC_irq_set_mask_enabled,
+    SYSC_irq_set_exclusive_handler,
+    SYSC_irq_get_exclusive_handler,
+    SYSC_irq_add_shared_handler,
+    SYSC_irq_remove_handler,
+#if SDK14
+    SYSC_irq_has_shared_handler,
+#endif
+    SYSC_irq_get_vtable_handler,
+    SYSC_irq_clear,
+    SYSC_irq_set_pending,
+    SYSC_irq_init_priorities,
+#if SDK14
+    SYSC_user_irq_claim,
+    SYSC_user_irq_unclaim,
+    SYSC_user_irq_claim_unused,
+    SYSC_user_irq_is_claimed
+#endif
 };
 
 static const struct {
@@ -708,6 +773,71 @@ static const struct {
     {"clocks_enable_resus", 1},
     {"clock_gpio_init", 3},
     {"clock_configure_gpin", 4},
+    // I2C
+    {"i2c_init", 2},
+    {"i2c_deinit", 1},
+    {"i2c_set_baudrate", 2},
+    {"i2c_set_slave_mode", 3},
+    {"i2c_hw_index", 1},
+    {"i2c_get_hw", 1},
+#if 0
+    {"i2c_write_blocking_until", 6},
+    {"i2c_read_blocking_until", 6},
+#endif
+    {"i2c_write_timeout_us", 6},
+    {"i2c_write_timeout_per_char_us", 6},
+    {"i2c_read_timeout_us", 6},
+    {"i2c_read_timeout_per_char_us", 6},
+    {"i2c_write_blocking", 5},
+    {"i2c_read_blocking", 5},
+    {"i2c_get_write_available", 1},
+    {"i2c_get_read_available", 1},
+    {"i2c_write_raw_blocking", 3},
+    {"i2c_read_raw_blocking", 3},
+    {"i2c_get_dreq", 2},
+    // SPI
+    {"spi_init", 2},
+    {"spi_deinit", 1},
+    {"spi_set_baudrate", 2},
+    {"spi_get_baudrate", 1},
+    {"spi_get_index", 1},
+    {"spi_get_hw", 1},
+    {"spi_get_const_hw", 1},
+    {"spi_set_format", 5},
+    {"spi_set_slave", 2},
+    {"spi_is_writable", 1},
+    {"spi_is_readable", 1},
+    {"spi_is_busy", 1},
+    {"spi_write_read_blocking", 4},
+    {"spi_write_blocking", 3},
+    {"spi_read_blocking", 4},
+    {"spi_write16_read16_blocking", 4},
+    {"spi_write16_blocking", 3},
+    {"spi_read16_blocking", 4},
+    {"spi_get_dreq", 2},
+    // IRQ
+    {"irq_set_priority", 2},
+    {"irq_get_priority", 1},
+    {"irq_set_enabled", 2},
+    {"irq_is_enabled", 1},
+    {"irq_set_mask_enabled", 2},
+    {"irq_set_exclusive_handler", 2},
+    {"irq_get_exclusive_handler", 1},
+    {"irq_add_shared_handler", 3},
+    {"irq_remove_handler", 2},
+#if SDK14
+    {"irq_has_shared_handler", 1},
+#endif
+    {"irq_get_vtable_handler", 1},
+    {"irq_clear", 1},
+    {"irq_set_pending", 1},
+    {"irq_init_priorities", 0},
+#if SDK14
+    {"user_irq_claim", 1},
+    {"user_irq_unclaim", 1},
+    {"user_irq_claim_unused", 1},
+    {"user_irq_is_claimed", 1},
+#endif
 
     {0, 0}};
 
@@ -774,6 +904,51 @@ static struct {
     {"clk_adc", clk_adc},
     {"clk_rtc", clk_rtc},
     {"CLK_COUNT", CLK_COUNT},
+    // I2C
+    {"i2c0", (int)&i2c0_inst},
+    {"i2c1", (int)&i2c1_inst},
+    {"i2c_default", (int)PICO_DEFAULT_I2C_INSTANCE},
+
+    // SPI
+    {"spi0", (int)spi0_hw},
+    {"spi1", (int)spi1_hw},
+    {"spi_default", (int)PICO_DEFAULT_SPI_INSTANCE},
+
+    {"TIMER_IRQ_0", TIMER_IRQ_0},
+    {"TIMER_IRQ_1", TIMER_IRQ_1},
+    {"TIMER_IRQ_2", TIMER_IRQ_2},
+    {"TIMER_IRQ_3", TIMER_IRQ_3},
+    {"PWM_IRQ_WRAP", PWM_IRQ_WRAP},
+    {"USBCTRL_IRQ", USBCTRL_IRQ},
+    {"XIP_IRQ", XIP_IRQ},
+    {"PIO0_IRQ_0", PIO0_IRQ_0},
+    {"PIO0_IRQ_1", PIO0_IRQ_1},
+    {"PIO1_IRQ_0", PIO1_IRQ_0},
+    {"PIO1_IRQ_1", PIO1_IRQ_1},
+    {"DMA_IRQ_0", DMA_IRQ_0},
+    {"DMA_IRQ_1", DMA_IRQ_1},
+    {"IO_IRQ_BANK0", IO_IRQ_BANK0},
+    {"IO_IRQ_QSPI", IO_IRQ_QSPI},
+    {"SIO_IRQ_PROC0", SIO_IRQ_PROC0},
+    {"SIO_IRQ_PROC1", SIO_IRQ_PROC1},
+    {"CLOCKS_IRQ", CLOCKS_IRQ},
+    {"SPI0_IRQ", SPI0_IRQ},
+    {"SPI1_IRQ", SPI1_IRQ},
+    {"UART0_IRQ", UART0_IRQ},
+    {"UART1_IRQ", UART1_IRQ},
+    {"ADC_IRQ_FIFO", ADC_IRQ_FIFO},
+    {"I2C0_IRQ", I2C0_IRQ},
+    {"I2C1_IRQ", I2C1_IRQ},
+    {"RTC_IRQ", RTC_IRQ},
+    {"PICO_DEFAULT_IRQ_PRIORITY", PICO_DEFAULT_IRQ_PRIORITY},
+    {"PICO_LOWEST_IRQ_PRIORITY", PICO_LOWEST_IRQ_PRIORITY},
+    {"PICO_HIGHEST_IRQ_PRIORITY", PICO_HIGHEST_IRQ_PRIORITY},
+    {"PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY",
+     PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY},
+    {"PICO_SHARED_IRQ_HANDLER_HIGHEST_ORDER_PRIORITY",
+     PICO_SHARED_IRQ_HANDLER_HIGHEST_ORDER_PRIORITY},
+    {"PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY",
+     PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY},
 
     {0, 0}};
 
@@ -820,7 +995,8 @@ static char* append_strtab(char** strtab, char* str) {
 }
 #define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
-static void die_func(const char* func, int lne, const char* fmt, ...) {
+static __attribute__((__noreturn__)) void die_func(const char* func, int lne, const char* fmt,
+                                                   ...) {
 #ifndef NDEBUG
     printf("error in compiler function %s at line %d\n", func, lne);
 #endif
@@ -832,7 +1008,7 @@ static void die_func(const char* func, int lne, const char* fmt, ...) {
     longjmp(done_jmp, 1);
 }
 
-static void run_die(const char* fmt, ...) {
+static __attribute__((__noreturn__)) void run_die(const char* fmt, ...) {
     printf("\nrun time error : ");
     va_list ap;
     va_start(ap, fmt);
@@ -3784,6 +3960,9 @@ int cc(int run_mode, int argc, char** argv) {
         fd = NULL;
     }
 
+#define INTR_NOT_IMPLEMENTED() run_die("interrupt support not there yet")
+    //#define INTR_NOT_IMPLEMENTED()
+
     printf("\n");
 
     // setup stack
@@ -4181,57 +4360,57 @@ int cc(int run_mode, int argc, char** argv) {
                 a.i = gpio_get_drive_strength(sp[0]);
                 break;
             case SYSC_gpio_set_irq_enabled:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_set_irq_enabled(sp[2], sp[1], sp[0]);
                 break;
 #if SDK14
             case SYSC_gpio_set_irq_callback:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_set_irq_callback((gpio_irq_callback_t)sp[0]);
                 break;
 #endif
             case SYSC_gpio_set_irq_enabled_with_callback:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_set_irq_enabled_with_callback(sp[3], sp[2], sp[1], (gpio_irq_callback_t)sp[0]);
                 break;
             case SYSC_gpio_set_dormant_irq_enabled:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_set_dormant_irq_enabled(sp[2], sp[1], sp[0]);
                 break;
 #if SDK14
             case SYSC_gpio_get_irq_event_mask:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 a.i = gpio_get_irq_event_mask(sp[0]);
                 break;
 #endif
             case SYSC_gpio_acknowledge_irq:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_acknowledge_irq(sp[1], sp[0]);
                 break;
 #if SDK14
             case SYSC_gpio_add_raw_irq_handler_with_order_priority_masked:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_add_raw_irq_handler_with_order_priority_masked(sp[2], (irq_handler_t)sp[1],
                                                                     sp[0]);
                 break;
             case SYSC_gpio_add_raw_irq_handler_with_order_priority:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_add_raw_irq_handler_with_order_priority(sp[2], (irq_handler_t)sp[1], sp[0]);
                 break;
             case SYSC_gpio_add_raw_irq_handler_masked:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_add_raw_irq_handler_masked(sp[1], (irq_handler_t)sp[0]);
                 break;
             case SYSC_gpio_add_raw_irq_handler:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_add_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
                 break;
             case SYSC_gpio_remove_raw_irq_handler_masked:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_remove_raw_irq_handler_masked(sp[1], (irq_handler_t)sp[0]);
                 break;
             case SYSC_gpio_remove_raw_irq_handler:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 gpio_remove_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
                 break;
 #endif
@@ -4372,23 +4551,23 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_set_mask_enabled(sp[0]);
                 break;
             case SYSC_pwm_set_irq_enabled:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 pwm_set_irq_enabled(sp[1], sp[0]);
                 break;
             case SYSC_pwm_set_irq_mask_enabled:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 pwm_set_irq_mask_enabled(sp[1], sp[0]);
                 break;
             case SYSC_pwm_clear_irq:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 pwm_clear_irq(sp[0]);
                 break;
             case SYSC_pwm_get_irq_status_mask:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 a.i = pwm_get_irq_status_mask();
                 break;
             case SYSC_pwm_force_irq:
-                run_die("interrupt support not there yet");
+                INTR_NOT_IMPLEMENTED();
                 pwm_force_irq(sp[0]);
                 break;
             case SYSC_pwm_get_dreq:
@@ -4474,8 +4653,205 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_clock_configure_gpin:
                 a.i = clock_configure_gpin(sp[3], sp[2], sp[1], sp[0]);
                 break;
+                // I2C
+            case SYSC_i2c_init:
+                a.i = i2c_init((void*)sp[1], sp[0]);
+                break;
+            case SYSC_i2c_deinit:
+                i2c_deinit((void*)sp[0]);
+                break;
+            case SYSC_i2c_set_baudrate:
+                a.i = i2c_set_baudrate((void*)sp[1], sp[0]);
+                break;
+            case SYSC_i2c_set_slave_mode:
+                i2c_set_slave_mode((void*)sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_i2c_hw_index:
+                a.i = i2c_hw_index((void*)sp[0]);
+                break;
+            case SYSC_i2c_get_hw:
+                a.i = (int)i2c_get_hw((void*)sp[0]);
+                break;
+#if 0
+    case SYSC_i2c_write_blocking_until:
+        a.i = i2c_write_blocking_until((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
+        break;
+    case SYSC_i2c_read_blocking_until:
+        a.i = i2c_read_blocking_until((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
+        break;
+#endif
+            case SYSC_i2c_write_timeout_us:
+                a.i = i2c_write_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_i2c_write_timeout_per_char_us:
+                a.i = i2c_write_timeout_per_char_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1],
+                                                    sp[0]);
+                break;
+            case SYSC_i2c_read_timeout_us:
+                a.i = i2c_read_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_i2c_read_timeout_per_char_us:
+                a.i = i2c_read_timeout_per_char_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1],
+                                                   sp[0]);
+                break;
+            case SYSC_i2c_write_blocking:
+                a.i = i2c_write_blocking((void*)sp[4], sp[3], (void*)sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_i2c_read_blocking:
+                a.i = i2c_read_blocking((void*)sp[4], sp[3], (void*)sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_i2c_get_write_available:
+                a.i = i2c_get_write_available((void*)sp[0]);
+                break;
+            case SYSC_i2c_get_read_available:
+                a.i = i2c_get_read_available((void*)sp[0]);
+                break;
+            case SYSC_i2c_write_raw_blocking:
+                i2c_write_raw_blocking((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_i2c_read_raw_blocking:
+                i2c_read_raw_blocking((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_i2c_get_dreq:
+                a.i = i2c_get_dreq((void*)sp[1], sp[0]);
+                break;
+                // SPI
+            case SYSC_spi_init:
+                a.i = spi_init((void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_deinit:
+                spi_deinit((void*)sp[0]);
+                break;
+            case SYSC_spi_set_baudrate:
+                a.i = spi_set_baudrate((void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_get_baudrate:
+                a.i = spi_get_baudrate((void*)sp[0]);
+                break;
+            case SYSC_spi_get_index:
+                a.i = spi_get_index((void*)sp[0]);
+                break;
+            case SYSC_spi_get_hw:
+                a.i = (int)spi_get_hw((void*)sp[0]);
+                break;
+            case SYSC_spi_get_const_hw:
+                a.i = (int)spi_get_const_hw((void*)sp[0]);
+                break;
+            case SYSC_spi_set_format:
+                spi_set_format((void*)sp[4], sp[3], sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_spi_set_slave:
+                spi_set_slave((void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_is_writable:
+                a.i = spi_is_writable((void*)sp[0]);
+                break;
+            case SYSC_spi_is_readable:
+                a.i = spi_is_readable((void*)sp[0]);
+                break;
+            case SYSC_spi_is_busy:
+                a.i = spi_is_busy((void*)sp[0]);
+                break;
+            case SYSC_spi_write_read_blocking:
+                a.i = spi_write_read_blocking((void*)sp[3], (void*)sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_write_blocking:
+                a.i = spi_write_blocking((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_read_blocking:
+                a.i = spi_read_blocking((void*)sp[3], sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_write16_read16_blocking:
+                a.i = spi_write16_read16_blocking((void*)sp[3], (void*)sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_write16_blocking:
+                a.i = spi_write16_blocking((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_read16_blocking:
+                a.i = spi_read16_blocking((void*)sp[3], sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_spi_get_dreq:
+                a.i = spi_get_dreq((void*)sp[1], sp[0]);
+                break;
+                // IRQ
+            case SYSC_irq_set_priority:
+                INTR_NOT_IMPLEMENTED();
+                irq_set_priority(sp[1], sp[0]);
+                break;
+            case SYSC_irq_get_priority:
+                INTR_NOT_IMPLEMENTED();
+                a.i = irq_get_priority(sp[0]);
+                break;
+            case SYSC_irq_set_enabled:
+                INTR_NOT_IMPLEMENTED();
+                irq_set_enabled(sp[1], sp[0]);
+                break;
+            case SYSC_irq_is_enabled:
+                INTR_NOT_IMPLEMENTED();
+                a.i = irq_is_enabled(sp[0]);
+                break;
+            case SYSC_irq_set_mask_enabled:
+                INTR_NOT_IMPLEMENTED();
+                irq_set_mask_enabled(sp[1], sp[0]);
+                break;
+            case SYSC_irq_set_exclusive_handler:
+                INTR_NOT_IMPLEMENTED();
+                irq_set_exclusive_handler(sp[1], (void*)sp[0]);
+                break;
+            case SYSC_irq_get_exclusive_handler:
+                INTR_NOT_IMPLEMENTED();
+                a.i = (int)irq_get_exclusive_handler(sp[0]);
+                break;
+            case SYSC_irq_add_shared_handler:
+                INTR_NOT_IMPLEMENTED();
+                irq_add_shared_handler(sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_irq_remove_handler:
+                INTR_NOT_IMPLEMENTED();
+                irq_remove_handler(sp[1], (void*)sp[0]);
+                break;
+#if SDK14
+            case SYSC_irq_has_shared_handler:
+                INTR_NOT_IMPLEMENTED();
+                a.i = irq_has_shared_handler(sp[0]);
+                break;
+#endif
+            case SYSC_irq_get_vtable_handler:
+                INTR_NOT_IMPLEMENTED();
+                a.i = (int)irq_get_vtable_handler(sp[0]);
+                break;
+            case SYSC_irq_clear:
+                INTR_NOT_IMPLEMENTED();
+                irq_clear(sp[0]);
+                break;
+            case SYSC_irq_set_pending:
+                INTR_NOT_IMPLEMENTED();
+                irq_set_pending(sp[0]);
+                break;
+            case SYSC_irq_init_priorities:
+                INTR_NOT_IMPLEMENTED();
+                irq_init_priorities();
+                break;
+#if SDK14
+            case SYSC_user_irq_claim:
+                INTR_NOT_IMPLEMENTED();
+                user_irq_claim(sp[0]);
+                break;
+            case SYSC_user_irq_unclaim:
+                INTR_NOT_IMPLEMENTED();
+                user_irq_unclaim(sp[0]);
+                break;
+            case SYSC_user_irq_claim_unused:
+                INTR_NOT_IMPLEMENTED();
+                a.i = user_irq_claim_unused(sp[0]);
+                break;
+            case SYSC_user_irq_is_claimed:
+                INTR_NOT_IMPLEMENTED();
+                a.i = user_irq_is_claimed(sp[0]);
+                break;
+#endif
             default:
-                run_die("unknown system call = %d %s! cycle = %d\n", i, instr_str[i], cycle);
+                run_die("unknown system call");
                 break;
             }
             break;
@@ -4483,7 +4859,7 @@ int cc(int run_mode, int argc, char** argv) {
             printf("\nCC=%d\n", a);
             goto done;
         case IRET:
-            run_die("return from interrupt not yet implemented");
+            INTR_NOT_IMPLEMENTED();
         default:
             run_die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         }

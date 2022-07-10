@@ -101,7 +101,7 @@ static uint64_t handle_errors(uint64_t v, char** endp) {
 
 static const char* msg_memory_exhausted = "out of memory";
 
-static void error_msg_and_die(const char* s, ...) {
+static __attribute__((__noreturn__)) void error_msg_and_die(const char* s, ...) {
     va_list p;
 
     va_start(p, s);
