@@ -3,9 +3,10 @@ What's new in version 1.0.7
 - SDK ADC function support
 - SDK SPI function support
 - SDK I2C function support
-- Predefined SDK constants for SDK functions
+- Predefined SDK constants for SDK function parameters
 - Vi uses secondary screen buffer such that prior screen restored on exit
 - Fix build errors under SDK 1.3.x
+- fix editor bug when more than one file name used in a command.
 
 What's new in version 1.0.6
 

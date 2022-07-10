@@ -32,7 +32,6 @@ extern char* full_path(const char* name);
 
 #define ARRAY_SIZE(x) ((uint32_t)(sizeof(x) / sizeof((x)[0])))
 
-static int argc, optind;
 static jmp_buf die_jmp;
 
 static inline void puts_no_eol(const char* s) {
@@ -326,6 +325,7 @@ struct globals {
 
     char ring_buf[16 * 1024];
     int ring_count, ring_head, ring_tail;
+    int argc, optind;
 };
 
 #define text (G.text)
@@ -392,6 +392,8 @@ struct globals {
 #define ring_count (G.ring_count)
 #define ring_head (G.ring_head)
 #define ring_tail (G.ring_tail)
+#define argc (G.argc)
+#define optind (G.optind)
 
 static struct globals G;
 
@@ -1998,9 +2000,10 @@ static void init_filename(char* fn) {
 }
 
 static void update_filename(char* fn) {
+    if (fn == NULL)
+        return;
     if (fn != current_filename) {
-        if (current_filename)
-            free(current_filename);
+        free(current_filename);
         current_filename = strdup(fn);
     }
 }
@@ -3808,10 +3811,8 @@ static void* xmalloc_open_read_close(const char* filename) {
 }
 
 int vi(int x, int y, int ac, char* argv[]) {
-    int opts;
-    argc = ac;
-
     memset(&G, 0, sizeof G); // clear the globals
+    argc = ac;
     rows = y;
     columns = x;
     last_modified_count = -1;
@@ -3846,8 +3847,12 @@ int vi(int x, int y, int ac, char* argv[]) {
     // This is the main file handling loop
     if (argc == 0)
         argc++;
+    optind = 0;
     for (optind = 0; optind < argc; optind++)
-        edit_file(full_path(argv[optind])); // might be NULL on 1st iteration
+        if (argv[optind])
+            edit_file(full_path(argv[optind]));
+        else
+            edit_file(NULL); // might be NULL on 1st iteration
 shell:
     if (text)
         free(text);

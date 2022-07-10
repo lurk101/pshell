@@ -1,15 +1,10 @@
-char s[100];
+r s[100];
 
 int sieve() {
-    int i = 2;
-    while (i < sizeof(s)) {
-        int j = i + i;
-        while (j < sizeof(s)) {
+    int i, j;
+    for (i = 2; i < sizeof(s); i++)
+        for (j = i + i; j < sizeof(s); j += i)
             s[j] = 1;
-            j += i;
-        }
-        i++;
-    }
 }
 
 int main() {

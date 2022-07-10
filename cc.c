@@ -37,13 +37,16 @@
 
 #define K 1024
 
-#define DATA_BYTES (4 * K)
+#define DATA_BYTES (16 * K)
 #define TEXT_BYTES (16 * K)
-#define SYM_TBL_BYTES (4 * K)
-#define TS_TBL_BYTES (1 * K)
+#define SYM_TBL_BYTES (16 * K)
+#define TS_TBL_BYTES (2 * K)
 #define AST_TBL_BYTES (16 * K)
-#define MEMBER_DICT_BYTES (1 * K)
+#define MEMBER_DICT_BYTES (4 * K)
 #define STACK_BYTES (16 * K)
+
+#define VT_BOLD "\033[1m"
+#define VT_NORMAL "\033[m"
 
 #if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
 #define SDK14 1
@@ -950,7 +953,7 @@ static struct {
     {"PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY",
      PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY},
 
-    {0, 0}};
+    {0}};
 
 static struct {
     int text_size, data_size;
@@ -958,7 +961,7 @@ static struct {
 } prog_hdr;
 
 static jmp_buf done_jmp;
-static char* malloc_list;
+static int* malloc_list;
 static lfs_file_t* fd;
 static char* fp;
 
@@ -968,8 +971,8 @@ struct file_handle {
 } * file_list;
 
 static void clear_globals(void) {
-    base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = ast =
-        (int*)(malloc_list = data_base = data = p = lp = fp = (char*)(id = sym_base = oid = NULL));
+    base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = ast = malloc_list =
+        (int*)(data_base = data = p = lp = fp = (char*)(id = sym_base = oid = NULL));
     fd = NULL;
     file_list = NULL;
 
@@ -982,17 +985,6 @@ static void clear_globals(void) {
     memset(&done_jmp, 0, sizeof(&done_jmp));
 }
 
-static char* append_strtab(char** strtab, char* str) {
-    char* s;
-    for (s = str; *s && (*s != ' '); ++s)
-        ; /* ignore trailing space */
-    int nbytes = s - str + 1;
-    char* res = *strtab;
-    memcpy(res, str, nbytes);
-    res[s - str] = 0; // null terminator
-    *strtab = res + nbytes;
-    return res;
-}
 #define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
 static __attribute__((__noreturn__)) void die_func(const char* func, int lne, const char* fmt,
@@ -1000,7 +992,7 @@ static __attribute__((__noreturn__)) void die_func(const char* func, int lne, co
 #ifndef NDEBUG
     printf("error in compiler function %s at line %d\n", func, lne);
 #endif
-    printf("C source line %d : ", line);
+    printf(VT_BOLD "C source line %d : " VT_NORMAL, line);
     va_list ap;
     va_start(ap, fmt);
     vprintf(fmt, ap);
@@ -1009,7 +1001,7 @@ static __attribute__((__noreturn__)) void die_func(const char* func, int lne, co
 }
 
 static __attribute__((__noreturn__)) void run_die(const char* fmt, ...) {
-    printf("\nrun time error : ");
+    printf("\n" VT_BOLD "run time error : " VT_NORMAL);
     va_list ap;
     va_start(ap, fmt);
     vprintf(fmt, ap);
@@ -1021,32 +1013,30 @@ static __attribute__((__noreturn__)) void run_die(const char* fmt, ...) {
 #define sys_malloc(l) sys_malloc_func(l, __LINE__)
 
 static void* sys_malloc_func(int l, int lno) {
-    l += 8;
-    void* p = malloc(l);
-    if (p) {
-        memset((char*)p + 8, 0, l - 8);
-        *((int*)p + 1) = lno;
-        *((int*)p) = (int)malloc_list;
-        malloc_list = p;
-        return (char*)p + 8;
-    }
-    return NULL;
+    int* p = malloc(l + 8);
+    if (!p)
+        return NULL;
+    memset(p + 2, 0, l);
+    p[0] = (int)malloc_list;
+    p[1] = lno;
+    malloc_list = p;
+    return p + 2;
 }
 
 static void sys_free(void* p) {
-    char* p2 = (char*)p - 8;
-    char* lastpl = (char*)&malloc_list;
-    char* pl = malloc_list;
-    while (pl != NULL) {
-        if (pl == p2) {
-            int* lpi = (int*)lastpl;
-            *lpi = *((int*)pl);
-            free(pl);
+    if (!p)
+        die("freeing a NULL pointer");
+    int* p2 = (int*)p - 2;
+    int* last = (int*)&malloc_list;
+    int* pi = (int*)(*last);
+    while (pi) {
+        if (pi == p2) {
+            last[0] = pi[0];
+            free(pi);
             return;
         }
-        lastpl = pl;
-        int i = *((int*)pl);
-        pl = (char*)i;
+        last = pi;
+        pi = (int*)pi[0];
     }
     die("corrupted memory");
 }
@@ -1512,14 +1502,11 @@ static void expr(int lev) {
                        (*np >= '0' && *np <= '9') || (*np == '_'))
                     np++;
                 nl = np - d->name;
-                np = sys_malloc(nl + 1);
-                if (np) {
-                    for (int i = 0; i < nl; i++)
-                        np[i] = d->name[i];
-                    np[nl] = 0;
-                    die("undefined variable %s", np);
-                } else
-                    die("undefined variable");
+                if (!(np = sys_malloc(nl + 1)))
+                    die("no symbol memory");
+                for (int i = 0; i < nl; i++)
+                    np[i] = d->name[i];
+                np[nl] = 0;
             }
             if ((d->type & 3) && d->class != Par) { // push reference address
                 ty = d->type & ~3;
@@ -2806,6 +2793,7 @@ static void gen(int* n) {
                 b = (int*)a[j];
             }
             sys_free(a);
+            a = NULL;
             if (i == Syscall) {
                 *++e = IMM;
                 *++e = sj + 1;
@@ -3674,10 +3662,9 @@ static inline int f_as_i(float f) {
 static int common_print_wrap(int n_parms, int sflag, int* sp) {
     // HACK ALLERT, we need to figure out which parameters
     // are floats. Scan the format string.
-    int* stk = sys_malloc(n_parms * 9);
-    if (stk == NULL)
-        die("format memory error");
-    char* atyp = (char*)stk + n_parms * 8;
+    int stack[15];
+    char atyp[15];
+    memset(&atyp, 0, 15);
     char* fmt = (char*)sp[n_parms - 1 - sflag];
     int an = sflag;
     while (*fmt) {
@@ -3706,20 +3693,19 @@ static int common_print_wrap(int n_parms, int sflag, int* sp) {
     volatile int stkp = 0;
     for (int j = n_parms - 1; j >= 0; j--)
         if (atyp[n_parms - j - 1] == 0)
-            stk[stkp++] = sp[j];
+            stack[stkp++] = sp[j];
         else {
             if (stkp & 1)
-                stk[stkp++] = 0;
+                stack[stkp++] = 0;
             union {
                 double d;
                 int ii[2];
             } u;
             u.d = *((float*)&sp[j]);
-            stk[stkp++] = u.ii[0];
-            stk[stkp++] = u.ii[1];
+            stack[stkp++] = u.ii[0];
+            stack[stkp++] = u.ii[1];
         }
-    int r = cc_printf(stk, stkp, sflag);
-    sys_free(stk);
+    int r = cc_printf(stack, stkp, sflag);
     if (!sflag)
         fflush(stdout);
     return r;
@@ -3749,6 +3735,14 @@ static inline void push_n(int n) { sp -= n; }
 
 static inline void pop_n(int n) { sp += n; }
 
+int foo(int i, const char* s) {
+    for (int j = 0; externs[j].name; j++)
+        if (strcmp(s, externs[j].name) == 0) {
+            printf("%d %d\n", i, j);
+            break;
+        }
+}
+
 int cc(int run_mode, int argc, char** argv) {
     clear_globals();
 
@@ -3762,7 +3756,6 @@ int cc(int run_mode, int argc, char** argv) {
         fd = sys_malloc(sizeof(lfs_file_t));
         if (fd == NULL)
             die("no file handle memory");
-
         if (!(sym_base = (struct ident_s*)sys_malloc(SYM_TBL_BYTES)))
             die("no symbol memory");
 
@@ -3897,9 +3890,13 @@ int cc(int run_mode, int argc, char** argv) {
             next();
         }
         sys_free(ast_base);
+        ast_base = NULL;
         sys_free(src_base);
+        src_base = NULL;
         sys_free(sym_base);
+        sym_base = NULL;
         sys_free(tsize);
+        tsize = NULL;
         if (!(pc = (int*)idmain->val))
             die("main() not defined\n");
         prog_hdr.pc = (int)pc;
@@ -4884,7 +4881,7 @@ done:
     }
     while (malloc_list) {
         // printf("%08x %d\n", (int)malloc_list, *((int*)malloc_list + 1));
-        sys_free(malloc_list + 8);
+        sys_free(malloc_list + 2);
     }
 
     return 0;

@@ -102,12 +102,12 @@ static void parse_cmd(void) {
     cp = cmd_buffer;
     bool not_last = true;
     for (argc = 0; not_last && (argc < MAX_ARGS); argc++) {
-        while ((*cp == ' ') || (*cp == ','))
+        while ((*cp == ' ') || (*cp == ',') || (*cp == '='))
             cp++; // skip blanks
         if ((*cp == '\r') || (*cp == '\n'))
             break;
         argv[argc] = cp; // start of string
-        while ((*cp != ' ') && (*cp != ',') && (*cp != '\r') && (*cp != '\n'))
+        while ((*cp != ' ') && (*cp != ',') && (*cp != '=') && (*cp != '\r') && (*cp != '\n'))
             cp++; // skip non blank
         if ((*cp == '\r') || (*cp == '\n'))
             not_last = false;
@@ -591,6 +591,7 @@ static bool screen_size(void) {
     do {
 		set_translate_crlf(false);
         printf(VT_ESC "[999;999H" VT_ESC "[6n");
+        fflush(stdout);
         int k = x_getchar_timeout_us(100000);
         if (k == PICO_ERROR_TIMEOUT)
             break;
@@ -655,12 +656,11 @@ static void HardFault_Handler(void) {
 int main(void) {
     // initialize the pico SDK
     if (ioinit() < 0) {
-        printf("no keyboard memory");
+        printf("no keyboard");
         exit(-1);
     }
     ram_vector_table[3] = (int)HardFault_Handler;
 	x_getchar_timeout_us(1000);
-	set_translate_crlf(1);
     bool uart = false;
 #if LIB_PICO_STDIO_UART
     uart = true;
@@ -668,8 +668,7 @@ int main(void) {
     bool detected = screen_size();
     const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
     const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
-    printf(VT_CLEAR "\n"
-                    "Pico Shell - Copyright (C) 1883 Thomas Edison\n"
+    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright (C) 1883 Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
@@ -680,9 +679,11 @@ int main(void) {
            git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR,
            PICO_SDK_VERSION_MINOR, PICO_SDK_VERSION_REVISION, uart ? "UART" : "USB", screen_x,
            screen_y);
-    if (!detected)
+    if (!detected) {
         printf("\nYour terminal does not respond to standard VT100 escape sequences"
                "\nsequences. The editor will likely not work at all!");
+        fflush(stdout);
+    }
 
     if (fs_mount() != LFS_ERR_OK) {
         printf("The flash file system appears corrupt or unformatted!\n"
@@ -711,7 +712,7 @@ int main(void) {
         mounted = true;
     }
     while (run) {
-        printf("\n%s: ", full_path(""));
+        printf("\n" VT_BOLD "%s: " VT_NORMAL, full_path(""));
         fflush(stdout);
         parse_cmd();
         int i;
