@@ -45,8 +45,7 @@ add_subdirectory(littlefs)
 
 add_executable(${PSHELL}
     main.c
-    xreceive.c xreceive.h
-    xtransmit.c xtransmit.h
+    xmodem.c xmodem.h
     crc16.c crc16.h
     fs.c fs.h
     vi.c vi.h

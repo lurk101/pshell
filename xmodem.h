@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #define SOH 0x01
 #define STX 0x02
 #define EOT 0x04
@@ -17,3 +19,9 @@
 int getbyte(uint32_t timeout);
 void flushreceive(void);
 void putCAN(void);
+
+typedef void (*xmodem_cb_t)(uint8_t* buf, uint32_t len);
+
+int xmodemReceive(xmodem_cb_t cb);
+
+int xmodemTransmit(uint8_t* src, int srcsz);

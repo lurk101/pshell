@@ -24,11 +24,10 @@
 
 #include "cc.h"
 #include "fs.h"
+#include "io.h"
 #include "version.h"
 #include "vi.h"
-#include "xreceive.h"
-#include "xtransmit.h"
-#include "io.h"
+#include "xmodem.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
