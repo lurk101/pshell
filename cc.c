@@ -48,6 +48,9 @@
 #define VT_BOLD "\033[1m"
 #define VT_NORMAL "\033[m"
 
+#define ADJ_BITS 4
+#define ADJ_MAX ((1 << 4) - 1)
+
 #if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
 #define SDK14 1
 #else
@@ -1433,14 +1436,15 @@ static void expr(int lev) {
                 int namelen = d->hash & 0x3f;
                 char ch = d->name[namelen];
                 d->name[namelen] = 0;
-                d->val = extern_getidx(d->name);
-                if (d->val < 0)
+                int ix = extern_getidx(d->name);
+                if (ix < 0)
                     die("Unknown external function %s", d->name);
-                d->type = (((d->val >= SYSC_sqrtf) && (d->val <= SYSC_powf)) ||
-                           (d->val == SYSC_frequency_count_mhz))
-                              ? FLOAT
-                              : INT;
-                d->etype = externs[d->val].etype;
+                d->val = ix;
+                d->type =
+                    (((ix >= SYSC_sqrtf) && (ix <= SYSC_powf)) || (ix == SYSC_frequency_count_mhz))
+                        ? FLOAT
+                        : INT;
+                d->etype = externs[ix].etype;
                 d->name[namelen] = ch;
             }
             next();
@@ -1465,10 +1469,10 @@ static void expr(int lev) {
                 } else if (tk != ')')
                     die("missing comma in function call");
             }
-            if (t > 15)
-                die("maximum of 15 function parameters");
+            if (t > ADJ_MAX)
+                die("maximum of %d function parameters", ADJ_MAX);
             tt = (tt << 10) + (nf << 5) + t; // func etype not like other etype
-            if (d->etype != tt)
+            if (d->etype != tt && d->val != SYSC_printf && d->val != SYSC_sprintf)
                 die("argument type mismatch");
             next();
             // function or system call id
@@ -2789,7 +2793,11 @@ static void gen(int* n) {
             int sj = j;
             while (j >= 0) { // push arguments
                 gen(b + 1);
-                *++e = (l & (1 << j)) ? PSHF : PSH;
+                if ((l & (1 << j)))
+                    *++e = PSHF;
+                else
+                    *++e = PSH;
+
                 --j;
                 b = (int*)a[j];
             }
@@ -2797,7 +2805,7 @@ static void gen(int* n) {
             a = NULL;
             if (i == Syscall) {
                 *++e = IMM;
-                *++e = sj + 1;
+                *++e = sj | ((n[4] >> 10) << 10);
             }
         }
         if (i == Syscall)
@@ -3225,8 +3233,8 @@ static void stmt(int ctx) {
                     if (tk == ',')
                         next();
                 }
-                if (ld > 15)
-                    die("maximum of 15 function parameters");
+                if (ld > ADJ_MAX)
+                    die("maximum of %d function parameters", ADJ_MAX);
                 // function etype is not like other etypes
                 next();
                 dd->etype = (dd->etype << 10) + (nf << 5) + ld; // prm info
@@ -3660,40 +3668,15 @@ static inline int f_as_i(float f) {
     return u.i;
 }
 
-static int common_print_wrap(int n_parms, int sflag, int* sp) {
+static int common_vfunc(int ac, int sflag, int* sp) {
     // HACK ALLERT, we need to figure out which parameters
     // are floats. Scan the format string.
-    int stack[15];
-    char atyp[15];
-    memset(&atyp, 0, 15);
-    char* fmt = (char*)sp[n_parms - 1 - sflag];
-    int an = sflag;
-    while (*fmt) {
-        if (*fmt == '%') {
-            if (*(fmt + 1) == '%') {
-                fmt += 2;
-                continue;
-            }
-            fmt++;
-            an++;
-            if (*fmt == 0)
-                die("missing format specifier");
-            const char* prefx = "-+ #.0123456789";
-            const char* spec = "aefgAEFG";
-            while (strchr(prefx, *fmt))
-                fmt++;
-            if (*fmt == 0)
-                die("missing format specifier");
-            if (strchr(spec, *fmt))
-                atyp[an] = 1;
-        }
-        fmt++;
-    }
-    if (an != n_parms - 1)
-        die("missing format specifier");
-    volatile int stkp = 0;
+    int stack[ADJ_MAX + ADJ_MAX + 2];
+    int stkp = 0;
+    int n_parms = (ac & ADJ_MAX) + 1;
+    ac >>= 10;
     for (int j = n_parms - 1; j >= 0; j--)
-        if (atyp[n_parms - j - 1] == 0)
+        if ((ac & (1 << j)) == 0)
             stack[stkp++] = sp[j];
         else {
             if (stkp & 1)
@@ -3881,7 +3864,6 @@ int cc(int run_mode, int argc, char** argv) {
         sys_free(fd);
         fd = NULL;
 
-        // real C parser begins 00a3c214
         // parse the program
         line = 1;
         pplevt = -1;
@@ -4146,10 +4128,10 @@ int cc(int run_mode, int argc, char** argv) {
             int sysc = *pc++;
             switch (sysc) {
             case SYSC_printf:
-                a.i = common_print_wrap(a.i, 0, sp);
+                a.i = common_vfunc(a.i, 0, sp);
                 break;
             case SYSC_sprintf:
-                a.i = common_print_wrap(a.i, 1, sp);
+                a.i = common_vfunc(a.i, 1, sp);
                 break;
             // memory management
             case SYSC_malloc:

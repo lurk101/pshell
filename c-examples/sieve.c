@@ -1,4 +1,4 @@
-r s[100];
+char s[100];
 
 int sieve() {
     int i, j;
