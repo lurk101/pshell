@@ -24,7 +24,6 @@
 
 #include "cc.h"
 #include "fs.h"
-#include "stdinit.h"
 #include "version.h"
 #include "vi.h"
 #include "xreceive.h"

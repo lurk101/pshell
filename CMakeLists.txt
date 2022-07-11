@@ -42,7 +42,6 @@ add_compile_options("-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH}")
 add_compile_options("-DGIT_BRANCH=${GIT_BRANCH}")
 
 add_subdirectory(littlefs)
-add_subdirectory(stdinit-lib)
 
 add_executable(${PSHELL}
     main.c
@@ -66,8 +65,8 @@ endif()
 
 set(LINK_LIST)
 list(APPEND LINK_LIST
+    littlefs
     pico_stdlib
-    littlefs stdinit-lib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
     hardware_spi hardware_irq)
