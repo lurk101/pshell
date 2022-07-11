@@ -27,6 +27,7 @@
 #include <hardware/irq.h>
 #include <hardware/pwm.h>
 #include <hardware/spi.h>
+#include <hardware/sync.h>
 
 #include <pico/time.h>
 #include <pico/stdio.h>
@@ -48,8 +49,8 @@
 #define VT_BOLD "\033[1m"
 #define VT_NORMAL "\033[m"
 
-#define ADJ_BITS 4
-#define ADJ_MAX ((1 << 4) - 1)
+#define ADJ_BITS 5
+#define ADJ_MASK ((1 << ADJ_BITS) - 1)
 
 #if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
 #define SDK14 1
@@ -65,6 +66,7 @@ extern int cc_printf(void* stk, int wrds, int sflag);
 
 static char *p, *lp;           // current position in source code
 static char *data_base, *data; // data/bss pointer
+static char* src_base;
 
 static int* base_sp;
 static int *e, *le, *text_base; // current position in emitted code
@@ -409,6 +411,7 @@ enum {
     SYSC_strcat,
     SYSC_strdup,
     SYSC_memcmp,
+    SYSC_memcpy,
     // math functions
     SYSC_atoi,
     SYSC_sqrtf,
@@ -636,7 +639,8 @@ static const struct {
     {"strcmp", 2},
     {"strcat", 2},
     {"strdup", 1},
-    {"memcmp", 2},
+    {"memcmp", 3},
+    {"memcpy", 3},
     // math
     {"atoi", 1},
     {"sqrtf", 1 | (1 << 5) | (1 << 10)},
@@ -970,6 +974,11 @@ static int* malloc_list;
 static lfs_file_t* fd;
 static char* fp;
 
+static struct {
+    bool enabled;
+    void* c_handler;
+} intrpt_vector[32];
+
 struct file_handle {
     struct file_handle* next;
     lfs_file_t file;
@@ -977,7 +986,7 @@ struct file_handle {
 
 static void clear_globals(void) {
     base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = ast = malloc_list =
-        (int*)(data_base = data = p = lp = fp = (char*)(id = sym_base = oid = NULL));
+        (int*)(data_base = data = src_base = p = lp = fp = (char*)(id = sym_base = oid = NULL));
     fd = NULL;
     file_list = NULL;
 
@@ -988,20 +997,31 @@ static void clear_globals(void) {
     memset(ir_var, 0, sizeof(ir_var));
     memset(&members, 0, sizeof(members));
     memset(&done_jmp, 0, sizeof(&done_jmp));
+    memset(intrpt_vector, 0, sizeof(intrpt_vector));
 }
 
 #define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
 static __attribute__((__noreturn__)) void die_func(const char* func, int lne, const char* fmt,
                                                    ...) {
-#ifndef NDEBUG
+    printf("\n");
+#ifdef NDEBUG
     printf("error in compiler function %s at line %d\n", func, lne);
 #endif
-    printf(VT_BOLD "C source line %d : " VT_NORMAL, line);
+    printf(VT_BOLD "Error : " VT_NORMAL);
     va_list ap;
     va_start(ap, fmt);
     vprintf(fmt, ap);
     va_end(ap);
+    if (line > 0) {
+        lp = src_base;
+        lne = line;
+        while (--lne)
+            lp = strchr(lp, '\n') + 1;
+        p = strchr(lp, '\n');
+        printf("\n" VT_BOLD "%d:" VT_NORMAL " %.*s", line, p - lp, lp);
+    }
+    printf("\n");
     longjmp(done_jmp, 1);
 }
 
@@ -1469,8 +1489,8 @@ static void expr(int lev) {
                 } else if (tk != ')')
                     die("missing comma in function call");
             }
-            if (t > ADJ_MAX)
-                die("maximum of %d function parameters", ADJ_MAX);
+            if (t > ADJ_MASK)
+                die("maximum of %d function parameters", ADJ_MASK);
             tt = (tt << 10) + (nf << 5) + t; // func etype not like other etype
             if (d->etype != tt && d->val != SYSC_printf && d->val != SYSC_sprintf)
                 die("argument type mismatch");
@@ -1484,7 +1504,7 @@ static void expr(int lev) {
             ty = d->type;
         }
         // enumeration, only enums have ->class == Num
-        else if (d->class == Num) {
+        else if ((d->class == Num) || (d->class == Func)) {
             *--n = d->val;
             *--n = Num;
             ty = INT;
@@ -1513,6 +1533,7 @@ static void expr(int lev) {
                 for (int i = 0; i < nl; i++)
                     np[i] = d->name[i];
                 np[nl] = 0;
+                die("undefined variable %s", np);
             }
             if ((d->type & 3) && d->class != Par) { // push reference address
                 ty = d->type & ~3;
@@ -2517,7 +2538,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 // With a modular code generator, new targets can be easily supported such as
 // native Arm machine code.
 static void gen(int* n) {
-    int i = *n, j, k, l, isPrtf;
+    int i = *n, j, k, l;
     int *a = NULL, *b, *c, *d, *t;
     struct ident_s* label;
 
@@ -3233,8 +3254,8 @@ static void stmt(int ctx) {
                     if (tk == ',')
                         next();
                 }
-                if (ld > ADJ_MAX)
-                    die("maximum of %d function parameters", ADJ_MAX);
+                if (ld > ADJ_MASK)
+                    die("maximum of %d function parameters", ADJ_MASK);
                 // function etype is not like other etypes
                 next();
                 dd->etype = (dd->etype << 10) + (nf << 5) + ld; // prm info
@@ -3671,9 +3692,9 @@ static inline int f_as_i(float f) {
 static int common_vfunc(int ac, int sflag, int* sp) {
     // HACK ALLERT, we need to figure out which parameters
     // are floats. Scan the format string.
-    int stack[ADJ_MAX + ADJ_MAX + 2];
+    int stack[ADJ_MASK + ADJ_MASK + 2];
     int stkp = 0;
-    int n_parms = (ac & ADJ_MAX) + 1;
+    int n_parms = (ac & ADJ_MASK) + 1;
     ac >>= 10;
     for (int j = n_parms - 1; j >= 0; j--)
         if ((ac & (1 << j)) == 0)
@@ -3703,33 +3724,108 @@ static inline void check_kbd_halt(void) {
 
 static int *bp, *pc, *sp;
 
-static inline float pop_float(void) { return *((float*)sp++); }
-
-static inline int* pop_ptr(void) { return (int*)*sp++; }
-
-static inline int pop_int(void) { return *sp++; }
-
-static inline void push_ptr(void* p) { *(--sp) = (int)p; }
-
-static inline void push_int(int i) { *(--sp) = i; }
-
-static inline void push_float(float f) { *((float*)--sp) = f; }
-
-static inline void push_n(int n) { sp -= n; }
-
-static inline void pop_n(int n) { sp += n; }
-
-int foo(int i, const char* s) {
-    for (int j = 0; externs[j].name; j++)
-        if (strcmp(s, externs[j].name) == 0) {
-            printf("%d %d\n", i, j);
-            break;
-        }
+static inline float pop_float(void) {
+    uint32_t save = save_and_disable_interrupts();
+    float r = *((float*)sp++);
+    restore_interrupts(save);
+    return r;
 }
+
+static inline int* pop_ptr(void) {
+    uint32_t save = save_and_disable_interrupts();
+    void* r = (int*)*sp++;
+    restore_interrupts(save);
+    return r;
+}
+
+static inline int pop_int(void) {
+    uint32_t save = save_and_disable_interrupts();
+    int r = *sp++;
+    restore_interrupts(save);
+    return r;
+}
+
+static inline void push_ptr(void* p) {
+    uint32_t save = save_and_disable_interrupts();
+    *(--sp) = (int)p;
+    restore_interrupts(save);
+}
+
+static inline void push_int(int i) {
+    uint32_t save = save_and_disable_interrupts();
+    *(--sp) = i;
+    restore_interrupts(save);
+}
+
+static inline void push_float(float f) {
+    uint32_t save = save_and_disable_interrupts();
+    *((float*)--sp) = f;
+    restore_interrupts(save);
+}
+
+static inline void push_n(int n) {
+    uint32_t save = save_and_disable_interrupts();
+    sp -= n;
+    restore_interrupts(save);
+}
+
+static inline void pop_n(int n) {
+    uint32_t save = save_and_disable_interrupts();
+    sp += n;
+    restore_interrupts(save);
+}
+
+static volatile bool in_intrpt;
+
+void irqn_handler(int n) {
+    in_intrpt = 1;
+    push_ptr(pc);
+    pc = intrpt_vector[n].c_handler;
+}
+
+void irq0_handler(void) { irqn_handler(0); }
+void irq1_handler(void) { irqn_handler(1); }
+void irq2_handler(void) { irqn_handler(2); }
+void irq3_handler(void) { irqn_handler(3); }
+void irq4_handler(void) { irqn_handler(4); }
+void irq5_handler(void) { irqn_handler(5); }
+void irq6_handler(void) { irqn_handler(6); }
+void irq7_handler(void) { irqn_handler(7); }
+void irq8_handler(void) { irqn_handler(8); }
+void irq9_handler(void) { irqn_handler(9); }
+void irq10_handler(void) { irqn_handler(10); }
+void irq11_handler(void) { irqn_handler(11); }
+void irq12_handler(void) { irqn_handler(12); }
+void irq13_handler(void) { irqn_handler(13); }
+void irq14_handler(void) { irqn_handler(14); }
+void irq15_handler(void) { irqn_handler(15); }
+void irq16_handler(void) { irqn_handler(16); }
+void irq17_handler(void) { irqn_handler(17); }
+void irq18_handler(void) { irqn_handler(18); }
+void irq19_handler(void) { irqn_handler(19); }
+void irq20_handler(void) { irqn_handler(20); }
+void irq21_handler(void) { irqn_handler(21); }
+void irq22_handler(void) { irqn_handler(22); }
+void irq23_handler(void) { irqn_handler(23); }
+void irq24_handler(void) { irqn_handler(24); }
+void irq25_handler(void) { irqn_handler(25); }
+void irq26_handler(void) { irqn_handler(26); }
+void irq27_handler(void) { irqn_handler(27); }
+void irq28_handler(void) { irqn_handler(28); }
+void irq29_handler(void) { irqn_handler(29); }
+void irq30_handler(void) { irqn_handler(30); }
+void irq31_handler(void) { irqn_handler(31); }
+
+static irq_handler_t handler[32] = {
+    irq0_handler,  irq1_handler,  irq2_handler,  irq3_handler,  irq4_handler,  irq5_handler,
+    irq6_handler,  irq7_handler,  irq8_handler,  irq9_handler,  irq10_handler, irq11_handler,
+    irq12_handler, irq13_handler, irq14_handler, irq15_handler, irq16_handler, irq17_handler,
+    irq18_handler, irq19_handler, irq20_handler, irq21_handler, irq22_handler, irq23_handler,
+    irq24_handler, irq25_handler, irq26_handler, irq27_handler, irq28_handler, irq29_handler,
+    irq30_handler, irq31_handler};
 
 int cc(int run_mode, int argc, char** argv) {
     clear_globals();
-
     int i;
     char* ofn = NULL;
 
@@ -3854,7 +3950,6 @@ int cc(int run_mode, int argc, char** argv) {
         if (!(members = (struct member_s**)sys_malloc(MEMBER_DICT_BYTES)))
             die("no members table memory");
 
-        char* src_base;
         if (!(src_base = lp = p = (char*)sys_malloc(siz + 1)))
             die("no source memory");
         if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
@@ -3961,20 +4056,27 @@ int cc(int run_mode, int argc, char** argv) {
     } a;
     a.i = 0;
     unsigned int last_esc = time_us_32();
+
+    in_intrpt = 0;
+
     while (1) {
-        unsigned int t = time_us_32();
-        if (t - last_esc > 1000000) {
-            check_kbd_halt();
-            last_esc = t;
+        if (!in_intrpt) {
+            unsigned int t = time_us_32();
+            if (t - last_esc > 1000000) {
+                check_kbd_halt();
+                last_esc = t;
+            }
         }
         i = *pc++;
         ++cycle;
-        if (trc) {
-            printf("%d> %.4s", cycle, instr_str[i]);
-            if ((i <= ADJ) || (i == SYSC))
-                printf(" %d\n", *pc);
-            else
-                printf("\n");
+        if (!in_intrpt) {
+            if (trc) {
+                printf("%d> %.4s", cycle, instr_str[i]);
+                if ((i <= ADJ) || (i == SYSC))
+                    printf(" %d\n", *pc);
+                else
+                    printf("\n");
+            }
         }
         switch (i) {
         case LEA:
@@ -4006,7 +4108,7 @@ int cc(int run_mode, int argc, char** argv) {
             push_n(*pc++);
             break;
         case ADJ:
-            pop_n(*pc++ & 0xf); // stack adjust
+            pop_n(*pc++); // stack adjust
             break;
         // leave subroutine
         case LEV:
@@ -4125,6 +4227,7 @@ int cc(int run_mode, int argc, char** argv) {
             a.i = (int)a.f;
             break;
         case SYSC:
+
             int sysc = *pc++;
             switch (sysc) {
             case SYSC_printf:
@@ -4163,6 +4266,9 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_memcmp:
                 a.i = memcmp((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_memcpy:
+                a.i = (int)memcpy((void*)sp[2], (void*)sp[1], sp[0]);
                 break;
             // math
             case SYSC_atoi:
@@ -4761,6 +4867,8 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_irq_set_enabled:
                 INTR_NOT_IMPLEMENTED();
+                int irqn = sp[0];
+                intrpt_vector[irqn].enabled = sp[0];
                 irq_set_enabled(sp[1], sp[0]);
                 break;
             case SYSC_irq_is_enabled:
@@ -4769,11 +4877,19 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_irq_set_mask_enabled:
                 INTR_NOT_IMPLEMENTED();
+                uint32_t mask = sp[1];
+                for (int i = 0; i < 32; i++) {
+                    if (mask & 1)
+                        intrpt_vector[i].enabled = sp[0];
+                    mask >>= 1;
+                }
                 irq_set_mask_enabled(sp[1], sp[0]);
                 break;
             case SYSC_irq_set_exclusive_handler:
                 INTR_NOT_IMPLEMENTED();
-                irq_set_exclusive_handler(sp[1], (void*)sp[0]);
+                irqn = sp[1];
+                intrpt_vector[irqn].c_handler = (void*)sp[0];
+                irq_set_exclusive_handler(sp[1], handler[irqn]);
                 break;
             case SYSC_irq_get_exclusive_handler:
                 INTR_NOT_IMPLEMENTED();
@@ -4781,10 +4897,15 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_irq_add_shared_handler:
                 INTR_NOT_IMPLEMENTED();
+                irqn = sp[2];
+                intrpt_vector[irqn].c_handler = (void*)sp[1];
                 irq_add_shared_handler(sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_irq_remove_handler:
                 INTR_NOT_IMPLEMENTED();
+                irqn = sp[0];
+                if (intrpt_vector[irqn].c_handler != (void*)sp[0])
+                    run_die("can't remove uninstalled handler");
                 irq_remove_handler(sp[1], (void*)sp[0]);
                 break;
 #if SDK14
@@ -4832,11 +4953,14 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             }
             break;
+
         case EXIT:
             printf("\nCC=%d\n", a);
             goto done;
         case IRET:
             INTR_NOT_IMPLEMENTED();
+            in_intrpt = 0;
+            break;
         default:
             run_die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         }
@@ -4853,6 +4977,9 @@ int cc(int run_mode, int argc, char** argv) {
             x_getchar();
     }
 done:
+    for (int i = 0; i < 32; i++)
+        if (intrpt_vector[i].enabled)
+            irq_set_enabled(i, 0);
     if (fd)
         fs_file_close(fd);
     while (file_list) {

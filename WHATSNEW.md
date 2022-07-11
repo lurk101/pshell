@@ -1,3 +1,11 @@
+What's new in version 1.0.8
+
+- proper handling of system calls with variable number of arguments. (remove printf hack)
+- argument type and number checking for all system calls.
+- removed stdlib-init submodule dependency.
+- consolidated xmodem code.
+- implemented move and copy to directory
+
 What's new in version 1.0.7
 
 - SDK ADC function support

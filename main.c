@@ -661,7 +661,9 @@ static void HardFault_Handler(void) {
                                " - Rebooting in 5 seconds ***" VT_NORMAL "\r\n\n";
     for (const char* cp = clear; *cp; cp++)
         putchar(*cp);
+#ifndef NDEBUG
     watchdog_reboot(0, 0, 5000);
+#endif
     for (;;)
         ;
 }
@@ -682,11 +684,11 @@ int main(void) {
     bool detected = screen_size();
     const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
     const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
-    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright (C) 1883 Thomas Edison\n"
+    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright 1883 Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
-                    "Pico Shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, vi " VI_VER
+                    "Pico Shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, Vi " VI_VER
                     ", SDK %d.%d.%d\n\n"
                     "console on %s [%u X %u]\n\n"
                     "enter command, hit return for help\n\n",
