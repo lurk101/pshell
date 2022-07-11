@@ -168,7 +168,7 @@ static void put_cmd(void) {
     sprintf(result, "\nfile transfered, size: %d\n", pos);
 }
 
-int check_cp_parms(char** from, char** to, int copy) {
+int check_from_to_parms(char** from, char** to, int copy) {
     *from = NULL;
     *to = NULL;
     int rc = 1;
@@ -236,13 +236,13 @@ int check_cp_parms(char** from, char** to, int copy) {
 static void mv_cmd(void) {
     char* from;
     char* to;
-    if (check_cp_parms(&from, &to, 0))
+    if (check_from_to_parms(&from, &to, 0))
         return;
     struct lfs_info info;
     if (fs_rename(from, to) < LFS_ERR_OK)
-        sprintf(result, "could not rename %s to %s", from, to);
+        sprintf(result, "could not move %s to %s", from, to);
     else
-        sprintf(result, "%s renamed to %s", from, to);
+        sprintf(result, "%s moved to %s", from, to);
     free(from);
     free(to);
 }
@@ -251,7 +251,7 @@ static void cp_cmd(void) {
     char* from;
     char* to;
     char* buf = NULL;
-    if (check_cp_parms(&from, &to, 1))
+    if (check_from_to_parms(&from, &to, 1))
         return;
     result[0] = 0;
     lfs_file_t in, out;

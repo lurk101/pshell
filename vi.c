@@ -84,20 +84,6 @@ static char* strchrnul(const char* s, int c) {
     return (char*)s;
 }
 
-static uint64_t handle_errors(uint64_t v, char** endp) {
-    char next_ch = **endp;
-
-    /* errno is already set to ERANGE by strtoXXX if value overflowed */
-    if (next_ch) {
-        /* "1234abcg" or out-of-range? */
-        if (isalnum(next_ch) || errno)
-            return -1;
-        /* good number, just suspicious terminator */
-        errno = EINVAL;
-    }
-    return v;
-}
-
 static const char* msg_memory_exhausted = "out of memory";
 
 static __attribute__((__noreturn__)) void error_msg_and_die(const char* s, ...) {
@@ -889,7 +875,7 @@ static const char esccmds[] = {
     /* '[','3',';','3','~' |0x80,KEYCODE_ALT_DELETE, - unused */
     0};
 
-int64_t read_key(char* buffer, int timeout) {
+int read_key(char* buffer, int timeout) {
     const char* seq;
     int n, c;
 

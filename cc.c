@@ -139,7 +139,6 @@ enum {
     Func = 128,
     Syscall,
     Main,
-    ClearCache,
     Glo,
     Par,
     Loc,
@@ -620,7 +619,7 @@ enum {
 
 static const struct {
     char* name;
-    char nargs;
+    int etype;
 } externs[] = {
     // varargs
     {"printf", 1},
@@ -637,12 +636,12 @@ static const struct {
     {"memcmp", 2},
     // math
     {"atoi", 1},
-    {"sqrtf", 1},
-    {"sinf", 1},
-    {"cosf", 1},
-    {"tanf", 1},
-    {"logf", 1},
-    {"powf", 2},
+    {"sqrtf", 1 | (1 << 5) | (1 << 10)},
+    {"sinf", 1 | (1 << 5) | (1 << 10)},
+    {"cosf", 1 | (1 << 5) | (1 << 10)},
+    {"tanf", 1 | (1 << 5) | (1 << 10)},
+    {"logf", 1 | (1 << 5) | (1 << 10)},
+    {"powf", 2 | (2 << 5) | (0b11 << 10)},
     // miscellaneous
     {"rand", 0},
     {"srand", 1},
@@ -722,7 +721,7 @@ static const struct {
     {"pwm_gpio_to_slice_num", 1},
     {"pwm_gpio_to_channel", 1},
     {"pwm_config_set_phase_correct", 2},
-    {"pwm_config_set_clkdiv", 2},
+    {"pwm_config_set_clkdiv", 2 | (1 << 5) | (0b01 << 10)},
     {"pwm_config_set_clkdiv_int_frac", 3},
     {"pwm_config_set_clkdiv_int", 2},
     {"pwm_config_set_clkdiv_mode", 2},
@@ -1424,7 +1423,7 @@ static void expr(int lev) {
         if (tk == '(') {
             if (d->class == Func && d->val == 0)
                 goto resolve_fnproto;
-            if (d->class < Func || d->class > ClearCache) {
+            if (d->class < Func || d->class > Syscall) {
                 if (d->class != 0)
                     die("bad function call");
                 d->type = INT;
@@ -1441,7 +1440,7 @@ static void expr(int lev) {
                            (d->val == SYSC_frequency_count_mhz))
                               ? FLOAT
                               : INT;
-
+                d->etype = externs[d->val].etype;
                 d->name[namelen] = ch;
             }
             next();
@@ -1466,10 +1465,10 @@ static void expr(int lev) {
                 } else if (tk != ')')
                     die("missing comma in function call");
             }
-            if (t > 14)
-                die("maximum of 14 function parameters");
+            if (t > 15)
+                die("maximum of 15 function parameters");
             tt = (tt << 10) + (nf << 5) + t; // func etype not like other etype
-            if (d->etype && (d->etype != tt))
+            if (d->etype != tt)
                 die("argument type mismatch");
             next();
             // function or system call id
@@ -2778,11 +2777,10 @@ static void gen(int* n) {
         break;
     case Func:
     case Syscall:
-    case ClearCache:
         b = (int*)n[1];
         k = b ? n[3] : 0;
         if (k) {
-            l = (i != ClearCache) ? (n[4] >> 10) : 0;
+            l = n[4] >> 10;
             if (!(a = (int*)sys_malloc(sizeof(int) * k)))
                 die("no cache memory");
             for (j = 0; *b; b = (int*)*b)
@@ -3227,8 +3225,8 @@ static void stmt(int ctx) {
                     if (tk == ',')
                         next();
                 }
-                if (ld > 22)
-                    die("maximum of 22 function parameters");
+                if (ld > 15)
+                    die("maximum of 15 function parameters");
                 // function etype is not like other etypes
                 next();
                 dd->etype = (dd->etype << 10) + (nf << 5) + ld; // prm info
