@@ -64,14 +64,14 @@ filesystem is not mounted
 /: format
 are you sure (y/N) ? n
 user cancelled
-/: mount 
+/: mount
 mounted
 /: ls
 
        9 .exrc
       56 hello.pas
 
-/:             
+/:
      cd - change directory
      cp - copy file
  format - format the filesystem
@@ -96,31 +96,31 @@ file /hello.pas copied to /bak/save.pas
        0 [bak]
        9 .exrc
       56 hello.pas
-                                                                                                                        
-/: ls bak                                                                                                               
-                                                                                                                        
-      56 save.pas                                                                                                       
-                                                                                                                        
-/: cd bak                                                                                                               
-changed to /bak                                                                                                         
-/bak: ls                                                                                                                
-                                                                                                                        
-      56 save.pas                                                                                                       
-                                                                                                                        
-/bak: ls /                                                                                                              
-                                                                                                                        
-       0 [bak]                                                                                                          
-       9 .exrc                                                                                                          
-      56 hello.pas                                                                                                      
-                                                                                                                        
-/bak: cd                                                                                                                
+
+/: ls bak
+
+      56 save.pas
+
+/: cd bak
+changed to /bak
+/bak: ls
+
+      56 save.pas
+
+/bak: ls /
+
+       0 [bak]
+       9 .exrc
+      56 hello.pas
+
+/bak: cd
 
 /: vi hello.pas
 
 ... fullscreen VT102/xterm compatible output edited out
-                                                                                                                        
-/: q                                                                                                                    
-                                                                                                                        
-done                                                                                                                    
+
+/: q
+
+done
 ```
 

@@ -179,24 +179,11 @@ int check_cp_parms(char** from, char** to, int copy) {
             strcpy(result, "need two names");
             break;
         }
+        bool from_is_dir = false;
+        bool to_is_dir = false;
+        bool to_exists = false;
         *from = strdup(full_path(argv[1]));
         if (*from == NULL) {
-            strcpy(result, "no memory");
-            break;
-        }
-        if (copy) {
-            struct lfs_info info;
-            if (fs_stat(*from, &info) < LFS_ERR_OK) {
-                sprintf(result, "%s not found", *from);
-                break;
-            }
-            if (info.type != LFS_TYPE_REG) {
-                sprintf(result, "%s is a directory", *from);
-                break;
-            }
-        }
-        *to = strdup(full_path(argv[2]));
-        if (*to == NULL) {
             strcpy(result, "no memory");
             break;
         }
@@ -205,9 +192,37 @@ int check_cp_parms(char** from, char** to, int copy) {
             sprintf(result, "%s not found", *from);
             break;
         }
-        if (fs_stat(*to, &info) >= LFS_ERR_OK) {
-            sprintf(result, "%s already exists", *to);
+        from_is_dir = info.type == LFS_TYPE_DIR;
+        *to = strdup(full_path(argv[2]));
+        if (*to == NULL) {
+            strcpy(result, "no memory");
             break;
+        }
+        if (fs_stat(*to, &info) == LFS_ERR_OK) {
+            to_is_dir = info.type == LFS_TYPE_DIR;
+            to_exists = 1;
+        }
+        if (copy && from_is_dir) {
+            strcpy(result, "can't copy a directory");
+            break;
+        }
+        if (to_exists && to_is_dir) {
+            char* name = strrchr(*from, '/') + 1;
+            bool append_slash = (*to)[strlen(*to) - 1] == '/' ? false : true;
+            int l = strlen(*to) + strlen(name) + 1;
+            if (append_slash)
+                l++;
+            char* to2 = malloc(l);
+            if (!to2) {
+                strcpy(result, "no memory");
+                break;
+            }
+            strcpy(to2, *to);
+            if (append_slash)
+                strcat(to2, "/");
+            strcat(to2, name);
+            free(*to);
+            *to = to2;
         }
         rc = 0;
     } while (0);
@@ -225,6 +240,7 @@ static void mv_cmd(void) {
     char* to;
     if (check_cp_parms(&from, &to, 0))
         return;
+    struct lfs_info info;
     if (fs_rename(from, to) < LFS_ERR_OK)
         sprintf(result, "could not rename %s to %s", from, to);
     else

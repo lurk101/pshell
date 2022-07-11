@@ -54,6 +54,9 @@
 #define SDK14 0
 #endif
 
+//#define INTR_NOT_IMPLEMENTED() run_die("interrupt support not there yet")
+#define INTR_NOT_IMPLEMENTED()
+
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 
@@ -3956,9 +3959,6 @@ int cc(int run_mode, int argc, char** argv) {
         sys_free(fd);
         fd = NULL;
     }
-
-#define INTR_NOT_IMPLEMENTED() run_die("interrupt support not there yet")
-    //#define INTR_NOT_IMPLEMENTED()
 
     printf("\n");
 
