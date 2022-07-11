@@ -686,7 +686,7 @@ int main(void) {
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"
-                    "Pico Shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, vi " VI_VER
+                    "Pico Shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, Vi " VI_VER
                     ", SDK %d.%d.%d\n\n"
                     "console on %s [%u X %u]\n\n"
                     "enter command, hit return for help\n\n",
