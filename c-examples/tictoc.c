@@ -1,3 +1,5 @@
+/* Timer test */
+
 int main(int ac, char* av[]) {
     int intvl = 2;
     if (ac > 1)
@@ -9,4 +11,3 @@ int main(int ac, char* av[]) {
     }
     return intvl;
 }
-

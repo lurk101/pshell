@@ -1,8 +1,10 @@
+/* LittleFs file I/O test. Create, write, close, open, read, seek, close. */
+
 int main(int ac, char* av[]) {
 
     int rc = -1;
 
-    int fin = 0, fout = open("test.txt", "w");
+    int fin = 0, fout = open("test.txt", O_WRONLY + O_CREAT);
     if (fout < 0) {
         printf("error opening test.txt\n");
         goto exit;
@@ -23,7 +25,7 @@ int main(int ac, char* av[]) {
     rename("test.txt", "test2.txt");
     printf("file renamed\n");
 
-    fin = open("test2.txt", "r");
+    fin = open("test2.txt", O_RDONLY);
     if (fin < 0) {
         printf("error opening test.txt\n");
         goto exit;

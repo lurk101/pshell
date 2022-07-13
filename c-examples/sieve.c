@@ -1,3 +1,5 @@
+/* Array test. Calculate primes using sieve. */
+
 char s[100];
 
 int sieve() {

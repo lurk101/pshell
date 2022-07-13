@@ -1,3 +1,5 @@
+/* SDK CLOCKS test. Display the various Pico clock frequencies */
+
 char clk_name[11][8] = {"gpout0", "gpout1", "gpout2", "gpout3", "ref", "sys",
                         "peri",   "usb",    "adc",    "rtc",    0};
 

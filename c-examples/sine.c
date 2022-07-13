@@ -1,3 +1,5 @@
+/* Math function test. Display a sine wave */
+
 int main() {
     int angle, incr;
     for (angle = incr, incr = 16; angle <= 360; angle += incr) {

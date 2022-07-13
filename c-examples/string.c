@@ -1,3 +1,6 @@
+/* string function test. Compare then concatenate
+   two program arguments */
+
 int main(int ac, char* av[]) {
     if (ac < 3) {
         printf("please provide 2 strings");

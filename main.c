@@ -666,6 +666,8 @@ static void HardFault_Handler(void) {
         ;
 #endif
     watchdog_reboot(0, 0, 5000);
+    for (;;)
+        __wfi();
 }
 
 // application entry point

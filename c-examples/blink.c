@@ -1,3 +1,5 @@
+/* SDK GPIO interface test. Blink the default LED. */
+
 int main() {
     int LED_PIN = PICO_DEFAULT_LED_PIN;
     gpio_init(LED_PIN);
