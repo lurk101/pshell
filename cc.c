@@ -58,8 +58,8 @@
 #define SDK14 0
 #endif
 
-//#define INTR_NOT_IMPLEMENTED() run_die("interrupt support not there yet")
-#define INTR_NOT_IMPLEMENTED()
+#define INTR_NOT_IMPLEMENTED() run_die("interrupt support not there yet")
+//#define INTR_NOT_IMPLEMENTED()
 
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
@@ -412,6 +412,7 @@ enum {
     SYSC_strdup,
     SYSC_memcmp,
     SYSC_memcpy,
+    SYSC_memset,
     // math functions
     SYSC_atoi,
     SYSC_sqrtf,
@@ -641,6 +642,7 @@ static const struct {
     {"strdup", 1},
     {"memcmp", 3},
     {"memcpy", 3},
+    {"memset", 3},
     // math
     {"atoi", 1},
     {"sqrtf", 1 | (1 << 5) | (1 << 10)},
@@ -1518,6 +1520,8 @@ static void expr(int lev) {
                 *--n = loc - d->val;
                 *--n = Loc;
                 break;
+                // XXX
+            case Func:
             case Glo:
                 *--n = d->val;
                 *--n = Num;
@@ -4050,11 +4054,8 @@ int cc(int run_mode, int argc, char** argv) {
 
     // run...
     int cycle = 0;
-    union {
-        int i;
-        float f;
-    } a;
-    a.i = 0;
+    int ai = 0;
+    float af = 0.0;
     unsigned int last_esc = time_us_32();
 
     in_intrpt = 0;
@@ -4072,21 +4073,25 @@ int cc(int run_mode, int argc, char** argv) {
         if (!in_intrpt) {
             if (trc) {
                 printf("%d> %.4s", cycle, instr_str[i]);
-                if ((i <= ADJ) || (i == SYSC))
+                if (i < ADJ)
                     printf(" %d\n", *pc);
+                if (i == ADJ)
+                    printf(" %d\n", *pc & ADJ_MASK);
+                else if (i == SYSC)
+                    printf(" %s\n", externs[*pc].name);
                 else
                     printf("\n");
             }
         }
         switch (i) {
         case LEA:
-            a.i = (int)(bp + *pc++); // load local address
+            ai = (int)(bp + *pc++); // load local address
             break;
         case IMM:
-            a.i = *pc++; // load global address or immediate
+            ai = *pc++; // load global address or immediate
             break;
         case IMMF:
-            a.f = *((float*)pc++);
+            af = *((float*)pc++);
             break;
         case JMP:
             pc = (int*)*pc; // jump
@@ -4096,10 +4101,10 @@ int cc(int run_mode, int argc, char** argv) {
             pc = (int*)*pc;
             break;
         case BZ:
-            pc = a.i ? pc + 1 : (int*)*pc; // branch if zero
+            pc = ai ? pc + 1 : (int*)*pc; // branch if zero
             break;
         case BNZ:
-            pc = a.i ? (int*)*pc : pc + 1; // branch if not zero
+            pc = ai ? (int*)*pc : pc + 1; // branch if not zero
             break;
         // enter subroutine
         case ENT:
@@ -4108,7 +4113,7 @@ int cc(int run_mode, int argc, char** argv) {
             push_n(*pc++);
             break;
         case ADJ:
-            pop_n(*pc++); // stack adjust
+            pop_n(*pc++ & ADJ_MASK); // stack adjust
             break;
         // leave subroutine
         case LEV:
@@ -4117,144 +4122,143 @@ int cc(int run_mode, int argc, char** argv) {
             pc = pop_ptr();
             break;
         case LI:
-            a.i = *(int*)a.i; // load int
+            ai = *(int*)ai; // load int
             break;
         case LF:
-            a.f = *(float*)a.i; // load float
+            af = *(float*)ai; // load float
             break;
         case LC:
-            a.i = *(char*)a.i; // load char
+            ai = *(char*)ai; // load char
             break;
         case SI:
-            *((int*)pop_ptr()) = a.i; // store int
+            *((int*)pop_ptr()) = ai; // store int
             break;
         case SF:
-            *((float*)pop_ptr()) = a.f; // store float
+            *((float*)pop_ptr()) = af; // store float
             break;
         case SC:
-            *((char*)pop_ptr()) = a.i; // store char
+            *((char*)pop_ptr()) = ai; // store char
             break;
 
         case PSH:
-            push_int(a.i); // push
+            push_int(ai); // push
             break;
         case PSHF:
-            push_float(a.f);
+            push_float(af);
             break;
 
         case OR:
-            a.i = pop_int() | a.i;
+            ai = pop_int() | ai;
             break;
         case XOR:
-            a.i = pop_int() ^ a.i;
+            ai = pop_int() ^ ai;
             break;
         case AND:
-            a.i = pop_int() & a.i;
+            ai = pop_int() & ai;
             break;
         case EQ:
-            a.i = pop_int() == a.i;
+            ai = pop_int() == ai;
             break;
         case EQF:
-            a.i = pop_float() == a.f;
+            ai = pop_float() == af;
             break;
         case NE:
-            a.i = pop_int() != a.i;
+            ai = pop_int() != ai;
             break;
         case NEF:
-            a.i = pop_float() != a.f;
+            ai = pop_float() != af;
             break;
         case LT:
-            a.i = pop_int() < a.i;
+            ai = pop_int() < ai;
             break;
         case LTF:
-            a.i = pop_float() < a.f;
+            ai = pop_float() < af;
             break;
         case GT:
-            a.i = pop_int() > a.i;
+            ai = pop_int() > ai;
             break;
         case GTF:
-            a.i = pop_float() > a.f;
+            ai = pop_float() > af;
             break;
         case LE:
-            a.i = pop_int() <= a.i;
+            ai = pop_int() <= ai;
             break;
         case LEF:
-            a.i = pop_float() <= a.f;
+            ai = pop_float() <= af;
             break;
         case GE:
-            a.i = pop_int() >= a.i;
+            ai = pop_int() >= ai;
             break;
         case GEF:
-            a.i = pop_float() == a.f;
+            ai = pop_float() == af;
             break;
         case SHL:
-            a.i = pop_int() << a.i;
+            ai = pop_int() << ai;
             break;
         case SHR:
-            a.i = pop_int() >> a.i;
+            ai = pop_int() >> ai;
             break;
         case ADD:
-            a.i = pop_int() + a.i;
+            ai = pop_int() + ai;
             break;
         case ADDF:
-            a.f = pop_float() + a.f;
+            af = pop_float() + af;
             break;
         case SUB:
-            a.i = pop_int() - a.i;
+            ai = pop_int() - ai;
             break;
         case SUBF:
-            a.f = pop_float() - a.f;
+            af = pop_float() - af;
             break;
         case MUL:
-            a.i = pop_int() * a.i;
+            ai = pop_int() * ai;
             break;
         case MULF:
-            a.f = pop_float() * a.f;
+            af = pop_float() * af;
             break;
         case DIV:
-            a.i = pop_int() / a.i;
+            ai = pop_int() / ai;
             break;
         case DIVF:
-            a.f = pop_float() / a.f;
+            af = pop_float() / af;
             break;
         case MOD:
-            a.i = pop_int() % a.i;
+            ai = pop_int() % ai;
             break;
         case ITOF:
-            a.f = (float)a.i;
+            af = (float)ai;
             break;
         case FTOI:
-            a.i = (int)a.f;
+            ai = (int)af;
             break;
         case SYSC:
-
             int sysc = *pc++;
             switch (sysc) {
             case SYSC_printf:
-                a.i = common_vfunc(a.i, 0, sp);
+                ai = common_vfunc(ai, 0, sp);
                 break;
             case SYSC_sprintf:
-                a.i = common_vfunc(a.i, 1, sp);
+                ai = common_vfunc(ai, 1, sp);
                 break;
             // memory management
             case SYSC_malloc:
-                a.i = (int)sys_malloc(sp[0]);
+                ai = (int)sys_malloc(sp[0]);
                 break;
             case SYSC_free:
                 sys_free((void*)(sp[0]));
                 break;
             // string
             case SYSC_strlen:
-                a.i = strlen((void*)sp[0]);
+                ai = strlen((void*)sp[0]);
                 break;
             case SYSC_strcpy:
-                a.i = (int)strcpy((void*)sp[1], (void*)sp[0]);
+                ai = (int)strcpy((void*)sp[1], (void*)sp[0]);
                 break;
             case SYSC_strcmp:
-                a.i = strcmp((void*)sp[1], (void*)sp[0]);
+                ai = strcmp((void*)sp[1], (void*)sp[0]);
                 break;
             case SYSC_strcat:
-                a.i = (int)strcat((void*)sp[1], (void*)sp[0]);
+                ai = (int)strcat((void*)sp[1], (void*)sp[0]);
                 break;
             case SYSC_strdup:
                 int strl = strlen((void*)sp[0]);
@@ -4262,48 +4266,51 @@ int cc(int run_mode, int argc, char** argv) {
                 if (!(strp = sys_malloc(strl + 1)))
                     run_die("no strdup memory");
                 strcpy(strp, (void*)sp[0]);
-                a.i = (int)strp;
+                ai = (int)strp;
                 break;
             case SYSC_memcmp:
-                a.i = memcmp((void*)sp[2], (void*)sp[1], sp[0]);
+                ai = memcmp((void*)sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_memcpy:
-                a.i = (int)memcpy((void*)sp[2], (void*)sp[1], sp[0]);
+                ai = (int)memcpy((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
+            case SYSC_memset:
+                ai = (int)memset((void*)sp[2], sp[1], sp[0]);
                 break;
             // math
             case SYSC_atoi:
-                a.i = atoi((char*)sp[0]);
+                ai = atoi((char*)sp[0]);
                 break;
             case SYSC_sqrtf:
-                a.f = sqrtf(*((float*)sp));
+                af = sqrtf(*((float*)sp));
                 break;
             case SYSC_sinf:
-                a.f = sinf(*((float*)sp));
+                af = sinf(*((float*)sp));
                 break;
             case SYSC_cosf:
-                a.f = cosf(*((float*)sp));
+                af = cosf(*((float*)sp));
                 break;
             case SYSC_tanf:
-                a.f = tanf(*((float*)sp));
+                af = tanf(*((float*)sp));
                 break;
             case SYSC_logf:
-                a.f = logf(*((float*)sp));
+                af = logf(*((float*)sp));
                 break;
             case SYSC_powf:
-                a.f = powf(*((float*)sp + 1), *((float*)sp));
+                af = powf(*((float*)sp + 1), *((float*)sp));
                 break;
             case SYSC_rand:
-                a.i = rand();
+                ai = rand();
                 break;
             case SYSC_srand:
                 srand(sp[0]);
                 break;
             // io
             case SYSC_getchar:
-                a.i = x_getchar();
+                ai = x_getchar();
                 break;
             case SYSC_getchar_timeout_us:
-                a.i = x_getchar_timeout_us(sp[0]);
+                ai = x_getchar_timeout_us(sp[0]);
                 break;
             case SYSC_putchar:
                 putchar(sp[0]);
@@ -4314,10 +4321,10 @@ int cc(int run_mode, int argc, char** argv) {
                     run_die("no file handle memory");
                 if (fs_file_open(&h->file, full_path((char*)sp[1]), sp[0]) < LFS_ERR_OK) {
                     sys_free(h);
-                    a.i = 0;
+                    ai = 0;
                     break;
                 }
-                a.i = (int)h;
+                ai = (int)h;
                 h->next = file_list;
                 file_list = h;
                 break;
@@ -4339,15 +4346,15 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_read:
                 h = (struct file_handle*)sp[2];
-                a.i = fs_file_read(&h->file, (void*)sp[1], sp[0]);
+                ai = fs_file_read(&h->file, (void*)sp[1], sp[0]);
                 break;
             case SYSC_write:
                 h = (struct file_handle*)sp[2];
-                a.i = fs_file_write(&h->file, (void*)sp[1], sp[0]);
+                ai = fs_file_write(&h->file, (void*)sp[1], sp[0]);
                 break;
             case SYSC_lseek:
                 h = (struct file_handle*)sp[2];
-                a.i = fs_file_seek(&h->file, sp[1], sp[0]);
+                ai = fs_file_seek(&h->file, sp[1], sp[0]);
                 break;
             case SYSC_rename:
                 fp = full_path((void*)sp[1]);
@@ -4356,15 +4363,15 @@ int cc(int run_mode, int argc, char** argv) {
                     run_die("no rename memory");
                 strcpy(fpa, fp);
                 char* fpb = full_path((void*)sp[0]);
-                a.i = fs_rename(fpa, fpb);
+                ai = fs_rename(fpa, fpb);
                 sys_free(fpa);
                 break;
             case SYSC_remove:
-                a.i = fs_remove(full_path((void*)sp[0]));
+                ai = fs_remove(full_path((void*)sp[0]));
                 break;
             // time
             case SYSC_time_us_32: // SDK
-                a.i = time_us_32();
+                ai = time_us_32();
                 break;
             case SYSC_sleep_us:
                 unsigned us = sp[0];
@@ -4389,7 +4396,7 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_set_function(sp[1], sp[0]);
                 break;
             case SYSC_gpio_get_function:
-                a.i = gpio_get_function(sp[0]);
+                ai = gpio_get_function(sp[0]);
                 break;
             case SYSC_gpio_set_pulls:
                 gpio_set_pulls(sp[2], sp[1], sp[0]);
@@ -4398,13 +4405,13 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_pull_up(sp[0]);
                 break;
             case SYSC_gpio_is_pulled_up:
-                a.i = gpio_is_pulled_up(sp[0]);
+                ai = gpio_is_pulled_up(sp[0]);
                 break;
             case SYSC_gpio_pull_down:
                 gpio_pull_down(sp[0]);
                 break;
             case SYSC_gpio_is_pulled_down:
-                a.i = gpio_is_pulled_down(sp[0]);
+                ai = gpio_is_pulled_down(sp[0]);
                 break;
             case SYSC_gpio_disable_pulls:
                 gpio_disable_pulls(sp[0]);
@@ -4428,19 +4435,19 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_set_input_hysteresis_enabled(sp[1], sp[0]);
                 break;
             case SYSC_gpio_is_input_hysteresis_enabled:
-                a.i = gpio_is_input_hysteresis_enabled(sp[0]);
+                ai = gpio_is_input_hysteresis_enabled(sp[0]);
                 break;
             case SYSC_gpio_set_slew_rate:
                 gpio_set_slew_rate(sp[1], sp[0]);
                 break;
             case SYSC_gpio_get_slew_rate:
-                a.i = gpio_get_slew_rate(sp[0]);
+                ai = gpio_get_slew_rate(sp[0]);
                 break;
             case SYSC_gpio_set_drive_strength:
                 gpio_set_drive_strength(sp[1], sp[0]);
                 break;
             case SYSC_gpio_get_drive_strength:
-                a.i = gpio_get_drive_strength(sp[0]);
+                ai = gpio_get_drive_strength(sp[0]);
                 break;
             case SYSC_gpio_set_irq_enabled:
                 INTR_NOT_IMPLEMENTED();
@@ -4463,7 +4470,7 @@ int cc(int run_mode, int argc, char** argv) {
 #if SDK14
             case SYSC_gpio_get_irq_event_mask:
                 INTR_NOT_IMPLEMENTED();
-                a.i = gpio_get_irq_event_mask(sp[0]);
+                ai = gpio_get_irq_event_mask(sp[0]);
                 break;
 #endif
             case SYSC_gpio_acknowledge_irq:
@@ -4507,10 +4514,10 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_init_mask(sp[0]);
                 break;
             case SYSC_gpio_get:
-                a.i = gpio_get(sp[0]);
+                ai = gpio_get(sp[0]);
                 break;
             case SYSC_gpio_get_all:
-                a.i = gpio_get_all();
+                ai = gpio_get_all();
                 break;
             case SYSC_gpio_set_mask:
                 gpio_set_mask(sp[0]);
@@ -4531,7 +4538,7 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_put(sp[1], sp[0]);
                 break;
             case SYSC_gpio_get_out_level:
-                a.i = gpio_get_out_level(sp[0]);
+                ai = gpio_get_out_level(sp[0]);
                 break;
             case SYSC_gpio_set_dir_out_masked:
                 gpio_set_dir_out_masked(sp[0]);
@@ -4549,17 +4556,17 @@ int cc(int run_mode, int argc, char** argv) {
                 gpio_set_dir(sp[1], sp[0]);
                 break;
             case SYSC_gpio_is_dir_out:
-                a.i = gpio_is_dir_out(sp[0]);
+                ai = gpio_is_dir_out(sp[0]);
                 break;
             case SYSC_gpio_get_dir:
-                a.i = gpio_get_dir(sp[0]);
+                ai = gpio_get_dir(sp[0]);
                 break;
             // PWM
             case SYSC_pwm_gpio_to_slice_num:
-                a.i = pwm_gpio_to_slice_num(sp[0]);
+                ai = pwm_gpio_to_slice_num(sp[0]);
                 break;
             case SYSC_pwm_gpio_to_channel:
-                a.i = pwm_gpio_to_channel(sp[0]);
+                ai = pwm_gpio_to_channel(sp[0]);
                 break;
             case SYSC_pwm_config_set_phase_correct:
                 pwm_config_set_phase_correct((void*)sp[1], sp[0]);
@@ -4601,7 +4608,7 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_set_gpio_level(sp[1], sp[0]);
                 break;
             case SYSC_pwm_get_counter:
-                a.i = pwm_get_counter(sp[0]);
+                ai = pwm_get_counter(sp[0]);
                 break;
             case SYSC_pwm_set_counter:
                 pwm_set_counter(sp[1], sp[0]);
@@ -4647,14 +4654,14 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_pwm_get_irq_status_mask:
                 INTR_NOT_IMPLEMENTED();
-                a.i = pwm_get_irq_status_mask();
+                ai = pwm_get_irq_status_mask();
                 break;
             case SYSC_pwm_force_irq:
                 INTR_NOT_IMPLEMENTED();
                 pwm_force_irq(sp[0]);
                 break;
             case SYSC_pwm_get_dreq:
-                a.i = pwm_get_dreq(sp[0]);
+                ai = pwm_get_dreq(sp[0]);
                 break;
                 // ADC
             case SYSC_adc_init:
@@ -4667,7 +4674,7 @@ int cc(int run_mode, int argc, char** argv) {
                 adc_select_input(sp[0]);
                 break;
             case SYSC_adc_get_selected_input:
-                a.i = adc_get_selected_input();
+                ai = adc_get_selected_input();
                 break;
             case SYSC_adc_set_round_robin:
                 adc_set_round_robin(sp[0]);
@@ -4676,7 +4683,7 @@ int cc(int run_mode, int argc, char** argv) {
                 adc_set_temp_sensor_enabled(sp[0]);
                 break;
             case SYSC_adc_read:
-                a.i = adc_read();
+                ai = adc_read();
                 break;
             case SYSC_adc_run:
                 adc_run(sp[0]);
@@ -4688,16 +4695,16 @@ int cc(int run_mode, int argc, char** argv) {
                 adc_fifo_setup(sp[4], sp[3], sp[2], sp[1], sp[0]);
                 break;
             case SYSC_adc_fifo_is_empty:
-                a.i = adc_fifo_is_empty();
+                ai = adc_fifo_is_empty();
                 break;
             case SYSC_adc_fifo_get_level:
-                a.i = adc_fifo_get_level();
+                ai = adc_fifo_get_level();
                 break;
             case SYSC_adc_fifo_get:
-                a.i = adc_fifo_get();
+                ai = adc_fifo_get();
                 break;
             case SYSC_adc_fifo_get_blocking:
-                a.i = adc_fifo_get_blocking();
+                ai = adc_fifo_get_blocking();
                 break;
             case SYSC_adc_fifo_drain:
                 adc_fifo_drain();
@@ -4710,22 +4717,22 @@ int cc(int run_mode, int argc, char** argv) {
                 clocks_init();
                 break;
             case SYSC_clock_configure:
-                a.i = clock_configure(sp[4], sp[3], sp[2], sp[1], sp[0]);
+                ai = clock_configure(sp[4], sp[3], sp[2], sp[1], sp[0]);
                 break;
             case SYSC_clock_stop:
                 clock_stop(sp[0]);
                 break;
             case SYSC_clock_get_hz:
-                a.i = clock_get_hz(sp[0]);
+                ai = clock_get_hz(sp[0]);
                 break;
             case SYSC_frequency_count_khz:
-                a.i = frequency_count_khz(sp[0]);
+                ai = frequency_count_khz(sp[0]);
                 break;
             case SYSC_clock_set_reported_hz:
                 clock_set_reported_hz(sp[1], sp[0]);
                 break;
             case SYSC_frequency_count_mhz:
-                a.f = frequency_count_mhz(sp[0]);
+                af = frequency_count_mhz(sp[0]);
                 break;
             case SYSC_clocks_enable_resus:
                 clocks_enable_resus((resus_callback_t)sp[0]);
@@ -4734,60 +4741,60 @@ int cc(int run_mode, int argc, char** argv) {
                 clock_gpio_init(sp[2], sp[1], sp[0]);
                 break;
             case SYSC_clock_configure_gpin:
-                a.i = clock_configure_gpin(sp[3], sp[2], sp[1], sp[0]);
+                ai = clock_configure_gpin(sp[3], sp[2], sp[1], sp[0]);
                 break;
                 // I2C
             case SYSC_i2c_init:
-                a.i = i2c_init((void*)sp[1], sp[0]);
+                ai = i2c_init((void*)sp[1], sp[0]);
                 break;
             case SYSC_i2c_deinit:
                 i2c_deinit((void*)sp[0]);
                 break;
             case SYSC_i2c_set_baudrate:
-                a.i = i2c_set_baudrate((void*)sp[1], sp[0]);
+                ai = i2c_set_baudrate((void*)sp[1], sp[0]);
                 break;
             case SYSC_i2c_set_slave_mode:
                 i2c_set_slave_mode((void*)sp[2], sp[1], sp[0]);
                 break;
             case SYSC_i2c_hw_index:
-                a.i = i2c_hw_index((void*)sp[0]);
+                ai = i2c_hw_index((void*)sp[0]);
                 break;
             case SYSC_i2c_get_hw:
-                a.i = (int)i2c_get_hw((void*)sp[0]);
+                ai = (int)i2c_get_hw((void*)sp[0]);
                 break;
 #if 0
     case SYSC_i2c_write_blocking_until:
-        a.i = i2c_write_blocking_until((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
+        ai = i2c_write_blocking_until((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
         break;
     case SYSC_i2c_read_blocking_until:
-        a.i = i2c_read_blocking_until((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
+        ai = i2c_read_blocking_until((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
         break;
 #endif
             case SYSC_i2c_write_timeout_us:
-                a.i = i2c_write_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
+                ai = i2c_write_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
                 break;
             case SYSC_i2c_write_timeout_per_char_us:
-                a.i = i2c_write_timeout_per_char_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1],
-                                                    sp[0]);
-                break;
-            case SYSC_i2c_read_timeout_us:
-                a.i = i2c_read_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_i2c_read_timeout_per_char_us:
-                a.i = i2c_read_timeout_per_char_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1],
+                ai = i2c_write_timeout_per_char_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1],
                                                    sp[0]);
                 break;
+            case SYSC_i2c_read_timeout_us:
+                ai = i2c_read_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
+                break;
+            case SYSC_i2c_read_timeout_per_char_us:
+                ai = i2c_read_timeout_per_char_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1],
+                                                  sp[0]);
+                break;
             case SYSC_i2c_write_blocking:
-                a.i = i2c_write_blocking((void*)sp[4], sp[3], (void*)sp[2], sp[1], sp[0]);
+                ai = i2c_write_blocking((void*)sp[4], sp[3], (void*)sp[2], sp[1], sp[0]);
                 break;
             case SYSC_i2c_read_blocking:
-                a.i = i2c_read_blocking((void*)sp[4], sp[3], (void*)sp[2], sp[1], sp[0]);
+                ai = i2c_read_blocking((void*)sp[4], sp[3], (void*)sp[2], sp[1], sp[0]);
                 break;
             case SYSC_i2c_get_write_available:
-                a.i = i2c_get_write_available((void*)sp[0]);
+                ai = i2c_get_write_available((void*)sp[0]);
                 break;
             case SYSC_i2c_get_read_available:
-                a.i = i2c_get_read_available((void*)sp[0]);
+                ai = i2c_get_read_available((void*)sp[0]);
                 break;
             case SYSC_i2c_write_raw_blocking:
                 i2c_write_raw_blocking((void*)sp[2], (void*)sp[1], sp[0]);
@@ -4796,29 +4803,29 @@ int cc(int run_mode, int argc, char** argv) {
                 i2c_read_raw_blocking((void*)sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_i2c_get_dreq:
-                a.i = i2c_get_dreq((void*)sp[1], sp[0]);
+                ai = i2c_get_dreq((void*)sp[1], sp[0]);
                 break;
                 // SPI
             case SYSC_spi_init:
-                a.i = spi_init((void*)sp[1], sp[0]);
+                ai = spi_init((void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_deinit:
                 spi_deinit((void*)sp[0]);
                 break;
             case SYSC_spi_set_baudrate:
-                a.i = spi_set_baudrate((void*)sp[1], sp[0]);
+                ai = spi_set_baudrate((void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_get_baudrate:
-                a.i = spi_get_baudrate((void*)sp[0]);
+                ai = spi_get_baudrate((void*)sp[0]);
                 break;
             case SYSC_spi_get_index:
-                a.i = spi_get_index((void*)sp[0]);
+                ai = spi_get_index((void*)sp[0]);
                 break;
             case SYSC_spi_get_hw:
-                a.i = (int)spi_get_hw((void*)sp[0]);
+                ai = (int)spi_get_hw((void*)sp[0]);
                 break;
             case SYSC_spi_get_const_hw:
-                a.i = (int)spi_get_const_hw((void*)sp[0]);
+                ai = (int)spi_get_const_hw((void*)sp[0]);
                 break;
             case SYSC_spi_set_format:
                 spi_set_format((void*)sp[4], sp[3], sp[2], sp[1], sp[0]);
@@ -4827,34 +4834,34 @@ int cc(int run_mode, int argc, char** argv) {
                 spi_set_slave((void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_is_writable:
-                a.i = spi_is_writable((void*)sp[0]);
+                ai = spi_is_writable((void*)sp[0]);
                 break;
             case SYSC_spi_is_readable:
-                a.i = spi_is_readable((void*)sp[0]);
+                ai = spi_is_readable((void*)sp[0]);
                 break;
             case SYSC_spi_is_busy:
-                a.i = spi_is_busy((void*)sp[0]);
+                ai = spi_is_busy((void*)sp[0]);
                 break;
             case SYSC_spi_write_read_blocking:
-                a.i = spi_write_read_blocking((void*)sp[3], (void*)sp[2], (void*)sp[1], sp[0]);
+                ai = spi_write_read_blocking((void*)sp[3], (void*)sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_write_blocking:
-                a.i = spi_write_blocking((void*)sp[2], (void*)sp[1], sp[0]);
+                ai = spi_write_blocking((void*)sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_read_blocking:
-                a.i = spi_read_blocking((void*)sp[3], sp[2], (void*)sp[1], sp[0]);
+                ai = spi_read_blocking((void*)sp[3], sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_write16_read16_blocking:
-                a.i = spi_write16_read16_blocking((void*)sp[3], (void*)sp[2], (void*)sp[1], sp[0]);
+                ai = spi_write16_read16_blocking((void*)sp[3], (void*)sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_write16_blocking:
-                a.i = spi_write16_blocking((void*)sp[2], (void*)sp[1], sp[0]);
+                ai = spi_write16_blocking((void*)sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_read16_blocking:
-                a.i = spi_read16_blocking((void*)sp[3], sp[2], (void*)sp[1], sp[0]);
+                ai = spi_read16_blocking((void*)sp[3], sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_spi_get_dreq:
-                a.i = spi_get_dreq((void*)sp[1], sp[0]);
+                ai = spi_get_dreq((void*)sp[1], sp[0]);
                 break;
                 // IRQ
             case SYSC_irq_set_priority:
@@ -4863,7 +4870,7 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_irq_get_priority:
                 INTR_NOT_IMPLEMENTED();
-                a.i = irq_get_priority(sp[0]);
+                ai = irq_get_priority(sp[0]);
                 break;
             case SYSC_irq_set_enabled:
                 INTR_NOT_IMPLEMENTED();
@@ -4873,7 +4880,7 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_irq_is_enabled:
                 INTR_NOT_IMPLEMENTED();
-                a.i = irq_is_enabled(sp[0]);
+                ai = irq_is_enabled(sp[0]);
                 break;
             case SYSC_irq_set_mask_enabled:
                 INTR_NOT_IMPLEMENTED();
@@ -4893,7 +4900,7 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_irq_get_exclusive_handler:
                 INTR_NOT_IMPLEMENTED();
-                a.i = (int)irq_get_exclusive_handler(sp[0]);
+                ai = (int)irq_get_exclusive_handler(sp[0]);
                 break;
             case SYSC_irq_add_shared_handler:
                 INTR_NOT_IMPLEMENTED();
@@ -4911,12 +4918,12 @@ int cc(int run_mode, int argc, char** argv) {
 #if SDK14
             case SYSC_irq_has_shared_handler:
                 INTR_NOT_IMPLEMENTED();
-                a.i = irq_has_shared_handler(sp[0]);
+                ai = irq_has_shared_handler(sp[0]);
                 break;
 #endif
             case SYSC_irq_get_vtable_handler:
                 INTR_NOT_IMPLEMENTED();
-                a.i = (int)irq_get_vtable_handler(sp[0]);
+                ai = (int)irq_get_vtable_handler(sp[0]);
                 break;
             case SYSC_irq_clear:
                 INTR_NOT_IMPLEMENTED();
@@ -4941,11 +4948,11 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             case SYSC_user_irq_claim_unused:
                 INTR_NOT_IMPLEMENTED();
-                a.i = user_irq_claim_unused(sp[0]);
+                ai = user_irq_claim_unused(sp[0]);
                 break;
             case SYSC_user_irq_is_claimed:
                 INTR_NOT_IMPLEMENTED();
-                a.i = user_irq_is_claimed(sp[0]);
+                ai = user_irq_is_claimed(sp[0]);
                 break;
 #endif
             default:
@@ -4953,9 +4960,8 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
             }
             break;
-
         case EXIT:
-            printf("\nCC=%d\n", a);
+            printf("\nCC=%d\n", ai);
             goto done;
         case IRET:
             INTR_NOT_IMPLEMENTED();
@@ -4965,12 +4971,13 @@ int cc(int run_mode, int argc, char** argv) {
             run_die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         }
         if (trc) {
-            printf("acc    %12f 0x%08x %12d\n", a.f, a.i, a.i);
-            printf("stk %08x x %08x %08x %08x $08x\n", (int)sp, *((int*)sp), *((int*)sp + 1),
+            printf("acc     %08x %d\n", ai, ai);
+            printf("accf    %f\n", af);
+            printf("stk %08x x %08x %08x %08x %08x\n", (int)sp, *((int*)sp), *((int*)sp + 1),
                    *((int*)sp + 2), *((int*)sp + 3));
-            printf("stk          i %d %d %d $d\n", *((int*)sp), *((int*)sp + 1), *((int*)sp + 2),
-                   *((int*)sp + 3));
-            printf("stk          f %f %f %f $f\n", *((float*)sp), *((float*)sp + 1),
+            printf("stk          i %08d %08d %08d %08d\n", *((int*)sp), *((int*)sp + 1),
+                   *((int*)sp + 2), *((int*)sp + 3));
+            printf("stk          f %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
                    *((float*)sp + 2), *((float*)sp + 3));
         }
         if (trc > 1)

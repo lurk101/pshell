@@ -662,10 +662,10 @@ static void HardFault_Handler(void) {
     for (const char* cp = clear; *cp; cp++)
         putchar(*cp);
 #ifndef NDEBUG
-    watchdog_reboot(0, 0, 5000);
-#endif
     for (;;)
         ;
+#endif
+    watchdog_reboot(0, 0, 5000);
 }
 
 // application entry point
