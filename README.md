@@ -53,7 +53,7 @@ C source code [examples].
 Example log.
 
 ```sh
-Pico Shell - Copyright 1883 Thomas Edison
+Pico Shell - Copyright 1883 (c) Thomas Edison
 This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions. See LICENSE file for details.

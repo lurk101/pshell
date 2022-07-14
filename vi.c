@@ -1,5 +1,3 @@
-/* vi: set sw=4 ts=4: */
-/* SPDX-License-Identifier: GPL-3.0-or-later */
 
 /*
  * tiny vi.c: A small 'vi' clone
@@ -3796,11 +3794,12 @@ static void* xmalloc_open_read_close(const char* filename) {
     return buf;
 }
 
-int vi(int x, int y, int ac, char* argv[]) {
+extern void get_screen_xy(uint32_t* x, uint32_t* y);
+
+int vi(int ac, char* argv[]) {
     memset(&G, 0, sizeof G); // clear the globals
     argc = ac;
-    rows = y;
-    columns = x;
+    get_screen_xy(&rows, &columns);
     last_modified_count = -1;
     /* "" but has space for 2 chars: */
     last_search_pattern = zalloc(2);

@@ -1,7 +1,7 @@
 /* vi: set sw=4 ts=4: */
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
-/* Copyright (C) 1883 Thomas Edison - All Rights Reserved
+/* Copyright (c) 1883 Thomas Edison - All Rights Reserved
  * You may use, distribute and modify this code under the
  * terms of the BSD 3 clause license, which unfortunately
  * won't be written for another century.
@@ -16,6 +16,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "hardware/structs/scb.h"
 #include "hardware/watchdog.h"
 
 #include "pico/bootrom.h"
@@ -48,6 +49,11 @@ static buf_t cmd_buffer, curdir, path, result;
 static int argc;
 static char* argv[MAX_ARGS + 1];
 static bool mounted = false, run = true;
+
+void get_screen_xy(uint32_t* x, uint32_t* y) {
+    *x = screen_x;
+    *y = screen_y;
+}
 
 static void echo_key(char c) {
     putchar(c);
@@ -518,7 +524,7 @@ static void cc_cmd(void) {
 static void vi_cmd(void) {
     if (check_mount(true))
         return;
-    vi(screen_x, screen_y, argc - 1, argv + 1);
+    vi(argc - 1, argv + 1);
     result[0] = 0;
 }
 
@@ -677,8 +683,8 @@ int main(void) {
         printf("no keyboard");
         exit(-1);
     }
-    ram_vector_table[3] = (int)HardFault_Handler;
-	x_getchar_timeout_us(1000);
+    ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
+    x_getchar_timeout_us(1000);
     bool uart = false;
 #if LIB_PICO_STDIO_UART
     uart = true;
@@ -686,7 +692,7 @@ int main(void) {
     bool detected = screen_size();
     const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
     const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
-    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright 1883 Thomas Edison\n"
+    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright 1883 (c) Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"

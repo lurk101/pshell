@@ -14,11 +14,12 @@
  * Further modifications by lurk101 for RP Pico
  */
 
+#include <limits.h>
 #include <math.h>
 #include <setjmp.h>
 #include <stdarg.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <hardware/adc.h>
 #include <hardware/clocks.h>
@@ -58,15 +59,12 @@
 #define SDK14 0
 #endif
 
-#define INTR_NOT_IMPLEMENTED() run_die("interrupt support not there yet")
-//#define INTR_NOT_IMPLEMENTED()
-
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 
 static char *p, *lp;           // current position in source code
-static char *data_base, *data; // data/bss pointer
-static char* src_base;
+static char *data, *data;      // data/bss pointer
+static char* src;
 
 static int* base_sp;
 static int *e, *le, *text_base; // current position in emitted code
@@ -94,8 +92,8 @@ static int ty;            // current expression type
                           // bit 10:11 - ptr level
 static int loc;           // local variable offset
 static int line;          // current line number
-static int src;           // print source and assembly flag
-static int trc;           // use `signed char` for `char`
+static int src_opt;       // print source and assembly flag
+static int trc_opt;       // Trace instruction.
 static int* n;            // current position in emitted abstract syntax tree
                           // With an AST, the compiler is not limited to generate
                           // code on the fly with parsing.
@@ -106,7 +104,7 @@ static int ld;            // local variable depth
 static int pplev, pplevt; // preprocessor conditional level
 static int oline, osize;  // for optimization suggestion
 
-static int *ast_base, *ast;
+static int* ast;
 
 // identifier
 #define MAX_IR 256
@@ -124,7 +122,7 @@ static struct ident_s {
     int val, hval;
     int etype, hetype; // extended type info. different meaning for funcs.
 } * id,                // currently parsed identifier
-    *sym_base,         // symbol table (simple list of identifiers)
+    *sym,              // symbol table (simple list of identifiers)
     *oid,              // for array optimization suggestion
     *ir_var[MAX_IR];   // IR information for local vars and parameters
 static int ir_count;
@@ -379,7 +377,6 @@ enum {
     SYSC, /* 46 system call */
 
     EXIT,
-    IRET, // return from interrupt
 
     INVALID
 };
@@ -424,6 +421,7 @@ enum {
     // miscellaneous
     SYSC_rand,
     SYSC_srand,
+    SYSC_wfi,
     // LIBC IO
     SYSC_getchar,
     SYSC_getchar_timeout_us,
@@ -654,6 +652,7 @@ static const struct {
     // miscellaneous
     {"rand", 0},
     {"srand", 1},
+    {"__wfi", 0},
     // io
     {"getchar", 0},
     {"getchar_timeout_us", 1},
@@ -860,6 +859,10 @@ static struct {
     int val;
 } defines[] = {
     // OPEN
+    {"TRUE", 1},
+    {"true", 1},
+    {"FALSE", 0},
+    {"false", 0},
     {"O_RDONLY", LFS_O_RDONLY},
     {"O_WRONLY", LFS_O_WRONLY},
     {"O_RDWR", LFS_O_RDWR},
@@ -987,13 +990,13 @@ struct file_handle {
 } * file_list;
 
 static void clear_globals(void) {
-    base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = ast = malloc_list =
-        (int*)(data_base = data = src_base = p = lp = fp = (char*)(id = sym_base = oid = NULL));
+    base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = malloc_list =
+        (int*)(data = data = src = p = lp = fp = (char*)(id = sym = oid = NULL));
     fd = NULL;
     file_list = NULL;
 
-    swtc = brkc = cntc = tnew = tk = ty = loc = line = src = trc = ld = pplev = pplevt = oline =
-        osize = ir_count = 0;
+    swtc = brkc = cntc = tnew = tk = ty = loc = line = src_opt = trc_opt = ld = pplev = pplevt =
+        oline = osize = ir_count = 0;
 
     memset(&tkv, 0, sizeof(tkv));
     memset(ir_var, 0, sizeof(ir_var));
@@ -1016,7 +1019,7 @@ static __attribute__((__noreturn__)) void die_func(const char* func, int lne, co
     vprintf(fmt, ap);
     va_end(ap);
     if (line > 0) {
-        lp = src_base;
+        lp = src;
         lne = line;
         while (--lne)
             lp = strchr(lp, '\n') + 1;
@@ -1037,15 +1040,12 @@ static __attribute__((__noreturn__)) void run_die(const char* fmt, ...) {
     longjmp(done_jmp, 1);
 }
 
-#define sys_malloc(l) sys_malloc_func(l, __LINE__)
-
-static void* sys_malloc_func(int l, int lno) {
+static void* sys_malloc(int l) {
     int* p = malloc(l + 8);
     if (!p)
         return NULL;
     memset(p + 2, 0, l);
     p[0] = (int)malloc_list;
-    p[1] = lno;
     malloc_list = p;
     return p + 2;
 }
@@ -1099,7 +1099,7 @@ static void next() {
             tk = (tk << 6) + (p - pp); // hash plus symbol length
             // hash value is used for fast comparison. Since it is inaccurate,
             // we have to validate the memory content as well.
-            for (id = sym_base; id->tk; ++id) { // find one free slot in table
+            for (id = sym; id->tk; ++id) {      // find one free slot in table
                 if (tk == id->hash &&           // if token is found (hash match), overwrite
                     !memcmp(id->name, pp, p - pp)) {
                     tk = id->tk;
@@ -1127,7 +1127,7 @@ static void next() {
         }
         switch (tk) {
         case '\n':
-            if (src) {
+            if (src_opt) {
                 printf("%d: %.*s", line, p - lp, lp);
                 lp = p;
             }
@@ -1527,17 +1527,7 @@ static void expr(int lev) {
                 *--n = Num;
                 break;
             default:
-                np = d->name;
-                while ((*np >= 'a' && *np <= 'z') || (*np >= 'A' && *np <= 'Z') ||
-                       (*np >= '0' && *np <= '9') || (*np == '_'))
-                    np++;
-                nl = np - d->name;
-                if (!(np = sys_malloc(nl + 1)))
-                    die("no symbol memory");
-                for (int i = 0; i < nl; i++)
-                    np[i] = d->name[i];
-                np[nl] = 0;
-                die("undefined variable %s", np);
+                die("undefined variable %.*s", d->hash & ADJ_MASK, d->name);
             }
             if ((d->type & 3) && d->class != Par) { // push reference address
                 ty = d->type & ~3;
@@ -2830,7 +2820,7 @@ static void gen(int* n) {
             a = NULL;
             if (i == Syscall) {
                 *++e = IMM;
-                *++e = sj | ((n[4] >> 10) << 10);
+                *++e = (sj + 1) | ((n[4] >> 10) << 10);
             }
         }
         if (i == Syscall)
@@ -3054,6 +3044,55 @@ static void loc_array_decl(int ct, int extent[3], int* dims, int* et, int* size)
         if (extent[0] > 1024 || extent[1] > 1024 || extent[2] > 2048)
             die("max bounds [1024][1024][2048]");
         break;
+    }
+}
+
+static void disassemble(int* base, int* le, int* e, int i_count) {
+    while (le < e) {
+        base -= i_count;
+        le -= i_count;
+        int off = le - base; // Func IR instruction memory offset
+        printf("%04d: ", off);
+        printf("%08x ", *++le);
+        if ((*le <= ADJ) || (*le == SYSC))
+            printf("%08x ", le[1]);
+        else
+            printf("         ");
+        printf(" %-4s", instr_str[*le]);
+        if (*le < ADJ) {
+            struct ident_s* scan;
+            ++le;
+            if (*le > (int)base && *le <= (int)e)
+                printf(" %04d\n", off + ((*le - (int)le) >> 2) + 1);
+            else if (*(le - 1) == LEA && !i_count) {
+                int ii = 0;
+                for (scan = ir_var[ii]; scan; scan = ir_var[++ii])
+                    if (loc - scan->val == *le) {
+                        printf(" %.*s (%d)\n", scan->hash & 0x3f, scan->name, *le);
+                        break;
+                    }
+            } else if ((*le & 0xf0000000) && (*le > 0 || -*le > 0x1000000)) {
+                for (scan = sym; scan->tk; ++scan)
+                    if (scan->val == *le) {
+                        printf(" &%.*s", scan->hash & 0x3f, scan->name);
+                        if (!i_count)
+                            printf(" (0x%08x)", *le);
+                        printf("\n");
+                        break;
+                    }
+                if (!scan->tk)
+                    printf(" 0x%08x\n", *le);
+            } else
+                printf(" %d\n", *le);
+        } else if (*le == ADJ) {
+            ++le;
+            printf(" %d\n", *le & 0xf);
+        } else if (*le == SYSC) {
+            printf(" %s\n", externs[*(++le)].name);
+        } else
+            printf("\n");
+        if (i_count)
+            break;
     }
 }
 
@@ -3294,56 +3333,14 @@ static void stmt(int ctx) {
                            (oid->hash & 0x3f), oid->name);
                 cas = 0;
                 gen(n);
-                if (src) {
-                    int* base = le;
+                if (src_opt) {
                     printf("%d: %.*s\n", line, p - lp, lp);
                     lp = p;
-                    while (le < e) {
-                        int off = le - base; // Func IR instruction memory offset
-                        printf("%04d: ", off);
-                        printf("%08x ", *++le);
-                        if ((*le <= ADJ) || (*le == SYSC))
-                            printf("%08x ", le[1]);
-                        else
-                            printf("         ");
-                        printf(" %-4s", instr_str[*le]);
-                        if (*le < ADJ) {
-                            struct ident_s* scan;
-                            ++le;
-                            if (*le > (int)base && *le <= (int)e)
-                                printf(" %04d\n", off + ((*le - (int)le) >> 2) + 1);
-                            else if (*(le - 1) == LEA && src == 2) {
-                                int ii = 0;
-                                for (scan = ir_var[ii]; scan; scan = ir_var[++ii])
-                                    if (loc - scan->val == *le) {
-                                        printf(" %.*s (%d)\n", scan->hash & 0x3f, scan->name, *le);
-                                        break;
-                                    }
-                            } else if ((*le & 0xf0000000) && (*le > 0 || -*le > 0x1000000)) {
-                                for (scan = sym_base; scan->tk; ++scan)
-                                    if (scan->val == *le) {
-                                        printf(" &%.*s", scan->hash & 0x3f, scan->name);
-                                        if (src == 2)
-                                            printf(" (0x%08x)", *le);
-                                        printf("\n");
-                                        break;
-                                    }
-                                if (!scan->tk)
-                                    printf(" 0x%08x\n", *le);
-                            } else
-                                printf(" %d\n", *le);
-                        } else if (*le == ADJ) {
-                            ++le;
-                            printf(" %d\n", *le & 0xf);
-                        } else if (*le == SYSC) {
-                            printf(" %s\n", externs[*(++le)].name);
-                        } else
-                            printf("\n");
-                    }
+                    disassemble(le, le, e, 0);
                 }
             unwind_func:
-                id = sym_base;
-                if (src)
+                id = sym;
+                if (src_opt)
                     memset(ir_var, 0, sizeof(struct ident_s*) * MAX_IR);
                 while (id->tk) { // unwind symbol table locals
                     if (id->class == Loc || id->class == Par) {
@@ -3698,7 +3695,7 @@ static int common_vfunc(int ac, int sflag, int* sp) {
     // are floats. Scan the format string.
     int stack[ADJ_MASK + ADJ_MASK + 2];
     int stkp = 0;
-    int n_parms = (ac & ADJ_MASK) + 1;
+    int n_parms = (ac & ADJ_MASK);
     ac >>= 10;
     for (int j = n_parms - 1; j >= 0; j--)
         if ((ac & (1 << j)) == 0)
@@ -3737,27 +3734,27 @@ static inline float pop_float(void) {
 
 static inline int* pop_ptr(void) {
     uint32_t save = save_and_disable_interrupts();
-    void* r = (int*)*sp++;
+    void* p = (int*)(*sp++);
     restore_interrupts(save);
-    return r;
+    return p;
 }
 
 static inline int pop_int(void) {
     uint32_t save = save_and_disable_interrupts();
-    int r = *sp++;
+    int i = *sp++;
     restore_interrupts(save);
-    return r;
+    return i;
 }
 
 static inline void push_ptr(void* p) {
     uint32_t save = save_and_disable_interrupts();
-    *(--sp) = (int)p;
+    *--sp = (int)p;
     restore_interrupts(save);
 }
 
 static inline void push_int(int i) {
     uint32_t save = save_and_disable_interrupts();
-    *(--sp) = i;
+    *--sp = i;
     restore_interrupts(save);
 }
 
@@ -3779,12 +3776,32 @@ static inline void pop_n(int n) {
     restore_interrupts(save);
 }
 
-static volatile bool in_intrpt;
+static int run(void);
+
+static volatile int run_level;
+static int cycle;
+static int ai;
+static float af;
 
 void irqn_handler(int n) {
-    in_intrpt = 1;
+    __dmb();
+    uint32_t save = save_and_disable_interrupts();
+    push_int(ai);
+    push_float(af);
     push_ptr(pc);
+    push_int(EXIT); // return to EXIT
+    push_ptr(sp);
+    bp = sp;
     pc = intrpt_vector[n].c_handler;
+    restore_interrupts(save);
+    run();
+    save = save_and_disable_interrupts();
+    pc = pop_ptr(); // throw away the fake EXIT instruction
+    pc = pop_ptr();
+	af = pop_float();
+	ai = pop_int();
+    restore_interrupts(save);
+    __dmb();
 }
 
 void irq0_handler(void) { irqn_handler(0); }
@@ -3828,261 +3845,22 @@ static irq_handler_t handler[32] = {
     irq24_handler, irq25_handler, irq26_handler, irq27_handler, irq28_handler, irq29_handler,
     irq30_handler, irq31_handler};
 
-int cc(int run_mode, int argc, char** argv) {
-    clear_globals();
-    int i;
-    char* ofn = NULL;
-
-    if (setjmp(done_jmp))
-        goto done;
-
-    if (!run_mode) {
-        fd = sys_malloc(sizeof(lfs_file_t));
-        if (fd == NULL)
-            die("no file handle memory");
-        if (!(sym_base = (struct ident_s*)sys_malloc(SYM_TBL_BYTES)))
-            die("no symbol memory");
-
-        // Register keywords in symbol stack. Must match the sequence of enum
-        p = "enum char int float struct union sizeof return goto break continue "
-            "if do while for switch case default else void main";
-
-        // call "next" to create symbol table entry.
-        // store the keyword's token type in the symbol table entry's "tk" field.
-        for (i = Enum; i <= Else; ++i) {
-            next();
-            id->tk = i;
-            id->class = Keyword; // add keywords to symbol table
-        }
-
-        // add __clear_cache to symbol table
-        next();
-
-        id->tk = Char;
-        id->class = Keyword; // handle void type
-        next();
-        struct ident_s* idmain = id;
-        id->class = Main; // keep track of main
-
-        if (!(data_base = data = (char*)sys_malloc(DATA_BYTES)))
-            die("no data memory");
-        if (!(tsize = (int*)sys_malloc(TS_TBL_BYTES)))
-            die("no tsize memory");
-        if (!(ast_base = ast = (int*)sys_malloc(AST_TBL_BYTES)))
-            die("could not allocate abstract syntax tree area");
-        n = ast + (AST_TBL_BYTES / 4) - 1;
-
-        // add primitive types
-        tsize[tnew++] = sizeof(char);
-        tsize[tnew++] = sizeof(int);
-        tsize[tnew++] = sizeof(float);
-        tsize[tnew++] = 0; // reserved for another scalar type
-
-        --argc;
-        ++argv;
-        while (argc > 0 && **argv == '-') {
-            if ((*argv)[1] == 's') {
-                src = ((*argv)[2] == 'i') ? 2 : 1;
-            } else if ((*argv)[1] == 't') {
-                trc = ((*argv)[2] == 'i') ? 2 : 1;
-            } else if ((*argv)[1] == 'o') {
-                --argc;
-                ++argv;
-                if (!argc)
-                    die("missing output file name");
-                ofn = *argv;
-            } else if ((*argv)[1] == 'D') {
-                p = &(*argv)[2];
-                next();
-                if (tk != Id)
-                    die("bad -D identifier");
-                struct ident_s* dd = id;
-                next();
-                i = 0;
-                if (tk == Assign) {
-                    next();
-                    expr(Cond);
-                    if (*n != Num)
-                        die("bad -D initializer");
-                    i = n[1];
-                    n += 2;
-                }
-                dd->class = Num;
-                dd->type = INT;
-                dd->val = i;
-            } else
-                argc = 0; // bad compiler option. Force exit.
-            --argc;
-            ++argv;
-        }
-        if (argc < 1) {
-            printf("\n"
-                   "usage: cc [-s[i]] [-t[i]] [-D [symbol[ = value]]] [-o filename] filename\n"
-                   "    -s,-si  display disassembly and quit. i adds symbolic display.\n"
-                   "    -t,-ti  trace execution. i enables single step.\n"
-                   "    -D symbol [= value]\n"
-                   "            define symbol for limited pre-processor.\n"
-                   "    -o filename\n"
-                   "            output executable file name.\n"
-                   "    filename\n"
-                   "            C source file name.\n");
-            goto done;
-        }
-
-        for (int d = 0; defines[d].name; d++) {
-            p = defines[d].name;
-            next();
-            id->class = Num;
-            id->type = INT;
-            id->val = defines[d].val;
-        }
-
-        fp = full_path(*argv);
-        if (!fp)
-            die("could not allocate file name area");
-        if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
-            sys_free(fd);
-            fd = NULL;
-            die("could not open %s \n", fp);
-        }
-
-        int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
-        fs_file_rewind(fd);
-
-        if (!(text_base = le = e = (int*)sys_malloc(TEXT_BYTES)))
-            die("no text memory");
-        if (!(members = (struct member_s**)sys_malloc(MEMBER_DICT_BYTES)))
-            die("no members table memory");
-
-        if (!(src_base = lp = p = (char*)sys_malloc(siz + 1)))
-            die("no source memory");
-        if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
-            die("unable to read from source file");
-        p[siz] = 0;
-        fs_file_close(fd);
-        sys_free(fd);
-        fd = NULL;
-
-        // parse the program
-        line = 1;
-        pplevt = -1;
-        next();
-        while (tk) {
-            stmt(Glo);
-            next();
-        }
-        sys_free(ast_base);
-        ast_base = NULL;
-        sys_free(src_base);
-        src_base = NULL;
-        sys_free(sym_base);
-        sym_base = NULL;
-        sys_free(tsize);
-        tsize = NULL;
-        if (!(pc = (int*)idmain->val))
-            die("main() not defined\n");
-        prog_hdr.pc = (int)pc;
-
-        if (ofn) {
-            if (!(fd = sys_malloc(sizeof(lfs_file_t))))
-                die("no file handle memory");
-            fp = full_path(ofn);
-            if (fs_file_open(fd, fp, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
-                sys_free(fd);
-                fd = NULL;
-                die("can't create output file %s", fp);
-            }
-            prog_hdr.text_size = (char*)e - (char*)text_base;
-            prog_hdr.data_size = data - data_base;
-            if (fs_file_write(fd, &prog_hdr, sizeof(prog_hdr)) < LFS_ERR_OK)
-                die("can't write output file");
-            if (fs_file_write(fd, text_base, prog_hdr.text_size) < LFS_ERR_OK)
-                die("can't write output file");
-            if (fs_file_write(fd, data_base, prog_hdr.data_size) < LFS_ERR_OK)
-                die("can't write output file");
-            fs_file_close(fd);
-            sys_free(fd);
-            fd = NULL;
-            static const char* exe = "exe";
-            if (fs_setattr(fp, 1, exe, strlen(exe)) < LFS_ERR_OK)
-                die("couldn't mark file as executable");
-            printf("executable %s - text %d bytes, data %d bytes\n\n", fp, prog_hdr.text_size,
-                   prog_hdr.data_size);
-            goto done;
-        }
-        if (src)
-            goto done;
-    } else {
-        printf("\nNice try! Executables are not implemented yet\n");
-        goto done;
-        // run mode, restore the code and data segments
-        if (!(fd = sys_malloc(sizeof(lfs_file_t))))
-            die("no file handle memory");
-        fp = full_path(argv[0]);
-        if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
-            sys_free(fd);
-            fd = NULL;
-            die("can't open %s", fp);
-        }
-        if (fs_file_read(fd, &prog_hdr, sizeof(prog_hdr)) != sizeof(prog_hdr))
-            die("error reading file");
-        if (!(text_base = (int*)sys_malloc(prog_hdr.text_size)))
-            die("no text segment memory");
-        if (fs_file_read(fd, text_base, prog_hdr.text_size) != prog_hdr.text_size)
-            die("error reading file");
-        if (!(data_base = sys_malloc(prog_hdr.data_size)))
-            die("no data segment memory");
-        if (fs_file_read(fd, data_base, prog_hdr.data_size) != prog_hdr.data_size)
-            die("error reading file");
-        fs_file_close(fd);
-        sys_free(fd);
-        fd = NULL;
-    }
-
-    printf("\n");
-
-    // setup stack
-    if (!(base_sp = bp = sp = (int*)sys_malloc(STACK_BYTES)))
-        die("could not allocate stack area");
-    bp = sp = (int*)((int)sp + STACK_BYTES - 4);
-    push_int(EXIT); // call exit if main returns
-    push_int(PSH);
-    int* t = sp;
-    push_int(argc);
-    push_ptr(argv);
-    push_ptr(t);
-
-    // run...
-    int cycle = 0;
-    int ai = 0;
-    float af = 0.0;
-    unsigned int last_esc = time_us_32();
-
-    in_intrpt = 0;
-
+static int run(void) {
+    run_level++;
+    uint32_t last_t = time_us_32();
+    int* this_pc;
+    int* base_pc;
     while (1) {
-        if (!in_intrpt) {
-            unsigned int t = time_us_32();
-            if (t - last_esc > 1000000) {
+        if (!run_level) {
+            uint32_t t = time_us_32();
+            if (t - last_t > 0x100000) {
+                last_t = t;
                 check_kbd_halt();
-                last_esc = t;
             }
         }
-        i = *pc++;
+        this_pc = pc;
+        int i = *pc++;
         ++cycle;
-        if (!in_intrpt) {
-            if (trc) {
-                printf("%d> %.4s", cycle, instr_str[i]);
-                if (i < ADJ)
-                    printf(" %d\n", *pc);
-                if (i == ADJ)
-                    printf(" %d\n", *pc & ADJ_MASK);
-                else if (i == SYSC)
-                    printf(" %s\n", externs[*pc].name);
-                else
-                    printf("\n");
-            }
-        }
         switch (i) {
         case LEA:
             ai = (int)(bp + *pc++); // load local address
@@ -4101,13 +3879,14 @@ int cc(int run_mode, int argc, char** argv) {
             pc = (int*)*pc;
             break;
         case BZ:
-            pc = ai ? pc + 1 : (int*)*pc; // branch if zero
+            pc = (ai == 0) ? (int*)*pc : pc + 1; // branch if zero
             break;
         case BNZ:
-            pc = ai ? (int*)*pc : pc + 1; // branch if not zero
+            pc = (ai != 0) ? (int*)*pc : pc + 1; // branch if zero
             break;
         // enter subroutine
         case ENT:
+            base_pc = this_pc;
             push_ptr(bp);
             bp = sp;
             push_n(*pc++);
@@ -4305,6 +4084,9 @@ int cc(int run_mode, int argc, char** argv) {
             case SYSC_srand:
                 srand(sp[0]);
                 break;
+            case SYSC_wfi:
+                __wfi();
+                break;
             // io
             case SYSC_getchar:
                 ai = x_getchar();
@@ -4450,57 +4232,45 @@ int cc(int run_mode, int argc, char** argv) {
                 ai = gpio_get_drive_strength(sp[0]);
                 break;
             case SYSC_gpio_set_irq_enabled:
-                INTR_NOT_IMPLEMENTED();
                 gpio_set_irq_enabled(sp[2], sp[1], sp[0]);
                 break;
 #if SDK14
             case SYSC_gpio_set_irq_callback:
-                INTR_NOT_IMPLEMENTED();
                 gpio_set_irq_callback((gpio_irq_callback_t)sp[0]);
                 break;
 #endif
             case SYSC_gpio_set_irq_enabled_with_callback:
-                INTR_NOT_IMPLEMENTED();
                 gpio_set_irq_enabled_with_callback(sp[3], sp[2], sp[1], (gpio_irq_callback_t)sp[0]);
                 break;
             case SYSC_gpio_set_dormant_irq_enabled:
-                INTR_NOT_IMPLEMENTED();
                 gpio_set_dormant_irq_enabled(sp[2], sp[1], sp[0]);
                 break;
 #if SDK14
             case SYSC_gpio_get_irq_event_mask:
-                INTR_NOT_IMPLEMENTED();
                 ai = gpio_get_irq_event_mask(sp[0]);
                 break;
 #endif
             case SYSC_gpio_acknowledge_irq:
-                INTR_NOT_IMPLEMENTED();
                 gpio_acknowledge_irq(sp[1], sp[0]);
                 break;
 #if SDK14
             case SYSC_gpio_add_raw_irq_handler_with_order_priority_masked:
-                INTR_NOT_IMPLEMENTED();
                 gpio_add_raw_irq_handler_with_order_priority_masked(sp[2], (irq_handler_t)sp[1],
                                                                     sp[0]);
                 break;
             case SYSC_gpio_add_raw_irq_handler_with_order_priority:
-                INTR_NOT_IMPLEMENTED();
                 gpio_add_raw_irq_handler_with_order_priority(sp[2], (irq_handler_t)sp[1], sp[0]);
                 break;
             case SYSC_gpio_add_raw_irq_handler_masked:
-                INTR_NOT_IMPLEMENTED();
                 gpio_add_raw_irq_handler_masked(sp[1], (irq_handler_t)sp[0]);
                 break;
             case SYSC_gpio_add_raw_irq_handler:
-                INTR_NOT_IMPLEMENTED();
                 gpio_add_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
                 break;
             case SYSC_gpio_remove_raw_irq_handler_masked:
-                INTR_NOT_IMPLEMENTED();
                 gpio_remove_raw_irq_handler_masked(sp[1], (irq_handler_t)sp[0]);
                 break;
             case SYSC_gpio_remove_raw_irq_handler:
-                INTR_NOT_IMPLEMENTED();
                 gpio_remove_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
                 break;
 #endif
@@ -4593,7 +4363,9 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_init(sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_pwm_get_default_config:
-                *((pwm_config*)sp[0]) = pwm_get_default_config();
+                static pwm_config c;
+                c = pwm_get_default_config();
+                ai = (int)&c;
                 break;
             case SYSC_pwm_set_wrap:
                 pwm_set_wrap(sp[1], sp[0]);
@@ -4641,23 +4413,18 @@ int cc(int run_mode, int argc, char** argv) {
                 pwm_set_mask_enabled(sp[0]);
                 break;
             case SYSC_pwm_set_irq_enabled:
-                INTR_NOT_IMPLEMENTED();
                 pwm_set_irq_enabled(sp[1], sp[0]);
                 break;
             case SYSC_pwm_set_irq_mask_enabled:
-                INTR_NOT_IMPLEMENTED();
                 pwm_set_irq_mask_enabled(sp[1], sp[0]);
                 break;
             case SYSC_pwm_clear_irq:
-                INTR_NOT_IMPLEMENTED();
                 pwm_clear_irq(sp[0]);
                 break;
             case SYSC_pwm_get_irq_status_mask:
-                INTR_NOT_IMPLEMENTED();
                 ai = pwm_get_irq_status_mask();
                 break;
             case SYSC_pwm_force_irq:
-                INTR_NOT_IMPLEMENTED();
                 pwm_force_irq(sp[0]);
                 break;
             case SYSC_pwm_get_dreq:
@@ -4865,25 +4632,20 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
                 // IRQ
             case SYSC_irq_set_priority:
-                INTR_NOT_IMPLEMENTED();
                 irq_set_priority(sp[1], sp[0]);
                 break;
             case SYSC_irq_get_priority:
-                INTR_NOT_IMPLEMENTED();
                 ai = irq_get_priority(sp[0]);
                 break;
             case SYSC_irq_set_enabled:
-                INTR_NOT_IMPLEMENTED();
-                int irqn = sp[0];
+                int irqn = sp[1];
                 intrpt_vector[irqn].enabled = sp[0];
                 irq_set_enabled(sp[1], sp[0]);
                 break;
             case SYSC_irq_is_enabled:
-                INTR_NOT_IMPLEMENTED();
                 ai = irq_is_enabled(sp[0]);
                 break;
             case SYSC_irq_set_mask_enabled:
-                INTR_NOT_IMPLEMENTED();
                 uint32_t mask = sp[1];
                 for (int i = 0; i < 32; i++) {
                     if (mask & 1)
@@ -4893,23 +4655,19 @@ int cc(int run_mode, int argc, char** argv) {
                 irq_set_mask_enabled(sp[1], sp[0]);
                 break;
             case SYSC_irq_set_exclusive_handler:
-                INTR_NOT_IMPLEMENTED();
                 irqn = sp[1];
                 intrpt_vector[irqn].c_handler = (void*)sp[0];
                 irq_set_exclusive_handler(sp[1], handler[irqn]);
                 break;
             case SYSC_irq_get_exclusive_handler:
-                INTR_NOT_IMPLEMENTED();
                 ai = (int)irq_get_exclusive_handler(sp[0]);
                 break;
             case SYSC_irq_add_shared_handler:
-                INTR_NOT_IMPLEMENTED();
                 irqn = sp[2];
                 intrpt_vector[irqn].c_handler = (void*)sp[1];
                 irq_add_shared_handler(sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_irq_remove_handler:
-                INTR_NOT_IMPLEMENTED();
                 irqn = sp[0];
                 if (intrpt_vector[irqn].c_handler != (void*)sp[0])
                     run_die("can't remove uninstalled handler");
@@ -4917,41 +4675,32 @@ int cc(int run_mode, int argc, char** argv) {
                 break;
 #if SDK14
             case SYSC_irq_has_shared_handler:
-                INTR_NOT_IMPLEMENTED();
                 ai = irq_has_shared_handler(sp[0]);
                 break;
 #endif
             case SYSC_irq_get_vtable_handler:
-                INTR_NOT_IMPLEMENTED();
                 ai = (int)irq_get_vtable_handler(sp[0]);
                 break;
             case SYSC_irq_clear:
-                INTR_NOT_IMPLEMENTED();
                 irq_clear(sp[0]);
                 break;
             case SYSC_irq_set_pending:
-                INTR_NOT_IMPLEMENTED();
                 irq_set_pending(sp[0]);
                 break;
             case SYSC_irq_init_priorities:
-                INTR_NOT_IMPLEMENTED();
                 irq_init_priorities();
                 break;
 #if SDK14
             case SYSC_user_irq_claim:
-                INTR_NOT_IMPLEMENTED();
                 user_irq_claim(sp[0]);
                 break;
             case SYSC_user_irq_unclaim:
-                INTR_NOT_IMPLEMENTED();
                 user_irq_unclaim(sp[0]);
                 break;
             case SYSC_user_irq_claim_unused:
-                INTR_NOT_IMPLEMENTED();
                 ai = user_irq_claim_unused(sp[0]);
                 break;
             case SYSC_user_irq_is_claimed:
-                INTR_NOT_IMPLEMENTED();
                 ai = user_irq_is_claimed(sp[0]);
                 break;
 #endif
@@ -4961,28 +4710,321 @@ int cc(int run_mode, int argc, char** argv) {
             }
             break;
         case EXIT:
-            printf("\nCC=%d\n", ai);
-            goto done;
-        case IRET:
-            INTR_NOT_IMPLEMENTED();
-            in_intrpt = 0;
-            break;
+            run_level--;
+            return ai;
         default:
             run_die("unknown instruction = %d %s! cycle = %d\n", i, instr_str[i], cycle);
         }
-        if (trc) {
+        if (trc_opt) {
+            disassemble(base_pc, this_pc, this_pc + 2, 1);
+            printf("\n");
             printf("acc     %08x %d\n", ai, ai);
             printf("accf    %f\n", af);
-            printf("stk %08x x %08x %08x %08x %08x\n", (int)sp, *((int*)sp), *((int*)sp + 1),
-                   *((int*)sp + 2), *((int*)sp + 3));
+            printf("stk [%6d] x %08x %08x %08x %08x\n", (int)(sp - base_sp), *((int*)sp),
+                   *((int*)sp + 1), *((int*)sp + 2), *((int*)sp + 3));
             printf("stk          i %08d %08d %08d %08d\n", *((int*)sp), *((int*)sp + 1),
                    *((int*)sp + 2), *((int*)sp + 3));
             printf("stk          f %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
                    *((float*)sp + 2), *((float*)sp + 3));
         }
-        if (trc > 1)
+        if (trc_opt > 1)
             x_getchar();
     }
+}
+
+extern void get_screen_xy(uint32_t* x, uint32_t* y);
+
+static int show_strings(char** names, int n) {
+    uint32_t x, y, lc = 0;
+    get_screen_xy(&x, &y);
+    if (x > 80)
+        x -= 2;
+    char* lbuf = sys_malloc(x + 1);
+    printf("\n");
+    strcpy(lbuf, "  ");
+    strcat(lbuf, names[0]);
+    int cc = strlen(lbuf);
+    char* lp = lbuf + cc;
+    for (int i = 1; i < n; i++) {
+        int sl = strlen(names[i]) + 2;
+        if (cc + sl < x) {
+            strcat(lp, ", ");
+            strcat(lp, names[i]);
+            cc += sl;
+        } else {
+            printf("%s\n", lbuf);
+            strcpy(lbuf, "  ");
+            strcat(lbuf, names[i]);
+            cc = strlen(lbuf);
+            lp = lbuf + cc;
+        }
+    }
+    printf("%s\n", lbuf);
+}
+
+static int lex_comp(const void* p1, const void* p2) { return strcmp(*(char**)p1, *(char**)p2); }
+
+static void show_defines(void) {
+    int size = sizeof(defines) / sizeof(defines[0]) - 1;
+    char** names = sys_malloc(size * sizeof(char*));
+    for (int i = 0; i < size; i++)
+        names[i] = defines[i].name;
+    qsort(names, size, sizeof(names[0]), lex_comp);
+    show_strings(names, size);
+}
+
+static void show_externals(void) {
+    int size = sizeof(externs) / sizeof(externs[0]) - 1;
+    char** names = sys_malloc(size * sizeof(char*));
+    for (int i = 0; i < size; i++)
+        names[i] = externs[i].name;
+    qsort(names, size, sizeof(names[0]), lex_comp);
+    show_strings(names, size);
+}
+
+static void help(void) {
+    printf("\n"
+           "usage: cc [-s] [-t[i]] [-l[x|d]] [-D [symbol[ = value]]] [-o filename] filename\n"
+           "    -s      display disassembly and quit.\n"
+           "    -t,-ti  trace execution. i enables single step.\n"
+           "    -D symbol [= value]\n"
+           "            define symbol for limited pre-processor.\n"
+           "    -o filename\n"
+           "            output executable file name.\n"
+           "    filename\n"
+           "            C source file name.\n");
+}
+
+int cc(int run_mode, int argc, char** argv) {
+    clear_globals();
+    char* ofn = NULL;
+
+    if (setjmp(done_jmp))
+        goto done;
+
+    if (!run_mode) {
+        if (!(sym = (struct ident_s*)sys_malloc(SYM_TBL_BYTES)))
+            die("no symbol memory");
+
+        // Register keywords in symbol stack. Must match the sequence of enum
+        p = "enum char int float struct union sizeof return goto break continue "
+            "if do while for switch case default else void main";
+
+        // call "next" to create symbol table entry.
+        // store the keyword's token type in the symbol table entry's "tk" field.
+        for (int i = Enum; i <= Else; ++i) {
+            next();
+            id->tk = i;
+            id->class = Keyword; // add keywords to symbol table
+        }
+
+        // add __clear_cache to symbol table
+        next();
+
+        id->tk = Char;
+        id->class = Keyword; // handle void type
+        next();
+        struct ident_s* idmain = id;
+        id->class = Main; // keep track of main
+
+        if (!(data = data = (char*)sys_malloc(DATA_BYTES)))
+            die("no data memory");
+        if (!(tsize = (int*)sys_malloc(TS_TBL_BYTES)))
+            die("no tsize memory");
+        if (!(ast = (int*)sys_malloc(AST_TBL_BYTES)))
+            die("could not allocate abstract syntax tree area");
+        n = ast + (AST_TBL_BYTES / 4) - 1;
+
+        // add primitive types
+        tsize[tnew++] = sizeof(char);
+        tsize[tnew++] = sizeof(int);
+        tsize[tnew++] = sizeof(float);
+        tsize[tnew++] = 0; // reserved for another scalar type
+
+        --argc;
+        ++argv;
+        while (argc > 0 && **argv == '-') {
+            if ((*argv)[1] == 'h') {
+                help();
+                goto done;
+            } else if ((*argv)[1] == 's') {
+                src_opt = 1;
+            } else if ((*argv)[1] == 't') {
+                trc_opt = ((*argv)[2] == 'i') ? 2 : 1;
+            } else if ((*argv)[1] == 'l') {
+                if ((*argv)[2] == 'd')
+                    show_defines();
+                else if ((*argv)[2] == 'x')
+                    show_externals();
+                goto done;
+            } else if ((*argv)[1] == 'o') {
+                --argc;
+                ++argv;
+                if (!argc)
+                    die("missing output file name");
+                ofn = *argv;
+            } else if ((*argv)[1] == 'D') {
+                p = &(*argv)[2];
+                next();
+                if (tk != Id)
+                    die("bad -D identifier");
+                struct ident_s* dd = id;
+                next();
+                int i = 0;
+                if (tk == Assign) {
+                    next();
+                    expr(Cond);
+                    if (*n != Num)
+                        die("bad -D initializer");
+                    i = n[1];
+                    n += 2;
+                }
+                dd->class = Num;
+                dd->type = INT;
+                dd->val = i;
+            } else
+                argc = 0; // bad compiler option. Force exit.
+            --argc;
+            ++argv;
+        }
+        if (argc < 1) {
+            help();
+            goto done;
+        }
+
+        for (int d = 0; defines[d].name; d++) {
+            p = defines[d].name;
+            next();
+            id->class = Num;
+            id->type = INT;
+            id->val = defines[d].val;
+        }
+
+        fp = full_path(*argv);
+        if (!fp)
+            die("could not allocate file name area");
+        fd = sys_malloc(sizeof(lfs_file_t));
+        if (fd == NULL)
+            die("no file handle memory");
+        if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
+            sys_free(fd);
+            fd = NULL;
+            die("could not open %s \n", fp);
+        }
+
+        int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
+        fs_file_rewind(fd);
+
+        if (!(text_base = le = e = (int*)sys_malloc(TEXT_BYTES)))
+            die("no text memory");
+        if (!(members = (struct member_s**)sys_malloc(MEMBER_DICT_BYTES)))
+            die("no members table memory");
+
+        if (!(src = lp = p = (char*)sys_malloc(siz + 1)))
+            die("no source memory");
+        if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
+            die("unable to read from source file");
+        p[siz] = 0;
+        fs_file_close(fd);
+        sys_free(fd);
+        fd = NULL;
+
+        // parse the program
+        line = 1;
+        pplevt = -1;
+        next();
+        while (tk) {
+            stmt(Glo);
+            next();
+        }
+        sys_free(ast);
+        ast = NULL;
+        sys_free(src);
+        src = NULL;
+        sys_free(sym);
+        sym = NULL;
+        sys_free(tsize);
+        tsize = NULL;
+        if (!(pc = (int*)idmain->val))
+            die("main() not defined\n");
+        prog_hdr.pc = (int)pc;
+
+        if (ofn) {
+            if (!(fd = sys_malloc(sizeof(lfs_file_t))))
+                die("no file handle memory");
+            fp = full_path(ofn);
+            if (fs_file_open(fd, fp, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
+                sys_free(fd);
+                fd = NULL;
+                die("can't create output file %s", fp);
+            }
+            prog_hdr.text_size = (char*)e - (char*)text_base;
+            prog_hdr.data_size = data - data;
+            if (fs_file_write(fd, &prog_hdr, sizeof(prog_hdr)) < LFS_ERR_OK)
+                die("can't write output file");
+            if (fs_file_write(fd, text_base, prog_hdr.text_size) < LFS_ERR_OK)
+                die("can't write output file");
+            if (fs_file_write(fd, data, prog_hdr.data_size) < LFS_ERR_OK)
+                die("can't write output file");
+            fs_file_close(fd);
+            sys_free(fd);
+            fd = NULL;
+            static const char* exe = "exe";
+            if (fs_setattr(fp, 1, exe, strlen(exe)) < LFS_ERR_OK)
+                die("couldn't mark file as executable");
+            printf("executable %s - text %d bytes, data %d bytes\n\n", fp, prog_hdr.text_size,
+                   prog_hdr.data_size);
+            goto done;
+        }
+        if (src_opt)
+            goto done;
+    } else {
+        printf("\nNice try! Executables are not implemented yet\n");
+        goto done;
+        // run mode, restore the code and data segments
+        if (!(fd = sys_malloc(sizeof(lfs_file_t))))
+            die("no file handle memory");
+        fp = full_path(argv[0]);
+        if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
+            sys_free(fd);
+            fd = NULL;
+            die("can't open %s", fp);
+        }
+        if (fs_file_read(fd, &prog_hdr, sizeof(prog_hdr)) != sizeof(prog_hdr))
+            die("error reading file");
+        if (!(text_base = (int*)sys_malloc(prog_hdr.text_size)))
+            die("no text segment memory");
+        if (fs_file_read(fd, text_base, prog_hdr.text_size) != prog_hdr.text_size)
+            die("error reading file");
+        if (!(data = sys_malloc(prog_hdr.data_size)))
+            die("no data segment memory");
+        if (fs_file_read(fd, data, prog_hdr.data_size) != prog_hdr.data_size)
+            die("error reading file");
+        fs_file_close(fd);
+        sys_free(fd);
+        fd = NULL;
+    }
+
+    printf("\n");
+
+    // setup stack
+    if (!(base_sp = bp = sp = (int*)sys_malloc(STACK_BYTES)))
+        die("could not allocate stack area");
+    bp = sp = (int*)((int)sp + STACK_BYTES - 4);
+    push_int(EXIT); // call exit if main returns
+    int* t = sp;
+    push_int(argc);
+    push_ptr(argv);
+    push_ptr(t);
+
+    // run...
+    cycle = 0;
+    ai = 0;
+    af = 0.0;
+    run_level = -1;
+
+    printf("\nCC=%d\n", run());
+
 done:
     for (int i = 0; i < 32; i++)
         if (intrpt_vector[i].enabled)
