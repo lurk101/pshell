@@ -567,7 +567,7 @@ typedef struct {
 // clang-format off
 static cmd_t cmd_table[] = {
     {"cat",     cat_cmd,        "display text file"},
-    {"cc",      cc_cmd,         "compile C source file"},
+    {"cc",      cc_cmd,         "compile C source file. cc -h for compiler help"},
     {"cd",      cd_cmd,         "change directory"},
     {"clear",   clear_cmd,      "clear the screen"},
     {"cp",      cp_cmd,         "copy a file"},
@@ -692,7 +692,7 @@ int main(void) {
     bool detected = screen_size();
     const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
     const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
-    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright 1883 (c) Thomas Edison\n"
+    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright 1883 \251 Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n\n"

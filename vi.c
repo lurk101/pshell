@@ -3798,8 +3798,8 @@ extern void get_screen_xy(uint32_t* x, uint32_t* y);
 
 int vi(int ac, char* argv[]) {
     memset(&G, 0, sizeof G); // clear the globals
+    get_screen_xy(&columns, &rows);
     argc = ac;
-    get_screen_xy(&rows, &columns);
     last_modified_count = -1;
     /* "" but has space for 2 chars: */
     last_search_pattern = zalloc(2);
