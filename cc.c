@@ -63,10 +63,9 @@ extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 
 static char *p, *lp;           // current position in source code
-static char *data, *data;      // data/bss pointer
-static char* src;
-
-static int* base_sp;
+static char* data;             // data/bss pointer
+static char* src;              //
+static int* base_sp;           // stack
 static int *e, *le, *text_base; // current position in emitted code
 static int* cas;                // case statement patch-up pointer
 static int* def;                // default statement patch-up pointer
@@ -78,19 +77,19 @@ static int cntc;                // !0 -> in a continue-stmt context
 static int* tsize;              // array (indexed by type) of type sizes
 static int tnew;                // next available type
 static int tk;                  // current token
-static union conv {
-    int i;
-    float f;
-} tkv;                    // current token value
-static int ty;            // current expression type
-                          // bit 0:1 - tensor rank, eg a[4][4][4]
-                          // 0=scalar, 1=1d, 2=2d, 3=3d
-                          //   1d etype -- bit 0:30)
-                          //   2d etype -- bit 0:15,16:30 [32768,65536]
-                          //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
-                          // bit 2:9 - type
-                          // bit 10:11 - ptr level
-static int loc;           // local variable offset
+static union conv {             //
+    int i;                      //
+    float f;                    //
+} tkv;                          // current token value
+static int ty;                  // current expression type
+                                // bit 0:1 - tensor rank, eg a[4][4][4]
+                                // 0=scalar, 1=1d, 2=2d, 3=3d
+                                //   1d etype -- bit 0:30)
+                                //   2d etype -- bit 0:15,16:30 [32768,65536]
+                                //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
+                                // bit 2:9 - type
+                                // bit 10:11 - ptr level
+static int loc;                 // local variable offset
 static int line;          // current line number
 static int src_opt;       // print source and assembly flag
 static int trc_opt;       // Trace instruction.
@@ -103,8 +102,8 @@ static int* n;            // current position in emitted abstract syntax tree
 static int ld;            // local variable depth
 static int pplev, pplevt; // preprocessor conditional level
 static int oline, osize;  // for optimization suggestion
-
-static int* ast;
+                          //
+static int* ast;          // abstract tree
 
 // identifier
 #define MAX_IR 256

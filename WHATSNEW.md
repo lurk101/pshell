@@ -1,3 +1,13 @@
+What's new in version 1.1.0
+
+- Xmodem code consolidated.
+- Interrupt handling.
+- Removed stdinit-lib submodule dependency
+- compiler support for taking address of function (needed for interrupt support)
+- file IO to file system
+- Added compiler help
+
+
 What's new in version 1.0.8
 
 - proper handling of system calls with variable number of arguments. (remove printf hack)
