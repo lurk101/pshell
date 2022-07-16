@@ -147,7 +147,7 @@ static void xmodem_cb(uint8_t* buf, uint32_t len) {
 static bool check_mount(bool need) {
     if (mounted == need)
         return false;
-    sprintf(result, "filesystem is %s mounted", (need ? "not" : "already"));
+    sprintf(result, "filesystem is %smounted", (need ? "not " : ""));
     return true;
 }
 
@@ -424,7 +424,7 @@ static void unmount_cmd(void) {
         return;
     }
     mounted = false;
-    strcpy(result, "mounted");
+    strcpy(result, "unmounted");
 }
 
 static void format_cmd(void) {
