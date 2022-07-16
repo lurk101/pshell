@@ -11,10 +11,26 @@
 
 #include "io.h"
 
+
+#if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
+#define SDK14 1
+#else
+#define SDK14 0
+#endif
+
+#if LIB_PICO_STDIO_USB
+#if SDK14
+#define CONS_CONNECTED stdio_usb_connected()
+#else
+#include "tusb.h"
+#define CONS_CONNECTED tud_cdc_connected()
+#endif
+#endif
+
 int ioinit(void) {
     stdio_init_all();
 #if LIB_PICO_STDIO_USB
-    while (!stdio_usb_connected())
+    while (!CONS_CONNECTED)
         sleep_ms(1000);
 #endif
 }

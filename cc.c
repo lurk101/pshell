@@ -633,8 +633,8 @@ enum {
     SYSC_user_irq_unclaim,
     SYSC_user_irq_claim_unused,
     SYSC_user_irq_is_claimed,
-    SYSC_last
 #endif
+    SYSC_last
 };
 
 static const struct {
