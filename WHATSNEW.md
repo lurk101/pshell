@@ -1,3 +1,8 @@
+What's new in version 1.1.1
+
+- fix USB startup failures
+- fix compile errors with older version of GCC
+
 What's new in version 1.1.0
 
 - Xmodem code consolidated.
