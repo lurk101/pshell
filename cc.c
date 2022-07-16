@@ -3905,6 +3905,7 @@ static int run(void) {
     uint32_t last_t = time_us_32();
     int* this_pc;
     int* base_pc;
+    int i, sysc, strl, irqn;
     while (1) {
         if (!run_level) {
             uint32_t t = time_us_32();
@@ -3914,7 +3915,7 @@ static int run(void) {
             }
         }
         this_pc = pc;
-        int i = *pc++;
+        i = *pc++;
         switch (i) {
         case LEA:
             a.i = (int)(bp + *pc++); // load local address
@@ -4065,7 +4066,7 @@ static int run(void) {
             a.i = (int)a.f;
             break;
         case SYSC:
-            int sysc = *pc++;
+            sysc = *pc++;
             switch (sysc) {
             case SYSC_printf:
                 a.i = common_vfunc(a.i, 0, sp);
@@ -4094,7 +4095,7 @@ static int run(void) {
                 a.i = (int)strcat((void*)sp[1], (void*)sp[0]);
                 break;
             case SYSC_strdup:
-                int strl = strlen((void*)sp[0]);
+                strl = strlen((void*)sp[0]);
                 void* strp;
                 if (!(strp = sys_malloc(strl + 1)))
                     run_die("no strdup memory");
@@ -4692,7 +4693,7 @@ static int run(void) {
                 a.i = irq_get_priority(sp[0]);
                 break;
             case SYSC_irq_set_enabled:
-                int irqn = sp[1];
+                irqn = sp[1];
                 intrpt_vector[irqn].enabled = sp[0];
                 irq_set_enabled(sp[1], sp[0]);
                 break;

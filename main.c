@@ -20,8 +20,9 @@
 #include "hardware/watchdog.h"
 
 #include "pico/bootrom.h"
-#include "pico/sync.h"
 #include "pico/stdio.h"
+#include "pico/stdlib.h"
+#include "pico/sync.h"
 
 #include "cc.h"
 #include "fs.h"
@@ -555,6 +556,7 @@ static void quit_cmd(void) {
     if (mounted)
         fs_unmount();
     printf("\nbye!\n");
+    sleep_ms(1000);
     exit(0);
 }
 

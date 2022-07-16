@@ -1,21 +1,21 @@
 
 #if LIB_PICO_STDIO_UART
 	#include "pico/stdio_uart.h"
-	#include "hardware/uart.h"
 #endif
 #if LIB_PICO_STDIO_USB
 	#include "pico/stdio_usb.h"
 #endif
 
+#include "pico/stdio.h"
+#include "pico/stdlib.h"
+
 #include "io.h"
 
 int ioinit(void) {
-#if LIB_PICO_STDIO_UART
-	stdio_uart_init();
-	uart_set_fifo_enabled(uart0, 1);
-#endif
+    stdio_init_all();
 #if LIB_PICO_STDIO_USB
-	stdio_usb_init();
+    while (!stdio_usb_connected())
+        sleep_ms(1000);
 #endif
 }
 

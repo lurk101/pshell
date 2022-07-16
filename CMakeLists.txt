@@ -70,10 +70,6 @@ list(APPEND LINK_LIST
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
     hardware_spi hardware_irq)
 
-if (NOT USB_CONSOLE)
-    list(APPEND LINK_LIST hardware_uart hardware_irq)
-endif()
-
 target_link_libraries(${PSHELL} PUBLIC ${LINK_LIST})
 
 pico_add_extra_outputs(${PSHELL})
