@@ -560,6 +560,15 @@ static void quit_cmd(void) {
     exit(0);
 }
 
+static void version_cmd(void) {
+    const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
+    const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
+    printf("\nPico Shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, Vi " VI_VER ", SDK %d.%d.%d\n",
+           git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR,
+           PICO_SDK_VERSION_MINOR, PICO_SDK_VERSION_REVISION);
+    result[0] = 0;
+}
+
 typedef struct {
     const char* name;
     cmd_func_t func;
@@ -583,9 +592,7 @@ static cmd_t cmd_table[] = {
     {"rm",      rm_cmd,         "remove file or directory"},
     {"status",  status_cmd,     "filesystem status"},
     {"unmount", unmount_cmd,    "unmount filesystem"},
-#if LIB_PICO_STDIO_USB
-    {"usbboot", usbboot_cmd,    "Reboot to USB flash mode"},
-#endif
+	{"version", version_cmd,    "display pshel version"},
     {"vi",      vi_cmd,         "editor"},
     {"xget",    get_cmd,        "get file (xmodem)"},
     {"xput",    put_cmd,        "put file (xmodem)"}
@@ -692,19 +699,14 @@ int main(void) {
     uart = true;
 #endif
     bool detected = screen_size();
-    const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
-    const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
     printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright 1883 \251 Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
-                    "under certain conditions. See LICENSE file for details.\n\n"
-                    "Pico Shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, Vi " VI_VER
-                    ", SDK %d.%d.%d\n\n"
-                    "console on %s [%u X %u]\n\n"
-                    "enter command, hit return for help\n\n",
-           git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR,
-           PICO_SDK_VERSION_MINOR, PICO_SDK_VERSION_REVISION, uart ? "UART" : "USB", screen_x,
-           screen_y);
+                    "under certain conditions. See LICENSE file for details.\n");
+    version_cmd();
+    printf("\nconsole on %s [%u X %u]\n\n"
+           "enter command, hit return for help\n\n",
+           uart ? "UART" : "USB", screen_x, screen_y);
     if (!detected) {
         printf("\nYour terminal does not respond to standard VT100 escape sequences"
                "\nsequences. The editor will likely not work at all!");
