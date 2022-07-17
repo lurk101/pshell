@@ -1,3 +1,9 @@
+What's new in version 1.1.2
+
+- added Conway's game of life
+- polished a few knobs.
+- hopefully fixed the last of the old compiler induced syntax errors?
+
 What's new in version 1.1.1
 
 - fix USB startup failures

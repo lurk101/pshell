@@ -31,6 +31,9 @@
 #include "vi.h"
 #include "xmodem.h"
 
+#define COPYRIGHT "\u00a9" // for UTF8
+//#define COPYRIGHT "(c)" // for ASCII
+
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
@@ -518,7 +521,7 @@ static void cd_cmd(void) {
 static void cc_cmd(void) {
     if (check_mount(true))
         return;
-    cc(0, argc, argv);
+    cc(argc, argv);
     result[0] = 0;
 }
 
@@ -578,7 +581,7 @@ typedef struct {
 // clang-format off
 static cmd_t cmd_table[] = {
     {"cat",     cat_cmd,        "display text file"},
-    {"cc",      cc_cmd,         "compile C source file. cc -h for compiler help"},
+    {"cc",      cc_cmd,         "run C source file. cc -h for compiler help"},
     {"cd",      cd_cmd,         "change directory"},
     {"clear",   clear_cmd,      "clear the screen"},
     {"cp",      cp_cmd,         "copy a file"},
@@ -669,8 +672,6 @@ static void help(void) {
         printf("%7s - %s\n", cmd_table[i].name, cmd_table[i].descr);
 }
 
-extern int ram_vector_table[48];
-
 static void HardFault_Handler(void) {
     static const char* clear = "\n\n" VT_BOLD "*** " VT_BLINK "CRASH" VT_NORMAL VT_BOLD
                                " - Rebooting in 5 seconds ***" VT_NORMAL "\r\n\n";
@@ -699,7 +700,8 @@ int main(void) {
     uart = true;
 #endif
     bool detected = screen_size();
-    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright 1883 \251 Thomas Edison\n"
+    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright " COPYRIGHT
+                    " 1883 Thomas Edison\n"
                     "This program comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it\n"
                     "under certain conditions. See LICENSE file for details.\n");
@@ -757,21 +759,6 @@ int main(void) {
                     found = true;
                     break;
                 }
-            if (!found) {
-                char* fp = full_path(argv[0]);
-                struct lfs_info info;
-                if (fs_stat(fp, &info) == LFS_ERR_OK) {
-                    if (info.type == LFS_TYPE_REG) {
-                        char buf[3];
-                        if (fs_getattr(fp, 1, buf, sizeof(buf)) == sizeof(buf) &&
-                            memcmp(buf, "exe", 3) == 0) {
-                            printf("\nCC=%d\n", cc(1, argc, argv));
-                        } else
-                            printf("\n%s is not executable\n", fp);
-                        continue;
-                    }
-                }
-            }
             if (!found)
                 printf("\nunknown command '%s'. hit ENTER for help\n", argv[0]);
         } else

@@ -61,6 +61,7 @@
 
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
+extern void get_screen_xy(int* x, int* y);
 
 static char *p, *lp;           // current position in source code
 static char* data;             // data/bss pointer
@@ -409,6 +410,8 @@ enum {
     SYSC_lseek,
     SYSC_rename,
     SYSC_remove,
+    SYSC_screen_width,
+    SYSC_screen_height,
 
     // stdlib.h
     SYSC_malloc,
@@ -656,6 +659,8 @@ static const struct {
     {"lseek", 3},
     {"rename", 2},
     {"remove", 1},
+    {"screen_width", 0},
+    {"screen_height", 0},
 
     // stdlib.h
     {"malloc", 1},
@@ -1025,11 +1030,6 @@ static struct {
                 {"spi", SYSC_spi_init, spi_defines},
                 {"irq", SYSC_irq_set_priority, irq_defines},
                 {0, SYSC_last}};
-
-static struct {
-    int text_size, data_size;
-    int pc;
-} prog_hdr;
 
 static jmp_buf done_jmp;
 static int* malloc_list;
@@ -3125,9 +3125,10 @@ static void disassemble(int* base, int* le, int* e, int i_count) {
                 int ii = 0;
                 for (scan = ir_var[ii]; scan; scan = ir_var[++ii])
                     if (loc - scan->val == *le) {
-                        printf(" %.*s (%d)\n", scan->hash & 0x3f, scan->name, *le);
+                        printf(" %.*s (%d)", scan->hash & 0x3f, scan->name, *le);
                         break;
                     }
+                printf("\n");
             } else if ((*le & 0xf0000000) && (*le > 0 || -*le > 0x1000000)) {
                 for (scan = sym; scan->tk; ++scan)
                     if (scan->val == *le) {
@@ -3901,11 +3902,15 @@ static irq_handler_t handler[32] = {
     irq30_handler, irq31_handler};
 
 static int run(void) {
+
     run_level++;
     uint32_t last_t = time_us_32();
-    int* this_pc;
-    int* base_pc;
+    int *this_pc, *base_pc;
     int i, sysc, strl, irqn;
+    unsigned us, ms, mask;
+    struct file_handle *h, *last_h;
+    static pwm_config c;
+
     while (1) {
         if (!run_level) {
             uint32_t t = time_us_32();
@@ -4153,7 +4158,7 @@ static int run(void) {
                 putchar(sp[0]);
                 break;
             case SYSC_open:
-                struct file_handle* h = sys_malloc(sizeof(struct file_handle));
+                h = sys_malloc(sizeof(struct file_handle));
                 if (!h)
                     run_die("no file handle memory");
                 if (fs_file_open(&h->file, full_path((char*)sp[1]), sp[0]) < LFS_ERR_OK) {
@@ -4166,7 +4171,7 @@ static int run(void) {
                 file_list = h;
                 break;
             case SYSC_close:
-                struct file_handle* last_h = (void*)&file_list;
+                last_h = (void*)&file_list;
                 h = file_list;
                 while (h) {
                     if (h == (struct file_handle*)sp[0]) {
@@ -4206,12 +4211,18 @@ static int run(void) {
             case SYSC_remove:
                 a.i = fs_remove(full_path((void*)sp[0]));
                 break;
+            case SYSC_screen_width:
+                get_screen_xy(&a.i, &us);
+                break;
+            case SYSC_screen_height:
+                get_screen_xy(&us, &a.i);
+                break;
             // time
             case SYSC_time_us_32: // SDK
                 a.i = time_us_32();
                 break;
             case SYSC_sleep_us:
-                unsigned us = sp[0];
+                us = sp[0];
                 while (us > 10000) {
                     sleep_ms(10000);
                     check_kbd_halt();
@@ -4220,7 +4231,7 @@ static int run(void) {
                 sleep_us(us);
                 break;
             case SYSC_sleep_ms:
-                unsigned ms = sp[0];
+                ms = sp[0];
                 while (ms > 10) {
                     sleep_ms(10);
                     check_kbd_halt();
@@ -4418,7 +4429,6 @@ static int run(void) {
                 pwm_init(sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_pwm_get_default_config:
-                static pwm_config c;
                 c = pwm_get_default_config();
                 a.i = (int)&c;
                 break;
@@ -4701,7 +4711,7 @@ static int run(void) {
                 a.i = irq_is_enabled(sp[0]);
                 break;
             case SYSC_irq_set_mask_enabled:
-                uint32_t mask = sp[1];
+                mask = sp[1];
                 for (int i = 0; i < 32; i++) {
                     if (mask & 1)
                         intrpt_vector[i].enabled = sp[0];
@@ -4788,10 +4798,8 @@ static int run(void) {
     }
 }
 
-extern void get_screen_xy(uint32_t* x, uint32_t* y);
-
 static int show_strings(char** names, int n) {
-    uint32_t x, y, lc = 0;
+    int x, y, lc = 0;
     get_screen_xy(&x, &y);
     if (x > 80)
         x -= 2;
@@ -4851,8 +4859,6 @@ static void help(char* lib) {
                "    -t,-ti  trace execution. i enables single step.\n"
                "    -D symbol [= value]\n"
                "            define symbol for limited pre-processor.\n"
-               "    -o filename\n"
-               "            output executable file name.\n"
                "    -h      Compiler help. lib lists externals.\n"
                "    filename\n"
                "            C source file name.\n"
@@ -4888,27 +4894,25 @@ static void add_defines(struct define_grp* d) {
     }
 }
 
-int cc(int run_mode, int argc, char** argv) {
+int cc(int argc, char** argv) {
     clear_globals();
-    char* ofn = NULL;
 
     if (setjmp(done_jmp))
         goto done;
 
-    if (!run_mode) {
-        if (!(sym = (struct ident_s*)sys_malloc(SYM_TBL_BYTES)))
-            die("no symbol memory");
+    if (!(sym = (struct ident_s*)sys_malloc(SYM_TBL_BYTES)))
+        die("no symbol memory");
 
-        // Register keywords in symbol stack. Must match the sequence of enum
-        p = "enum char int float struct union sizeof return goto break continue "
-            "if do while for switch case default else void main";
+    // Register keywords in symbol stack. Must match the sequence of enum
+    p = "enum char int float struct union sizeof return goto break continue "
+        "if do while for switch case default else void main";
 
-        // call "next" to create symbol table entry.
-        // store the keyword's token type in the symbol table entry's "tk" field.
-        for (int i = Enum; i <= Else; ++i) {
-            next();
-            id->tk = i;
-            id->class = Keyword; // add keywords to symbol table
+    // call "next" to create symbol table entry.
+    // store the keyword's token type in the symbol table entry's "tk" field.
+    for (int i = Enum; i <= Else; ++i) {
+        next();
+        id->tk = i;
+        id->class = Keyword; // add keywords to symbol table
         }
 
         next();
@@ -4948,12 +4952,6 @@ int cc(int run_mode, int argc, char** argv) {
                 src_opt = 1;
             } else if ((*argv)[1] == 't') {
                 trc_opt = ((*argv)[2] == 'i') ? 2 : 1;
-            } else if ((*argv)[1] == 'o') {
-                --argc;
-                ++argv;
-                if (!argc)
-                    die("missing output file name");
-                ofn = *argv;
             } else if ((*argv)[1] == 'D') {
                 p = &(*argv)[2];
                 next();
@@ -5038,63 +5036,9 @@ int cc(int run_mode, int argc, char** argv) {
         tsize = NULL;
         if (!(pc = (int*)idmain->val))
             die("main() not defined\n");
-        prog_hdr.pc = (int)pc;
 
-        if (ofn) {
-            if (!(fd = sys_malloc(sizeof(lfs_file_t))))
-                die("no file handle memory");
-            fp = full_path(ofn);
-            if (fs_file_open(fd, fp, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
-                sys_free(fd);
-                fd = NULL;
-                die("can't create output file %s", fp);
-            }
-            prog_hdr.text_size = (char*)e - (char*)text_base;
-            prog_hdr.data_size = data - data;
-            if (fs_file_write(fd, &prog_hdr, sizeof(prog_hdr)) < LFS_ERR_OK)
-                die("can't write output file");
-            if (fs_file_write(fd, text_base, prog_hdr.text_size) < LFS_ERR_OK)
-                die("can't write output file");
-            if (fs_file_write(fd, data, prog_hdr.data_size) < LFS_ERR_OK)
-                die("can't write output file");
-            fs_file_close(fd);
-            sys_free(fd);
-            fd = NULL;
-            static const char* exe = "exe";
-            if (fs_setattr(fp, 1, exe, strlen(exe)) < LFS_ERR_OK)
-                die("couldn't mark file as executable");
-            printf("executable %s - text %d bytes, data %d bytes\n\n", fp, prog_hdr.text_size,
-                   prog_hdr.data_size);
-            goto done;
-        }
         if (src_opt)
             goto done;
-    } else {
-        printf("\nNice try! Executables are not implemented yet\n");
-        goto done;
-        // run mode, restore the code and data segments
-        if (!(fd = sys_malloc(sizeof(lfs_file_t))))
-            die("no file handle memory");
-        fp = full_path(argv[0]);
-        if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
-            sys_free(fd);
-            fd = NULL;
-            die("can't open %s", fp);
-        }
-        if (fs_file_read(fd, &prog_hdr, sizeof(prog_hdr)) != sizeof(prog_hdr))
-            die("error reading file");
-        if (!(text_base = (int*)sys_malloc(prog_hdr.text_size)))
-            die("no text segment memory");
-        if (fs_file_read(fd, text_base, prog_hdr.text_size) != prog_hdr.text_size)
-            die("error reading file");
-        if (!(data = sys_malloc(prog_hdr.data_size)))
-            die("no data segment memory");
-        if (fs_file_read(fd, data, prog_hdr.data_size) != prog_hdr.data_size)
-            die("error reading file");
-        fs_file_close(fd);
-        sys_free(fd);
-        fd = NULL;
-    }
 
     printf("\n");
 

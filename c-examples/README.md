@@ -8,6 +8,7 @@ Example C source files.
 | hello.c | Needs no introduction |
 | io.c | LittleFs file I/O test. Create, write, close, open, read, seek, close. |
 | irq_blink.c | interrupt driven blink |
+| life.c | Conway's game of life. The Gosper glider canon |
 | pi.c | Test floats and recursion |
 | printf.c | Simple printf and sprintf formating test |
 | sieve.c | Array test. Calculate primes using sieve. |
