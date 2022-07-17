@@ -419,6 +419,7 @@ enum {
     SYSC_atoi,
     SYSC_rand,
     SYSC_srand,
+    SYSC_exit,
 
     // string.h
     SYSC_strlen,
@@ -668,6 +669,7 @@ static const struct {
     {"atoi", 1},
     {"rand", 0},
     {"srand", 1},
+    {"exit", 1},
 
     // string.h
     {"strlen", 1},
@@ -4144,6 +4146,9 @@ static int run(void) {
             case SYSC_srand:
                 srand(sp[0]);
                 break;
+            case SYSC_exit:
+                a.i = sp[0];
+                goto exit_called;
             case SYSC_wfi:
                 __wfi();
                 break;
@@ -4796,6 +4801,7 @@ static int run(void) {
         			run_die("user interrupted!!");
         }
     }
+exit_called:;
 }
 
 static int show_strings(char** names, int n) {

@@ -1,3 +1,6 @@
+What's new in version 1.1.3
+- added exit function
+
 What's new in version 1.1.2
 
 - added Conway's game of life
