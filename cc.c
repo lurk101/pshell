@@ -40,7 +40,7 @@
 #define K 1024
 
 #define DATA_BYTES (16 * K)
-#define TEXT_BYTES (16 * K)
+#define TEXT_BYTES (48 * K)
 #define SYM_TBL_BYTES (16 * K)
 #define TS_TBL_BYTES (2 * K)
 #define AST_TBL_BYTES (16 * K)
@@ -420,12 +420,14 @@ enum {
     SYSC_rand,
     SYSC_srand,
     SYSC_exit,
+    SYSC_popcount,
 
     // string.h
     SYSC_strlen,
     SYSC_strcpy,
     SYSC_strcmp,
     SYSC_strcat,
+    SYSC_strchr,
     SYSC_strdup,
     SYSC_memcmp,
     SYSC_memcpy,
@@ -670,12 +672,14 @@ static const struct {
     {"rand", 0},
     {"srand", 1},
     {"exit", 1},
+    {"popcount", 1},
 
     // string.h
     {"strlen", 1},
     {"strcpy", 2},
     {"strcmp", 2},
     {"strcat", 2},
+    {"strchr", 2},
     {"strdup", 1},
     {"memcmp", 3},
     {"memcpy", 3},
@@ -898,6 +902,9 @@ static struct define_grp stdio_defines[] = {
     {"O_EXCL", LFS_O_EXCL},     // Fail if a file already exists
     {"O_TRUNC", LFS_O_TRUNC},   // Truncate the existing file to zero size
     {"O_APPEND", LFS_O_APPEND}, // Move to end of file on every write
+    {"SEEK_SET", LFS_SEEK_SET}, //
+    {"SEEK_CUR", LFS_SEEK_CUR}, //
+    {"SEEK_END", LFS_SEEK_END}, //
     {0}};
 
 static struct define_grp gpio_defines[] = {
@@ -4101,6 +4108,9 @@ static int run(void) {
             case SYSC_strcat:
                 a.i = (int)strcat((void*)sp[1], (void*)sp[0]);
                 break;
+            case SYSC_strchr:
+                a.i = (int)strchr((void*)sp[1], sp[0]);
+                break;
             case SYSC_strdup:
                 strl = strlen((void*)sp[0]);
                 void* strp;
@@ -4149,6 +4159,9 @@ static int run(void) {
             case SYSC_exit:
                 a.i = sp[0];
                 goto exit_called;
+            case SYSC_popcount:
+                a.i = __builtin_popcount(sp[0]);
+                break;
             case SYSC_wfi:
                 __wfi();
                 break;
