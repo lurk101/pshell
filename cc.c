@@ -2868,11 +2868,13 @@ static void gen(int* n) {
         k = b ? n[3] : 0;
         if (k) {
             l = n[4] >> 10;
-            if (!(a = (int*)sys_malloc(sizeof(int) * (j + 1))))
+            if (!(a = (int*)sys_malloc(sizeof(int) * (l + 1))))
                 die("no cache memory");
-            for (j = 0; *b; b = (int*)*b)
+            j = 0;
+            while (*b) {
                 a[j++] = (int)b;
-            a[j] = (int)b;
+                b = (int*)*b;
+            }
             int sj = j;
             while (j >= 0) { // push arguments
                 gen(b + 1);
@@ -4800,7 +4802,7 @@ static int run(void) {
             run_level--;
             return a.i;
         default:
-            run_die("unknown instruction = %d %s!\n", i, instr_str[i]);
+            run_die("unknown instruction = %d %s!\n", i);
         }
         if (trc_opt && run_level == 0) {
             disassemble(base_pc, this_pc, this_pc + 2, 1);
