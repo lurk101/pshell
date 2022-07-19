@@ -6,6 +6,7 @@ Example C source files.
 | clocks.c | CLOCKS test. Display the various Pico clock frequencies |
 | crash.c | CRASH recovery test. Intentional hard fault |
 | exit.c | exit function test |
+| fade.c | breathing LED, interrupt driven |
 | hello.c | Needs no introduction |
 | io.c | LittleFs file I/O test. Create, write, close, open, read, seek, close. |
 | irq_blink.c | interrupt driven blink |
