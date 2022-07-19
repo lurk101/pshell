@@ -2868,7 +2868,7 @@ static void gen(int* n) {
         k = b ? n[3] : 0;
         if (k) {
             l = n[4] >> 10;
-            if (!(a = (int*)sys_malloc(sizeof(int) * (l + 1))))
+            if (!(a = (int*)sys_malloc(sizeof(int) * (k + 1))))
                 die("no cache memory");
             j = 0;
             while (*b) {

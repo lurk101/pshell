@@ -3,6 +3,7 @@ if [ $# -eq 0 ] ; then
     echo "specify version as n.n.n"
 	exit
 fi
+git checkout master
 rm -rf release
 mkdir release
 cd release
