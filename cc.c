@@ -3941,10 +3941,8 @@ static int run(void) {
             a.i = (int)(bp + *pc++); // load local address
             break;
         case IMM:
-            a.i = *pc++; // load global address or immediate
-            break;
         case IMMF:
-            a.f = *((float*)pc++);
+            a.i = *pc++; // load global address or immediate
             break;
         case JMP:
             pc = (int*)*pc; // jump
@@ -3976,29 +3974,23 @@ static int run(void) {
             pc = pop_ptr();
             break;
         case LI:
-            a.i = *(int*)a.i; // load int
-            break;
         case LF:
-            a.f = *(float*)a.i; // load float
+            a.i = *(int*)a.i; // load int or float
             break;
         case LC:
             a.i = *(char*)a.i; // load char
             break;
         case SI:
-            *((int*)pop_ptr()) = a.i; // store int
-            break;
         case SF:
-            *((float*)pop_ptr()) = a.f; // store float
+            *((int*)pop_ptr()) = a.i; // store int or float
             break;
         case SC:
             *((char*)pop_ptr()) = a.i; // store char
             break;
 
         case PSH:
-            push_int(a.i); // push
-            break;
         case PSHF:
-            push_float(a.f);
+            push_int(a.i); // push
             break;
 
         case OR:
@@ -4011,16 +4003,12 @@ static int run(void) {
             a.i = pop_int() & a.i;
             break;
         case EQ:
+        case EQF:
             a.i = pop_int() == a.i;
             break;
-        case EQF:
-            a.i = pop_float() == a.f;
-            break;
         case NE:
-            a.i = pop_int() != a.i;
-            break;
         case NEF:
-            a.i = pop_float() != a.f;
+            a.i = pop_int() != a.i;
             break;
         case LT:
             a.i = pop_int() < a.i;
