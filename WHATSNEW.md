@@ -1,5 +1,8 @@
 What's new in version 1.1.3
+- fixed compiler bug triggered by mid block declarations
 - added exit function
+- added popcount function
+- added strchr function
 
 What's new in version 1.1.2
 
