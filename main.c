@@ -452,6 +452,9 @@ static void status_cmd(void) {
     fs_fsstat(&stat);
     const char percent = 37;
     int total_size = stat.block_count * stat.block_size;
+#ifndef NDEBUG
+    printf("\ntext size 0x%x, bss size 0x%x (%d)", stat.text_size, stat.bss_size, stat.bss_size);
+#endif
     sprintf(result,
             "\nflash base 0x%x, blocks %d, block size %d, used %d, total %u bytes (%dK), %1.1f%c "
             "used.\n",

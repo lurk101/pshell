@@ -27,6 +27,10 @@ struct fs_fsstat_t {
     lfs_size_t block_size;
     lfs_size_t block_count;
     lfs_size_t blocks_used;
+#ifndef NDEBUG
+    lfs_size_t text_size;
+    lfs_size_t bss_size;
+#endif
 };
 
 // implemented

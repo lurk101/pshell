@@ -93,10 +93,19 @@ static int fs_hal_sync(const struct lfs_config* c) {
     return LFS_ERR_OK;
 }
 
+#ifndef NDEBUG
+extern char __HeapLimit;
+extern char __flash_binary_end;
+#endif
+
 int fs_fsstat(struct fs_fsstat_t* stat) {
     stat->block_count = fs_cfg.block_count;
     stat->block_size = fs_cfg.block_size;
     stat->blocks_used = lfs_fs_size(&fs_lfs);
+#ifndef NDEBUG
+    stat->text_size = (lfs_size_t)&__flash_binary_end - 0x10000000;
+    stat->bss_size = (lfs_size_t)&__HeapLimit - 0x20000000;
+#endif
     return LFS_ERR_OK;
 }
 

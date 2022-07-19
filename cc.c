@@ -1736,8 +1736,10 @@ static void expr(int lev) {
                 next();
                 b = n;
                 expr(Assign);
-                *--n = (int)b;
-                *--n = '{';
+                if (b != n) {
+                    *--n = (int)b;
+                    *--n = '{';
+                }
             }
             if (tk != ')')
                 die("close parenthesis expected");
@@ -2866,7 +2868,7 @@ static void gen(int* n) {
         k = b ? n[3] : 0;
         if (k) {
             l = n[4] >> 10;
-            if (!(a = (int*)sys_malloc(sizeof(int) * k)))
+            if (!(a = (int*)sys_malloc(sizeof(int) * (j + 1))))
                 die("no cache memory");
             for (j = 0; *b; b = (int*)*b)
                 a[j++] = (int)b;
@@ -3721,8 +3723,10 @@ static void stmt(int ctx) {
             a = n;
             check_label(&a);
             stmt(ctx);
-            *--n = (int)a;
-            *--n = '{';
+            if (a != n) {
+                *--n = (int)a;
+                *--n = '{';
+            }
         }
         next();
         return;
@@ -4932,132 +4936,132 @@ int cc(int argc, char** argv) {
         next();
         id->tk = i;
         id->class = Keyword; // add keywords to symbol table
-        }
+    }
 
-        next();
+    next();
 
-        id->tk = Char;
-        id->class = Keyword; // handle void type
-        next();
-        struct ident_s* idmain = id;
-        id->class = Main; // keep track of main
+    id->tk = Char;
+    id->class = Keyword; // handle void type
+    next();
+    struct ident_s* idmain = id;
+    id->class = Main; // keep track of main
 
-        if (!(data = data = (char*)sys_malloc(DATA_BYTES)))
-            die("no data memory");
-        if (!(tsize = (int*)sys_malloc(TS_TBL_BYTES)))
-            die("no tsize memory");
-        if (!(ast = (int*)sys_malloc(AST_TBL_BYTES)))
-            die("could not allocate abstract syntax tree area");
-        n = ast + (AST_TBL_BYTES / 4) - 1;
+    if (!(data = data = (char*)sys_malloc(DATA_BYTES)))
+        die("no data memory");
+    if (!(tsize = (int*)sys_malloc(TS_TBL_BYTES)))
+        die("no tsize memory");
+    if (!(ast = (int*)sys_malloc(AST_TBL_BYTES)))
+        die("could not allocate abstract syntax tree area");
+    n = ast + (AST_TBL_BYTES / 4) - 1;
 
-        // add primitive types
-        tsize[tnew++] = sizeof(char);
-        tsize[tnew++] = sizeof(int);
-        tsize[tnew++] = sizeof(float);
-        tsize[tnew++] = 0; // reserved for another scalar type
+    // add primitive types
+    tsize[tnew++] = sizeof(char);
+    tsize[tnew++] = sizeof(int);
+    tsize[tnew++] = sizeof(float);
+    tsize[tnew++] = 0; // reserved for another scalar type
 
-        --argc;
-        ++argv;
-        char* lib_name = NULL;
-        while (argc > 0 && **argv == '-') {
-            if ((*argv)[1] == 'h') {
-                --argc;
-                ++argv;
-                if (argc)
-                    lib_name = *argv;
-                help(lib_name);
-                goto done;
-            } else if ((*argv)[1] == 's') {
-                src_opt = 1;
-            } else if ((*argv)[1] == 't') {
-                trc_opt = ((*argv)[2] == 'i') ? 2 : 1;
-            } else if ((*argv)[1] == 'D') {
-                p = &(*argv)[2];
-                next();
-                if (tk != Id)
-                    die("bad -D identifier");
-                struct ident_s* dd = id;
-                next();
-                int i = 0;
-                if (tk == Assign) {
-                    next();
-                    expr(Cond);
-                    if (*n != Num)
-                        die("bad -D initializer");
-                    i = n[1];
-                    n += 2;
-                }
-                dd->class = Num;
-                dd->type = INT;
-                dd->val = i;
-            } else
-                argc = 0; // bad compiler option. Force exit.
+    --argc;
+    ++argv;
+    char* lib_name = NULL;
+    while (argc > 0 && **argv == '-') {
+        if ((*argv)[1] == 'h') {
             --argc;
             ++argv;
-        }
-        if (argc < 1) {
-            help(NULL);
+            if (argc)
+                lib_name = *argv;
+            help(lib_name);
             goto done;
-        }
+        } else if ((*argv)[1] == 's') {
+            src_opt = 1;
+        } else if ((*argv)[1] == 't') {
+            trc_opt = ((*argv)[2] == 'i') ? 2 : 1;
+        } else if ((*argv)[1] == 'D') {
+            p = &(*argv)[2];
+            next();
+            if (tk != Id)
+                die("bad -D identifier");
+            struct ident_s* dd = id;
+            next();
+            int i = 0;
+            if (tk == Assign) {
+                next();
+                expr(Cond);
+                if (*n != Num)
+                    die("bad -D initializer");
+                i = n[1];
+                n += 2;
+            }
+            dd->class = Num;
+            dd->type = INT;
+            dd->val = i;
+        } else
+            argc = 0; // bad compiler option. Force exit.
+        --argc;
+        ++argv;
+    }
+    if (argc < 1) {
+        help(NULL);
+        goto done;
+    }
 
-        add_defines(stdio_defines);
-        add_defines(gpio_defines);
-        add_defines(pwm_defines);
-        add_defines(clk_defines);
-        add_defines(i2c_defines);
-        add_defines(spi_defines);
-        add_defines(irq_defines);
+    add_defines(stdio_defines);
+    add_defines(gpio_defines);
+    add_defines(pwm_defines);
+    add_defines(clk_defines);
+    add_defines(i2c_defines);
+    add_defines(spi_defines);
+    add_defines(irq_defines);
 
-        fp = full_path(*argv);
-        if (!fp)
-            die("could not allocate file name area");
-        fd = sys_malloc(sizeof(lfs_file_t));
-        if (fd == NULL)
-            die("no file handle memory");
-        if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
-            sys_free(fd);
-            fd = NULL;
-            die("could not open %s \n", fp);
-        }
-
-        int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
-        fs_file_rewind(fd);
-
-        if (!(text_base = le = e = (int*)sys_malloc(TEXT_BYTES)))
-            die("no text memory");
-        if (!(members = (struct member_s**)sys_malloc(MEMBER_DICT_BYTES)))
-            die("no members table memory");
-
-        if (!(src = lp = p = (char*)sys_malloc(siz + 1)))
-            die("no source memory");
-        if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
-            die("unable to read from source file");
-        p[siz] = 0;
-        fs_file_close(fd);
+    fp = full_path(*argv);
+    if (!fp)
+        die("could not allocate file name area");
+    fd = sys_malloc(sizeof(lfs_file_t));
+    if (fd == NULL)
+        die("no file handle memory");
+    if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
         sys_free(fd);
         fd = NULL;
+        die("could not open %s \n", fp);
+    }
 
-        // parse the program
-        line = 1;
-        pplevt = -1;
+    int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
+    fs_file_rewind(fd);
+
+    if (!(text_base = le = e = (int*)sys_malloc(TEXT_BYTES)))
+        die("no text memory");
+    if (!(members = (struct member_s**)sys_malloc(MEMBER_DICT_BYTES)))
+        die("no members table memory");
+
+    if (!(src = lp = p = (char*)sys_malloc(siz + 1)))
+        die("no source memory");
+    if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
+        die("unable to read from source file");
+    p[siz] = 0;
+    fs_file_close(fd);
+    sys_free(fd);
+    fd = NULL;
+
+    // parse the program
+    line = 1;
+    pplevt = -1;
+    next();
+    while (tk) {
+        stmt(Glo);
         next();
-        while (tk) {
-            stmt(Glo);
-            next();
-        }
-        sys_free(ast);
-        ast = NULL;
-        sys_free(src);
-        src = NULL;
-        sys_free(sym);
-        sym = NULL;
-        sys_free(tsize);
-        tsize = NULL;
-        if (!(pc = (int*)idmain->val))
-            die("main() not defined\n");
+    }
+    sys_free(ast);
+    ast = NULL;
+    sys_free(src);
+    src = NULL;
+    sys_free(sym);
+    sym = NULL;
+    sys_free(tsize);
+    tsize = NULL;
+    if (!(pc = (int*)idmain->val))
+        die("main() not defined\n");
 
-        if (src_opt)
-            goto done;
+    if (src_opt)
+        goto done;
 
     printf("\n");
 
