@@ -7,7 +7,7 @@ git checkout master
 rm -rf release
 mkdir release
 cd release
-cmake ..
+cmake .. -DUSB_CONSOLE=OFF
 make -j4
 cp *.elf *.hex *.bin *.uf2 ..
 rm -rf *
