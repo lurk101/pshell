@@ -1,3 +1,13 @@
+What's new in version 1.1.5
+
+- formalized three cmake build options
+```
+-DUSB_CONSOLE=[ON|OFF]      Build for USB, otherwise UART
+-DWITH_IRQ=[ON|OFF]         Build with interrup handling support
+-DWITH_KBD_HALT=[ON|OFF]    Build with run-time kbd CTL-C checks
+```
+Turning off IRQ support and keyboard halt checking can significantly improve performance,
+
 What's new in version 1.1.4
 
 - add strncpy, strncmp, strncat, strrchr, asinf, acosf, atanf, atan2f, sinhf, coshf, tanhf, asinhf, acoshf, atanhf and log10f functions
