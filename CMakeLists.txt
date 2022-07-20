@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 
-option(USB_CONSOLE "build for USB console" 0)
+option(USB_CONSOLE "build for USB console" ON)
+option(WITH_IRQ "build with interrupt support" ON) 
+option(WITH_KBD_HALT "build with run-time CTL-C checking" ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -11,7 +13,6 @@ if (USB_CONSOLE)
   set(PSHELL pshell_usb)
 else()
   set(PSHELL pshell_uart)
-  message("Building for UART. For USB use -DUSB_CONSOLE=ON")
 endif()
 
 project(${PSHELL} C CXX ASM)
@@ -40,6 +41,18 @@ add_compile_options("-DLFS_NO_DEBUG")
 add_compile_options("-DLFS_NO_WARN")
 add_compile_options("-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH}")
 add_compile_options("-DGIT_BRANCH=${GIT_BRANCH}")
+
+if (WITH_IRQ)
+add_compile_options("-DWITH_IRQ=1")
+else()
+add_compile_options("-DWITH_IRQ=0")
+endif()
+
+if (WITH_KBD_HALT)
+add_compile_options("-DWITH_KBD_HALT=1")
+else()
+add_compile_options("-DWITH_KBD_HALT=0")
+endif()
 
 add_subdirectory(littlefs)
 
@@ -73,4 +86,13 @@ list(APPEND LINK_LIST
 target_link_libraries(${PSHELL} PUBLIC ${LINK_LIST})
 
 pico_add_extra_outputs(${PSHELL})
+
+message("---------------------------------------------------------------------")
+message("-- CMake ${CMAKE_VERSION}")
+message("-- Build ${CMAKE_BUILD_TYPE} / ${CMAKE_SYSTEM_NAME}")
+message("--------------------------------------------------------- components")
+message("-- USR_CONSOLE      Build for USB, otherwise UART         ${USB_CONSOLE}")
+message("-- WITH_IRQ         Build with interrup handling support  ${WITH_IRQ}")
+message("-- WITH_KBD_HALT    Build with run-time kbd CTL-C checks  ${WITH_KBD_HALT}")
+message("---------------------------------------------------------------------")
 

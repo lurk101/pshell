@@ -486,6 +486,7 @@ enum {
     SYSC_gpio_get_slew_rate,
     SYSC_gpio_set_drive_strength,
     SYSC_gpio_get_drive_strength,
+#if WITH_IRQ
     SYSC_gpio_set_irq_enabled,
 #if SDK14
     SYSC_gpio_set_irq_callback,
@@ -504,6 +505,7 @@ enum {
     SYSC_gpio_remove_raw_irq_handler_masked,
     SYSC_gpio_remove_raw_irq_handler,
 #endif
+#endif // WITH_IRQ
     SYSC_gpio_init,
     SYSC_gpio_deinit,
     SYSC_gpio_init_mask,
@@ -551,11 +553,13 @@ enum {
     SYSC_pwm_set_phase_correct,
     SYSC_pwm_set_enabled,
     SYSC_pwm_set_mask_enabled,
+#if WITH_IRQ
     SYSC_pwm_set_irq_enabled,
     SYSC_pwm_set_irq_mask_enabled,
     SYSC_pwm_clear_irq,
     SYSC_pwm_get_irq_status_mask,
     SYSC_pwm_force_irq,
+#endif
     SYSC_pwm_get_dreq,
 
     // hardware/adc.h
@@ -632,6 +636,7 @@ enum {
     SYSC_spi_read16_blocking,
     SYSC_spi_get_dreq,
 
+#if WITH_IRQ
     // hardware/irq.h
     SYSC_irq_set_priority,
     SYSC_irq_get_priority,
@@ -655,6 +660,7 @@ enum {
     SYSC_user_irq_claim_unused,
     SYSC_user_irq_is_claimed,
 #endif
+#endif // WITH_IRQ
     SYSC_last
 };
 
@@ -748,6 +754,7 @@ static const struct {
     {"gpio_get_slew_rate", 1},
     {"gpio_set_drive_strength", 2},
     {"gpio_get_drive_strength", 1},
+#if WITH_IRQ
     {"gpio_set_irq_enabled", 3},
 #if SDK14
     {"gpio_set_irq_callback", 1},
@@ -766,6 +773,7 @@ static const struct {
     {"gpio_remove_raw_irq_handler_masked", 2},
     {"gpio_remove_raw_irq_handler", 2},
 #endif
+#endif // WITH_IRQ
     {"gpio_init", 1},
     {"gpio_deinit", 1},
     {"gpio_init_mask", 1},
@@ -812,11 +820,13 @@ static const struct {
     {"pwm_set_phase_correct", 2},
     {"pwm_set_enabled", 2},
     {"pwm_set_mask_enabled", 1},
+#if WITH_IRQ
     {"pwm_set_irq_enabled", 2},
     {"pwm_set_irq_mask_enabled", 2},
     {"pwm_clear_irq", 1},
     {"pwm_get_irq_status_mask", 0},
     {"pwm_force_irq", 1},
+#endif
     {"pwm_get_dreq", 1},
     // ADC
     {"adc_init", 0},
@@ -1011,6 +1021,7 @@ static struct define_grp spi_defines[] = {
     {"spi_default", (int)PICO_DEFAULT_SPI_INSTANCE},
     {0}};
 
+#if WITH_IRQ
 static struct define_grp irq_defines[] = {
     // IRQ
     {"TIMER_IRQ_0", TIMER_IRQ_0},
@@ -1049,6 +1060,7 @@ static struct define_grp irq_defines[] = {
     {"PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY",
      PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY},
     {0}};
+#endif // WITH_IRQ
 
 static struct {
     char* name;
@@ -1067,7 +1079,9 @@ static struct {
                 {"clocks", SYSC_clocks_init, clk_defines},
                 {"i2c", SYSC_i2c_init, i2c_defines},
                 {"spi", SYSC_spi_init, spi_defines},
+#if WITH_IRQ
                 {"irq", SYSC_irq_set_priority, irq_defines},
+#endif
                 {0, SYSC_last}};
 
 static jmp_buf done_jmp;
@@ -3820,63 +3834,97 @@ static int common_vfunc(int ac, int sflag, int* sp) {
     return r;
 }
 
+#if WITH_KBD_HALT
 static inline void check_kbd_halt(void) {
     int key = x_getchar_timeout_us(0);
     if ((key == 27) || (key == 3)) // check for escape
         run_die("user interrupted!!");
 }
+#endif
 
 static int *bp, *pc, *sp;
 
 static inline float pop_float(void) {
+#if WITH_IRQ
     uint32_t save = save_and_disable_interrupts();
+#endif
     float r = *((float*)sp++);
+#if WITH_IRQ
     restore_interrupts(save);
+#endif
     return r;
 }
 
 static inline int* pop_ptr(void) {
+#if WITH_IRQ
     uint32_t save = save_and_disable_interrupts();
+#endif
     void* p = (int*)(*sp++);
+#if WITH_IRQ
     restore_interrupts(save);
+#endif
     return p;
 }
 
 static inline int pop_int(void) {
+#if WITH_IRQ
     uint32_t save = save_and_disable_interrupts();
+#endif
     int i = *sp++;
+#if WITH_IRQ
     restore_interrupts(save);
+#endif
     return i;
 }
 
 static inline void push_ptr(void* p) {
+#if WITH_IRQ
     uint32_t save = save_and_disable_interrupts();
+#endif
     *--sp = (int)p;
+#if WITH_IRQ
     restore_interrupts(save);
+#endif
 }
 
 static inline void push_int(int i) {
+#if WITH_IRQ
     uint32_t save = save_and_disable_interrupts();
+#endif
     *--sp = i;
+#if WITH_IRQ
     restore_interrupts(save);
+#endif
 }
 
 static inline void push_float(float f) {
+#if WITH_IRQ
     uint32_t save = save_and_disable_interrupts();
+#endif
     *((float*)--sp) = f;
+#if WITH_IRQ
     restore_interrupts(save);
+#endif
 }
 
 static inline void push_n(int n) {
+#if WITH_IRQ
     uint32_t save = save_and_disable_interrupts();
+#endif
     sp -= n;
+#if WITH_IRQ
     restore_interrupts(save);
+#endif
 }
 
 static inline void pop_n(int n) {
+#if WITH_IRQ
     uint32_t save = save_and_disable_interrupts();
+#endif
     sp += n;
+#if WITH_IRQ
     restore_interrupts(save);
+#endif
 }
 
 static int run(void);
@@ -3888,6 +3936,7 @@ static union {
     float f;
 } a; // accumulator
 
+#if WITH_IRQ
 void irqn_handler(int n) {
     uint32_t save = save_and_disable_interrupts();
     push_int(a.i);
@@ -3945,6 +3994,7 @@ static irq_handler_t handler[32] = {
     irq18_handler, irq19_handler, irq20_handler, irq21_handler, irq22_handler, irq23_handler,
     irq24_handler, irq25_handler, irq26_handler, irq27_handler, irq28_handler, irq29_handler,
     irq30_handler, irq31_handler};
+#endif
 
 static int run(void) {
 
@@ -3957,13 +4007,19 @@ static int run(void) {
     static pwm_config c;
 
     while (1) {
+#if WITH_KBD_HALT
+#if WITH_IRQ
         if (!run_level) {
+#endif
             uint32_t t = time_us_32();
             if (t - last_t > 0x100000) {
                 last_t = t;
                 check_kbd_halt();
             }
+#if WITH_IRQ
         }
+#endif
+#endif
         this_pc = pc;
         i = *pc++;
         switch (i) {
@@ -4312,7 +4368,9 @@ static int run(void) {
                 us = sp[0];
                 while (us > 10000) {
                     sleep_ms(10000);
+#if WITH_KDB_HALT
                     check_kbd_halt();
+#endif
                     us -= 10000;
                 }
                 sleep_us(us);
@@ -4321,7 +4379,9 @@ static int run(void) {
                 ms = sp[0];
                 while (ms > 10) {
                     sleep_ms(10);
+#if WITH_KDB_HALT
                     check_kbd_halt();
+#endif
                     ms -= 10;
                 }
                 sleep_ms(ms);
@@ -4384,6 +4444,7 @@ static int run(void) {
             case SYSC_gpio_get_drive_strength:
                 a.i = gpio_get_drive_strength(sp[0]);
                 break;
+#if WITH_IRQ
             case SYSC_gpio_set_irq_enabled:
                 gpio_set_irq_enabled(sp[2], sp[1], sp[0]);
                 break;
@@ -4427,6 +4488,7 @@ static int run(void) {
                 gpio_remove_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
                 break;
 #endif
+#endif // WITH_IRQ
             case SYSC_gpio_init:
                 gpio_init(sp[0]);
                 break;
@@ -4564,6 +4626,7 @@ static int run(void) {
             case SYSC_pwm_set_mask_enabled:
                 pwm_set_mask_enabled(sp[0]);
                 break;
+#if WITH_IRQ
             case SYSC_pwm_set_irq_enabled:
                 pwm_set_irq_enabled(sp[1], sp[0]);
                 break;
@@ -4579,6 +4642,7 @@ static int run(void) {
             case SYSC_pwm_force_irq:
                 pwm_force_irq(sp[0]);
                 break;
+#endif
             case SYSC_pwm_get_dreq:
                 a.i = pwm_get_dreq(sp[0]);
                 break;
@@ -4783,6 +4847,7 @@ static int run(void) {
                 a.i = spi_get_dreq((void*)sp[1], sp[0]);
                 break;
                 // IRQ
+#if WITH_IRQ
             case SYSC_irq_set_priority:
                 irq_set_priority(sp[1], sp[0]);
                 break;
@@ -4856,6 +4921,7 @@ static int run(void) {
                 a.i = user_irq_is_claimed(sp[0]);
                 break;
 #endif
+#endif // WITH_IRQ
             default:
                 run_die("unknown system call");
                 break;
@@ -4883,7 +4949,8 @@ static int run(void) {
         			run_die("user interrupted!!");
         }
     }
-exit_called:;
+exit_called:
+    return a.i;
 }
 
 static int show_strings(char** names, int n) {
@@ -5075,7 +5142,9 @@ int cc(int argc, char** argv) {
     add_defines(clk_defines);
     add_defines(i2c_defines);
     add_defines(spi_defines);
+#if WITH_IRQ
     add_defines(irq_defines);
+#endif
 
     char* fn = sys_malloc(strlen(full_path(*argv)) + 3);
     strcpy(fn, full_path(*argv));
