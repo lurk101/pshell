@@ -1,6 +1,6 @@
 #ifndef __PS_VERSION__
 #define __PS_VERSION__
 
-#define PS_VERSION "1.1.4"
+#define PS_VERSION "1.1.5"
 
 #endif
