@@ -1,3 +1,10 @@
+What's new in version 1.1.4
+
+- add strncpy, strncmp, strncat, strrchr, asinf, acosf, atanf, atan2f, sinhf, coshf, tanhf, asinhf, acoshf, atanhf and log10f functions
+- append .c to compiler filename if not specified
+- add interrupt driven LED fade example
+- a few minor instruction optimizations
+
 What's new in version 1.1.3
 - fixed compiler bug triggered by mid block declarations
 - added exit function
