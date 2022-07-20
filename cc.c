@@ -4955,8 +4955,8 @@ static void help(char* lib) {
                includes[0].name);
         for (int i = 1; includes[i].name; i++) {
             printf(", %s", includes[i].name);
-            if ((i % 8) == 0)
-                printf("\n    %s", includes[i++].name);
+            if ((i % 8) == 0 && includes[i + 1].name)
+                printf("\n    %s", includes[++i].name);
         }
         printf("\n");
         return;
