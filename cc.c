@@ -425,9 +425,13 @@ enum {
     // string.h
     SYSC_strlen,
     SYSC_strcpy,
+    SYSC_strncpy,
     SYSC_strcmp,
+    SYSC_strncmp,
     SYSC_strcat,
+    SYSC_strncat,
     SYSC_strchr,
+    SYSC_strrchr,
     SYSC_strdup,
     SYSC_memcmp,
     SYSC_memcpy,
@@ -438,7 +442,18 @@ enum {
     SYSC_sinf,
     SYSC_cosf,
     SYSC_tanf,
+    SYSC_asinf,
+    SYSC_acosf,
+    SYSC_atanf,
+    SYSC_atan2f,
+    SYSC_sinhf,
+    SYSC_coshf,
+    SYSC_tanhf,
+    SYSC_asinhf,
+    SYSC_acoshf,
+    SYSC_atanhf,
     SYSC_logf,
+    SYSC_log10f,
     SYSC_powf,
 
     // hardware/sync.h
@@ -677,9 +692,13 @@ static const struct {
     // string.h
     {"strlen", 1},
     {"strcpy", 2},
+    {"strncpy", 3},
     {"strcmp", 2},
+    {"strncmp", 3},
     {"strcat", 2},
+    {"strncat", 3},
     {"strchr", 2},
+    {"strrchr", 2},
     {"strdup", 1},
     {"memcmp", 3},
     {"memcpy", 3},
@@ -690,7 +709,18 @@ static const struct {
     {"sinf", 1 | (1 << 5) | (1 << 10)},
     {"cosf", 1 | (1 << 5) | (1 << 10)},
     {"tanf", 1 | (1 << 5) | (1 << 10)},
+    {"asinf", 1 | (1 << 5) | (1 << 10)},
+    {"acosf", 1 | (1 << 5) | (1 << 10)},
+    {"atanf", 1 | (1 << 5) | (1 << 10)},
+    {"atan2f", 2 | (2 << 5) | (0b11 << 10)},
+    {"sinhf", 1 | (1 << 5) | (1 << 10)},
+    {"coshf", 1 | (1 << 5) | (1 << 10)},
+    {"tanhf", 1 | (1 << 5) | (1 << 10)},
+    {"asinhf", 1 | (1 << 5) | (1 << 10)},
+    {"acoshf", 1 | (1 << 5) | (1 << 10)},
+    {"atanhf", 1 | (1 << 5) | (1 << 10)},
     {"logf", 1 | (1 << 5) | (1 << 10)},
+    {"log10f", 1 | (1 << 5) | (1 << 10)},
     {"powf", 2 | (2 << 5) | (0b11 << 10)},
     // sync
     {"wfi", 0},
@@ -4096,14 +4126,26 @@ static int run(void) {
             case SYSC_strcpy:
                 a.i = (int)strcpy((void*)sp[1], (void*)sp[0]);
                 break;
+            case SYSC_strncpy:
+                a.i = (int)strncpy((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
             case SYSC_strcmp:
                 a.i = strcmp((void*)sp[1], (void*)sp[0]);
+                break;
+            case SYSC_strncmp:
+                a.i = strncmp((void*)sp[2], (void*)sp[1], sp[0]);
                 break;
             case SYSC_strcat:
                 a.i = (int)strcat((void*)sp[1], (void*)sp[0]);
                 break;
+            case SYSC_strncat:
+                a.i = (int)strncat((void*)sp[2], (void*)sp[1], sp[0]);
+                break;
             case SYSC_strchr:
                 a.i = (int)strchr((void*)sp[1], sp[0]);
+                break;
+            case SYSC_strrchr:
+                a.i = (int)strrchr((void*)sp[1], sp[0]);
                 break;
             case SYSC_strdup:
                 strl = strlen((void*)sp[0]);
@@ -4138,8 +4180,41 @@ static int run(void) {
             case SYSC_tanf:
                 a.f = tanf(*((float*)sp));
                 break;
+            case SYSC_asinf:
+                a.f = asinf(*((float*)sp));
+                break;
+            case SYSC_acosf:
+                a.f = acosf(*((float*)sp));
+                break;
+            case SYSC_atanf:
+                a.f = atanf(*((float*)sp));
+                break;
+            case SYSC_atan2f:
+                a.f = atan2f(*((float*)sp + 1), *((float*)sp));
+                break;
+            case SYSC_sinhf:
+                a.f = sinhf(*((float*)sp));
+                break;
+            case SYSC_coshf:
+                a.f = coshf(*((float*)sp));
+                break;
+            case SYSC_tanhf:
+                a.f = tanhf(*((float*)sp));
+                break;
+            case SYSC_asinhf:
+                a.f = asinhf(*((float*)sp));
+                break;
+            case SYSC_acoshf:
+                a.f = acoshf(*((float*)sp));
+                break;
+            case SYSC_atanhf:
+                a.f = atanhf(*((float*)sp));
+                break;
             case SYSC_logf:
                 a.f = logf(*((float*)sp));
+                break;
+            case SYSC_log10f:
+                a.f = log10f(*((float*)sp));
                 break;
             case SYSC_powf:
                 a.f = powf(*((float*)sp + 1), *((float*)sp));
