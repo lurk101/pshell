@@ -9,7 +9,6 @@ Example C source files.
 | fade.c | breathing LED, interrupt driven |
 | hello.c | Needs no introduction |
 | io.c | LittleFs file I/O test. Create, write, close, open, read, seek, close. |
-| irq_blink.c | interrupt driven blink |
 | life.c | Conway's game of life. The Gosper glider canon |
 | pi.c | Test floats and recursion |
 | printf.c | Simple printf and sprintf formating test |

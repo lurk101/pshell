@@ -5002,17 +5002,19 @@ int cc(int argc, char** argv) {
     add_defines(spi_defines);
     add_defines(irq_defines);
 
-    fp = full_path(*argv);
-    if (!fp)
-        die("could not allocate file name area");
+    char* fn = sys_malloc(strlen(full_path(*argv)) + 3);
+    strcpy(fn, full_path(*argv));
+    if (strrchr(fn, '.') == NULL)
+        strcat(fn, ".c");
     fd = sys_malloc(sizeof(lfs_file_t));
     if (fd == NULL)
         die("no file handle memory");
-    if (fs_file_open(fd, fp, LFS_O_RDONLY) < LFS_ERR_OK) {
+    if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
         sys_free(fd);
         fd = NULL;
         die("could not open %s \n", fp);
     }
+    sys_free(fn);
 
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
