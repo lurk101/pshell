@@ -75,15 +75,12 @@ else()
   pico_enable_stdio_usb(${PSHELL} 0)
 endif()
 
-set(LINK_LIST)
-list(APPEND LINK_LIST
+target_link_libraries(${PSHELL} PUBLIC
     littlefs
     pico_stdlib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
     hardware_spi hardware_irq)
-
-target_link_libraries(${PSHELL} PUBLIC ${LINK_LIST})
 
 pico_add_extra_outputs(${PSHELL})
 
