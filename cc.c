@@ -3447,11 +3447,12 @@ static void stmt(int ctx) {
                     printf("--> %d: move %.*s to global scope for performance.\n", oline,
                            (oid->hash & 0x3f), oid->name);
                 cas = 0;
+                int* se = e;
                 gen(n);
                 if (src_opt) {
                     printf("%d: %.*s\n", line, p - lp, lp);
                     lp = p;
-                    disassemble(le, le, e, 0);
+                    disassemble(0, se, e, 0);
                 }
             unwind_func:
                 id = sym;
@@ -3844,92 +3845,70 @@ static inline void check_kbd_halt(void) {
 
 static int *bp, *pc, *sp;
 
+#if WITH_IRQ
+#define disable() uint32_t save = save_and_disable_interrupts()
+#define enable() restore_interrupts(save)
+#else
+#define disable()
+#define enable()
+#endif
+
 static inline float pop_float(void) {
-#if WITH_IRQ
-    uint32_t save = save_and_disable_interrupts();
-#endif
+    disable();
     float r = *((float*)sp++);
-#if WITH_IRQ
-    restore_interrupts(save);
-#endif
+    enable();
     return r;
 }
 
 static inline int* pop_ptr(void) {
-#if WITH_IRQ
-    uint32_t save = save_and_disable_interrupts();
-#endif
+    disable();
     void* p = (int*)(*sp++);
-#if WITH_IRQ
-    restore_interrupts(save);
-#endif
+    enable();
     return p;
 }
 
 static inline int pop_int(void) {
-#if WITH_IRQ
-    uint32_t save = save_and_disable_interrupts();
-#endif
+    disable();
     int i = *sp++;
-#if WITH_IRQ
-    restore_interrupts(save);
-#endif
+    enable();
     return i;
 }
 
 static inline void push_ptr(void* p) {
-#if WITH_IRQ
-    uint32_t save = save_and_disable_interrupts();
-#endif
+    disable();
     *--sp = (int)p;
-#if WITH_IRQ
-    restore_interrupts(save);
-#endif
+    enable();
 }
 
 static inline void push_int(int i) {
-#if WITH_IRQ
-    uint32_t save = save_and_disable_interrupts();
-#endif
+    disable();
     *--sp = i;
-#if WITH_IRQ
-    restore_interrupts(save);
-#endif
+    enable();
 }
 
 static inline void push_float(float f) {
-#if WITH_IRQ
-    uint32_t save = save_and_disable_interrupts();
-#endif
+    disable();
     *((float*)--sp) = f;
-#if WITH_IRQ
-    restore_interrupts(save);
-#endif
+    enable();
 }
 
 static inline void push_n(int n) {
-#if WITH_IRQ
-    uint32_t save = save_and_disable_interrupts();
-#endif
+    disable();
     sp -= n;
-#if WITH_IRQ
-    restore_interrupts(save);
-#endif
+    enable();
 }
 
 static inline void pop_n(int n) {
-#if WITH_IRQ
-    uint32_t save = save_and_disable_interrupts();
-#endif
+    disable();
     sp += n;
-#if WITH_IRQ
-    restore_interrupts(save);
-#endif
+    enable();
 }
 
 static int run(void);
 
+#if WITH_IRQ
 static volatile int run_level;
+#endif
 
 static union {
     int i;
@@ -3938,20 +3917,24 @@ static union {
 
 #if WITH_IRQ
 void irqn_handler(int n) {
-    uint32_t save = save_and_disable_interrupts();
-    push_int(a.i);
-    push_ptr(pc);
-    push_int(EXIT); // return to EXIT
-    push_ptr(sp);
-    bp = sp;
-    pc = intrpt_vector[n].c_handler;
-    restore_interrupts(save);
+    {
+        disable();
+        push_int(a.i);
+        push_ptr(pc);
+        push_int(EXIT); // return to EXIT
+        push_ptr(sp);
+        bp = sp;
+        pc = intrpt_vector[n].c_handler;
+        enable();
+    }
     run();
-    save = save_and_disable_interrupts();
-    pc = pop_ptr(); // throw away the fake EXIT instruction
-    pc = pop_ptr();
-    a.i = pop_int();
-    restore_interrupts(save);
+    {
+        disable();
+        pc = pop_ptr(); // throw away the fake EXIT instruction
+        pc = pop_ptr();
+        a.i = pop_int();
+        enable();
+    }
 }
 
 void irq0_handler(void) { irqn_handler(0); }
@@ -3998,7 +3981,9 @@ static irq_handler_t handler[32] = {
 
 static int run(void) {
 
+#if WITH_IRQ
     run_level++;
+#endif
     uint32_t last_t = time_us_32();
     int *this_pc, *base_pc;
     int i, sysc, strl, irqn;
@@ -4928,26 +4913,32 @@ static int run(void) {
             }
             break;
         case EXIT:
+#if WITH_IRQ
             run_level--;
+#endif
             return a.i;
         default:
             run_die("unknown instruction = %d %s!\n", i);
         }
-        if (trc_opt && run_level == 0) {
-            disassemble(base_pc, this_pc, this_pc + 2, 1);
-            printf("\n");
-            printf("acc          %08x (as int) %d\n", a.i, a.i);
-            printf("accf         %f\n", a.f);
-            printf("stk [%6d] %08x %08x %08x %08x\n", (int)(sp - base_sp), *((int*)sp),
-                   *((int*)sp + 1), *((int*)sp + 2), *((int*)sp + 3));
-            printf("    (as int) %08d %08d %08d %08d\n", *((int*)sp), *((int*)sp + 1),
-                   *((int*)sp + 2), *((int*)sp + 3));
-            printf("  (as float) %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
-                   *((float*)sp + 2), *((float*)sp + 3));
-        	if (trc_opt > 1)
-            	if (x_getchar() == 3)
-        			run_die("user interrupted!!");
-        }
+        if (trc_opt)
+#if WITH_IRQ
+            if (run_level == 0)
+#endif
+            {
+                disassemble(base_pc, this_pc, this_pc + 2, 1);
+                printf("\n");
+                printf("acc          %08x (as int) %d\n", a.i, a.i);
+                printf("accf         %f\n", a.f);
+                printf("stk [%6d] %08x %08x %08x %08x\n", (int)(sp - base_sp), *((int*)sp),
+                       *((int*)sp + 1), *((int*)sp + 2), *((int*)sp + 3));
+                printf("    (as int) %08d %08d %08d %08d\n", *((int*)sp), *((int*)sp + 1),
+                       *((int*)sp + 2), *((int*)sp + 3));
+                printf("  (as float) %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
+                       *((float*)sp + 2), *((float*)sp + 3));
+                if (trc_opt > 1)
+                    if (x_getchar() == 3)
+                        run_die("user interrupted!!");
+            }
     }
 exit_called:
     return a.i;
@@ -5213,7 +5204,9 @@ int cc(int argc, char** argv) {
 
     // run...
     a.i = 0;
+#if WITH_IRQ
     run_level = -1;
+#endif
 
     printf("\nCC=%d\n", run());
 
