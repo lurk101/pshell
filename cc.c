@@ -1544,8 +1544,29 @@ static void bitopcheck(int tl, int tr) {
  * Bracket [
  */
 
-static void ast_push2(int v, int k) {
-    *--n = v;
+static void ast_push5(int v1, int v2, int v3, int v4, int k) {
+    *--n = v1;
+    *--n = v2;
+    *--n = v3;
+    *--n = v4;
+    *--n = k;
+}
+
+static void ast_push4(int v1, int v2, int v3, int k) {
+    *--n = v1;
+    *--n = v2;
+    *--n = v3;
+    *--n = k;
+}
+
+static void ast_push3(int v1, int v2, int k) {
+    *--n = v1;
+    *--n = v2;
+    *--n = k;
+}
+
+static void ast_push2(int v1, int k) {
+    *--n = v1;
     *--n = k;
 }
 
@@ -1616,11 +1637,7 @@ static void expr(int lev) {
                 die("argument type mismatch");
             next();
             // function or system call id
-            *--n = tt;
-            *--n = t;
-            *--n = d->val;
-            *--n = (int)b;
-            *--n = d->class;
+            ast_push5(tt, t, d->val, (int)b, d->class);
             ty = d->type;
         }
         // enumeration, only enums have ->class == Num
@@ -1894,9 +1911,7 @@ static void expr(int lev) {
             next();
             expr(Assign);
             typecheck(Assign, t, ty);
-            *--n = (int)b;
-            *--n = (ty << 16) | t;
-            *--n = Assign;
+            ast_push3((int)b, (ty << 16) | t, Assign);
             ty = t;
             break;
         case OrAssign: // right associated
@@ -1928,9 +1943,7 @@ static void expr(int lev) {
             if (t == FLOAT && (otk >= AddAssign && otk <= DivAssign))
                 *n += 5;
             typecheck(*n, t, ty);
-            *--n = (int)b;
-            *--n = (ty << 16) | t;
-            *--n = Assign;
+            ast_push3((int)b, (ty << 16) | t, Assign);
             ty = t;
             break;
         case Cond: // `x?a:b` is similar to if except that it relies on else
@@ -1942,13 +1955,9 @@ static void expr(int lev) {
             next();
             c = n;
             expr(Cond);
-            --n;
             if (tc != ty)
                 die("both results need same type");
-            *n = (int)(n + 1);
-            *--n = (int)c;
-            *--n = (int)b;
-            *--n = Cond;
+            ast_push4((int)n, (int)c, (int)b, Cond);
             break;
         case Lor: // short circuit, the logical or
             next();
@@ -3432,9 +3441,7 @@ static void stmt(int ctx) {
                         i = ty;
                         expr(Assign);
                         typecheck(Assign, i, ty);
-                        *--n = (int)a;
-                        *--n = (ty << 16) | i;
-                        *--n = Assign;
+                        ast_push3((int)a, (ty << 16) | i, Assign);
                         ty = i;
                         ast_push2((int)b, '{');
                     }
@@ -3462,10 +3469,7 @@ static void stmt(int ctx) {
             d = n;
         } else
             d = 0;
-        *--n = (int)d;
-        *--n = (int)b;
-        *--n = (int)a;
-        *--n = Cond;
+        ast_push4((int)d, (int)b, (int)a, Cond);
         return;
     case While:
         next();
@@ -3483,9 +3487,7 @@ static void stmt(int ctx) {
         a = n; // parse body of "while"
         --brkc;
         --cntc;
-        *--n = (int)b;
-        *--n = (int)a;
-        *--n = While;
+        ast_push3((int)b, (int)a, While);
         return;
     case DoWhile:
         next();
@@ -3507,9 +3509,7 @@ static void stmt(int ctx) {
         if (tk != ')')
             die("close parenthesis expected");
         next();
-        *--n = (int)b;
-        *--n = (int)a;
-        *--n = DoWhile;
+        ast_push3((int)b, (int)a, DoWhile);
         return;
     case Switch:
         i = 0;
@@ -3532,9 +3532,7 @@ static void stmt(int ctx) {
         --swtc;
         --brkc;
         b = n;
-        *--n = (int)b;
-        *--n = (int)a;
-        *--n = Switch;
+        ast_push3((int)b, (int)a, Switch);
         if (j)
             cas = (int*)j;
         return;
@@ -3556,9 +3554,7 @@ static void stmt(int ctx) {
         next();
         stmt(ctx);
         b = n;
-        *--n = (int)b;
-        *--n = (int)a;
-        *--n = Case;
+        ast_push3((int)b, (int)a, Case);
         return;
     case Break:
         if (!brkc)
@@ -3649,11 +3645,7 @@ static void stmt(int ctx) {
         c = n;
         --brkc;
         --cntc;
-        *--n = (int)d;
-        *--n = (int)c;
-        *--n = (int)b;
-        *--n = (int)a;
-        *--n = For;
+        ast_push5((int)d, (int)c, (int)b, (int)a, For);
         return;
     case Goto:
         next();
