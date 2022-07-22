@@ -1,4 +1,3 @@
-
 /*
  * mc is capable of compiling a (subset of) C source files
  * There is no preprocessor.
@@ -107,8 +106,9 @@ static int oline, osize;  // for optimization suggestion
 static int* ast;          // abstract tree
 
 // identifier
-#define MAX_IR 256
-static struct ident_s {
+#define MAX_IR 64 // maxim number of local variable or function parameters
+
+struct ident_s {
     int tk; // type-id or keyword
     int hash;
     char* name; // name of this identifier
@@ -121,103 +121,52 @@ static struct ident_s {
     int type, htype;   // data type such as char and int
     int val, hval;
     int etype, hetype; // extended type info. different meaning for funcs.
-} * id,                // currently parsed identifier
-    *sym,              // symbol table (simple list of identifiers)
-    *oid,              // for array optimization suggestion
-    *ir_var[MAX_IR];   // IR information for local vars and parameters
+};
+
+struct ident_s *id,  // currently parsed identifier
+    *sym,            // symbol table (simple list of identifiers)
+    *oid,            // for array optimization suggestion
+    *ir_var[MAX_IR]; // IR information for local vars and parameters
+
 static int ir_count;
 
-static struct member_s {
+struct member_s {
     struct member_s* next;
     struct ident_s* id;
     int offset;
     int type;
     int etype;
     int pad;
-} * *members; // array (indexed by type) of struct member lists
+};
 
+static struct member_s** members; // array (indexed by type) of struct member lists
+
+// clang-format off
 // tokens and classes (operators last and in precedence order)
 // ( >= 128 so not to collide with ASCII-valued tokens)
 enum {
     Func = 128,
-    Syscall,
-    Main,
-    Glo,
-    Par,
-    Loc,
-    Keyword,
-    Id,
-    Load,
-    Enter,
-    Num,
-    NumF,
-    Enum,
-    Char,
-    Int,
-    Float,
-    Struct,
-    Union,
-    Sizeof,
-    Return,
-    Goto,
-    Break,
-    Continue,
-    If,
-    DoWhile,
-    While,
-    For,
-    Switch,
-    Case,
-    Default,
-    Else,
-    Label,
+    Syscall, Main, Glo, Par, Loc, Keyword, Id, Load, Enter, Num, NumF, Enum,
+    Char, Int, Float, Struct, Union, Sizeof, Return, Goto, Break, Continue,
+    If, DoWhile, While, For, Switch, Case, Default, Else, Label,
     Assign, // operator =, keep Assign as highest priority operator
-    OrAssign,
-    XorAssign,
-    AndAssign,
-    ShlAssign,
+    OrAssign, XorAssign, AndAssign, ShlAssign,
     ShrAssign, // |=, ^=, &=, <<=, >>=
-    AddAssign,
-    SubAssign,
-    MulAssign,
-    DivAssign,
+    AddAssign, SubAssign, MulAssign, DivAssign,
     ModAssign, // +=, -=, *=, /=, %=
     Cond,      // operator: ?
-    Lor,
-    Lan,
-    Or,
-    Xor,
+    Lor, Lan, Or, Xor,
     And, // operator: ||, &&, |, ^, &
-    Eq,
-    Ne,
-    Ge,
-    Lt,
-    Gt,
+    Eq, Ne, Ge, Lt, Gt,
     Le, // operator: ==, !=, >=, <, >, <=
-    Shl,
-    Shr,
-    Add,
-    Sub,
-    Mul,
-    Div,
+    Shl, Shr, Add, Sub, Mul, Div,
     Mod, // operator: <<, >>, +, -, *, /, %
-    AddF,
-    SubF,
-    MulF,
+    AddF, SubF, MulF,
     DivF, // float type operators (hidden)
-    EqF,
-    NeF,
-    GeF,
-    LtF,
-    GtF,
-    LeF,
-    CastF,
-    Inc,
-    Dec,
-    Dot,
-    Arrow,
+    EqF, NeF, GeF, LtF, GtF, LeF, CastF, Inc, Dec, Dot, Arrow,
     Bracket // operator: ++, --, ., ->, [
 };
+// clang-format on
 
 // opcodes
 /* The instruction set is designed for building intermediate representation.
@@ -266,35 +215,27 @@ enum {
      * Together with JSR, ENT, ADJ, LEV, and LEA instruction, we are able to
      * make function calls.
      */
-
     IMM, //  1
     /* IMM <num> to put immediate <num> into R0 */
-
     IMMF, // 2
     /* IMM <num> to put immediate <num> into S0 */
-
     JMP, /*  3 */
     /* JMP <addr> will unconditionally set the value PC register to <addr> */
-
     JSR, /*  4 */
     /* Jump to address, setting link register for return address */
-
     BZ,  /*  5 : conditional jump if R0 is zero (jump-if-zero) */
     BNZ, /*  6 : conditional jump if R0 is not zero */
-
     ENT, /*  7 */
     /* ENT <size> is called when we are about to enter the function call to
      * "make a new calling frame". It will store the current PC value onto
      * the stack, and save some space(<size> bytes) to store the local
      * variables for function.
      */
-
     ADJ, /*  8 */
     /* ADJ <size> is to adjust the stack, to "remove arguments from frame"
      * The following pseudocode illustrates how ADJ works:
      *     if (op == ADJ) { sp += *pc++; } // add esp, <size>
      */
-
     LEV, /*  9 */
     /* LEV fetches bookkeeping info to resume previous execution.
      * There is no POP instruction in our design, and the following pseudocode
@@ -302,43 +243,34 @@ enum {
      *     if (op == LEV) { sp = bp; bp = (int *) *sp++;
      *                  pc = (int *) *sp++; } // restore call frame and PC
      */
-
     PSH, /* 10 */
     /* PSH pushes the value in R0 onto the stack */
-
     PSHF, /* 11 */
     /* PSH pushes the value in R0 onto the stack */
-
     LC, /* 12 */
     /* LC loads a character into R0 from a given memory
      * address which is stored in R0 before execution.
      */
-
     LI, /* 13 */
     /* LI loads an integer into R0 from a given memory
      * address which is stored in R0 before execution.
      */
-
     LF, /* 14 */
     /* LI loads a float into S0 from a given memory
      * address which is stored in R0 before execution.
      */
-
     SC, /* 15 */
     /* SC stores the character in R0 into the memory whose
      * address is stored on the top of the stack.
      */
-
     SI, /* 16 */
     /* SI stores the integer in R0 into the memory whose
      * address is stored on the top of the stack.
      */
-
     SF, /* 17 */
     /* SI stores the float in S0 into the memory whose
      * address is stored on the top of the stack.
      */
-
     OR,   // 18 */
     XOR,  // 19 */
     AND,  // 20 */
@@ -373,11 +305,8 @@ enum {
      * After the calculation is done, the argument on the stack will be poped
      * off and the result will be stored in R0.
      */
-
     SYSC, /* 46 system call */
-
     EXIT,
-
     INVALID
 };
 
@@ -412,7 +341,6 @@ enum {
     SYSC_remove,
     SYSC_screen_width,
     SYSC_screen_height,
-
     // stdlib.h
     SYSC_malloc,
     SYSC_free,
@@ -421,7 +349,6 @@ enum {
     SYSC_srand,
     SYSC_exit,
     SYSC_popcount,
-
     // string.h
     SYSC_strlen,
     SYSC_strcpy,
@@ -436,7 +363,6 @@ enum {
     SYSC_memcmp,
     SYSC_memcpy,
     SYSC_memset,
-
     // math.h
     SYSC_sqrtf,
     SYSC_sinf,
@@ -455,17 +381,13 @@ enum {
     SYSC_logf,
     SYSC_log10f,
     SYSC_powf,
-
     // hardware/sync.h
     SYSC_wfi,
-
     // hardware/timer.h
     SYSC_time_us_32,
-
     // pico/time.h
     SYSC_sleep_us,
     SYSC_sleep_ms,
-
     // hardware/gpio.h
     SYSC_gpio_set_function,
     SYSC_gpio_get_function,
@@ -525,7 +447,6 @@ enum {
     SYSC_gpio_set_dir,
     SYSC_gpio_is_dir_out,
     SYSC_gpio_get_dir,
-
     // hardware/pwm.h
     SYSC_pwm_gpio_to_slice_num,
     SYSC_pwm_gpio_to_channel,
@@ -561,7 +482,6 @@ enum {
     SYSC_pwm_force_irq,
 #endif
     SYSC_pwm_get_dreq,
-
     // hardware/adc.h
     SYSC_adc_init,
     SYSC_adc_gpio_init,
@@ -579,7 +499,6 @@ enum {
     SYSC_adc_fifo_get_blocking,
     SYSC_adc_fifo_drain,
     SYSC_adc_irq_set_enabled,
-
     // hardware/clocks.h
     SYSC_clocks_init,
     SYSC_clock_configure,
@@ -591,7 +510,6 @@ enum {
     SYSC_clocks_enable_resus,
     SYSC_clock_gpio_init,
     SYSC_clock_configure_gpin,
-
     // hardware/i2c.h
     SYSC_i2c_init,
     SYSC_i2c_deinit,
@@ -599,10 +517,6 @@ enum {
     SYSC_i2c_set_slave_mode,
     SYSC_i2c_hw_index,
     SYSC_i2c_get_hw,
-#if 0 // we'd need uint64_ suppot for these
-    SYSC_i2c_write_blocking_until,
-    SYSC_i2c_read_blocking_until,
-#endif
     SYSC_i2c_write_timeout_us,
     SYSC_i2c_write_timeout_per_char_us,
     SYSC_i2c_read_timeout_us,
@@ -614,7 +528,6 @@ enum {
     SYSC_i2c_write_raw_blocking,
     SYSC_i2c_read_raw_blocking,
     SYSC_i2c_get_dreq,
-
     // hardware/spi.h
     SYSC_spi_init,
     SYSC_spi_deinit,
@@ -635,7 +548,6 @@ enum {
     SYSC_spi_write16_blocking,
     SYSC_spi_read16_blocking,
     SYSC_spi_get_dreq,
-
 #if WITH_IRQ
     // hardware/irq.h
     SYSC_irq_set_priority,
@@ -1544,7 +1456,13 @@ static void bitopcheck(int tl, int tr) {
  * Bracket [
  */
 
-static void ast_push5(int v1, int v2, int v3, int v4, int k) {
+typedef struct {
+    int tk;
+    int v1;
+} two_wrd_entry_t;
+#define two_words (*((two_wrd_entry_t*)n))
+
+static void ast_Func(int v1, int v2, int v3, int v4, int k) {
     *--n = v1;
     *--n = v2;
     *--n = v3;
@@ -1552,25 +1470,139 @@ static void ast_push5(int v1, int v2, int v3, int v4, int k) {
     *--n = k;
 }
 
-static void ast_push4(int v1, int v2, int v3, int k) {
+static void ast_Cond(int v1, int v2, int v3) {
     *--n = v1;
     *--n = v2;
     *--n = v3;
-    *--n = k;
+    *--n = Cond;
 }
 
-static void ast_push3(int v1, int v2, int k) {
+static void ast_Assign(int v1, int v2) {
     *--n = v1;
     *--n = v2;
-    *--n = k;
+    *--n = Assign;
 }
 
-static void ast_push2(int v1, int k) {
+static void ast_While(int v1, int v2) {
     *--n = v1;
-    *--n = k;
+    *--n = v2;
+    *--n = While;
 }
 
-static void ast_push1(int k) { *--n = k; }
+static void ast_DoWhile(int v1, int v2) {
+    *--n = v1;
+    *--n = v2;
+    *--n = DoWhile;
+}
+
+static void ast_Switch(int v1, int v2) {
+    *--n = v1;
+    *--n = v2;
+    *--n = Switch;
+}
+
+static void ast_Case(int v1, int v2) {
+    *--n = v1;
+    *--n = v2;
+    *--n = Case;
+}
+
+// two word entries
+static void ast_Return(int v1) {
+    n -= 2;
+    two_words.tk = Return;
+    two_words.v1 = v1;
+}
+
+static void ast_Oper(int v1, int op) {
+    n -= 2;
+    two_words.tk = op;
+    two_words.v1 = v1;
+}
+
+static void ast_Num(int v1) {
+    n -= 2;
+    two_words.tk = Num;
+    two_words.v1 = v1;
+}
+
+static void ast_Label(int v1) {
+    n -= 2;
+    two_words.tk = Label;
+    two_words.v1 = v1;
+}
+
+static void ast_Enter(int v1) {
+    n -= 2;
+    two_words.tk = Enter;
+    two_words.v1 = v1;
+}
+
+static void ast_Goto(int v1) {
+    n -= 2;
+    two_words.tk = Goto;
+    two_words.v1 = v1;
+}
+
+static void ast_Default(int v1) {
+    n -= 2;
+    two_words.tk = Default;
+    two_words.v1 = v1;
+}
+
+static void ast_NumF(int v1) {
+    n -= 2;
+    two_words.tk = NumF;
+    two_words.v1 = v1;
+}
+
+static void ast_Loc(int v1) {
+    n -= 2;
+    two_words.tk = Loc;
+    two_words.v1 = v1;
+}
+
+static void ast_Load(int v1) {
+    n -= 2;
+    two_words.tk = Load;
+    two_words.v1 = v1;
+}
+
+typedef struct {
+    int tk;
+    int val;
+} CastF_entry_t;
+#define CastF_entry (*((CastF_entry_t*)n))
+
+static void ast_CastF(int v1) {
+    n -= 2;
+    CastF_entry.tk = CastF;
+    CastF_entry.val = v1;
+}
+
+typedef struct {
+    int tk;
+    int addr;
+} Begin_entry_t;
+#define Begin_entry (*((Begin_entry_t*)n))
+
+static void ast_Begin(int v1) {
+    n -= 2;
+    Begin_entry.tk = '{';
+    Begin_entry.addr = v1;
+}
+
+// single word entry
+
+typedef struct {
+    int tk;
+} Single_entry_t;
+#define Single_entry (*((Single_entry_t*)n))
+
+static void ast_Single(int k) {
+    n--;
+    Single_entry.tk = k;
+}
 
 static void expr(int lev) {
     int t, tc, tt, nf, *b, sz, *c;
@@ -1615,7 +1647,7 @@ static void expr(int lev) {
             nf = 0; // argument count
             while (tk != ')') {
                 expr(Assign);
-                ast_push1((int)b);
+                ast_Single((int)b);
                 b = n;
                 ++t;
                 tt = tt * 2;
@@ -1637,12 +1669,12 @@ static void expr(int lev) {
                 die("argument type mismatch");
             next();
             // function or system call id
-            ast_push5(tt, t, d->val, (int)b, d->class);
+            ast_Func(tt, t, d->val, (int)b, d->class);
             ty = d->type;
         }
         // enumeration, only enums have ->class == Num
         else if ((d->class == Num) || (d->class == Func)) {
-            ast_push2(d->val, Num);
+            ast_Num(d->val);
             ty = INT;
         } else {
             // Variable get offset
@@ -1651,11 +1683,11 @@ static void expr(int lev) {
             switch (d->class) {
             case Loc:
             case Par:
-                ast_push2(loc - d->val, Loc);
+                ast_Loc(loc - d->val);
                 break;
             case Func:
             case Glo:
-                ast_push2(d->val, Num);
+                ast_Num(d->val);
                 break;
             default:
                 die("undefined variable %.*s", d->hash & ADJ_MASK, d->name);
@@ -1663,24 +1695,24 @@ static void expr(int lev) {
             if ((d->type & 3) && d->class != Par) { // push reference address
                 ty = d->type & ~3;
             } else {
-                ast_push2((ty = d->type & ~3), Load);
+                ast_Load((ty = d->type & ~3));
             }
         }
         break;
     // directly take an immediate value as the expression value
     // IMM recorded in emit sequence
     case Num:
-        ast_push2(tkv.i, Num);
+        ast_Num(tkv.i);
         next();
         ty = INT;
         break;
     case NumF:
-        ast_push2(tkv.i, NumF);
+        ast_NumF(tkv.i);
         next();
         ty = FLOAT;
         break;
     case '"': // string, as a literal in data segment
-        ast_push2(tkv.i, Num);
+        ast_Num(tkv.i);
         next();
         // continuous `"` handles C-style multiline text such as `"abc" "def"`
         while (tk == '"')
@@ -1728,9 +1760,8 @@ static void expr(int lev) {
         if (tk != ')')
             die("close parenthesis expected in sizeof");
         next();
-        ast_push2((ty & 3) ? (((ty - PTR) >= PTR) ? sizeof(int) : tsize[(ty - PTR) >> 2])
-                           : ((ty >= PTR) ? sizeof(int) : tsize[ty >> 2]),
-                  Num);
+        ast_Num((ty & 3) ? (((ty - PTR) >= PTR) ? sizeof(int) : tsize[(ty - PTR) >> 2])
+                         : ((ty >= PTR) ? sizeof(int) : tsize[ty >> 2]));
         // just one dimension supported at the moment
         if (d != 0 && (ty & 3))
             n[1] *= (id->etype + 1);
@@ -1772,8 +1803,8 @@ static void expr(int lev) {
                         c1->f = (float)c1->i;
                     } else {
                         b = n;
-                        ast_push1(ITOF);
-                        ast_push2((int)b, CastF);
+                        ast_Single(ITOF);
+                        ast_CastF((int)b);
                     }
                 } else if (t < FLOAT && ty == FLOAT) { // int : float
                     if (*n == NumF) {
@@ -1782,8 +1813,8 @@ static void expr(int lev) {
                         c1->i = (int)c1->f;
                     } else {
                         b = n;
-                        ast_push1(FTOI);
-                        ast_push2((int)b, CastF);
+                        ast_Single(FTOI);
+                        ast_CastF((int)b);
                     }
                 } else
                     die("explicit cast required");
@@ -1795,9 +1826,8 @@ static void expr(int lev) {
                 next();
                 b = n;
                 expr(Assign);
-                if (b != n) {
-                    ast_push2((int)b, '{');
-                }
+                if (b != n)
+                    ast_Begin((int)b);
             }
             if (tk != ')')
                 die("close parenthesis expected");
@@ -1810,7 +1840,7 @@ static void expr(int lev) {
         if (ty < PTR)
             die("bad dereference");
         ty -= PTR;
-        ast_push2(ty, Load);
+        ast_Load(ty);
         break;
     case And: // "&", take the address operation
         /* when "token" is a variable, it takes the address first and
@@ -1831,8 +1861,8 @@ static void expr(int lev) {
         if (*n == Num)
             n[1] = !n[1];
         else {
-            ast_push2(0, Num);
-            ast_push2((int)(n + 2), Eq);
+            ast_Num(0);
+            ast_Oper((int)(n + 2), Eq);
         }
         ty = INT;
         break;
@@ -1844,8 +1874,8 @@ static void expr(int lev) {
         if (*n == Num)
             n[1] = ~n[1];
         else {
-            ast_push2(-1, Num);
-            ast_push2((int)(n + 2), Xor);
+            ast_Num(-1);
+            ast_Oper((int)(n + 2), Xor);
         }
         ty = INT;
         break;
@@ -1865,11 +1895,11 @@ static void expr(int lev) {
         else if (*n == NumF) {
             n[1] ^= 0x80000000;
         } else if (ty == FLOAT) {
-            ast_push2(0xbf800000, NumF);
-            ast_push2((int)(n + 2), MulF);
+            ast_NumF(0xbf800000);
+            ast_Oper((int)(n + 2), MulF);
         } else {
-            ast_push2(-1, Num);
-            ast_push2((int)(n + 2), Mul);
+            ast_Num(-1);
+            ast_Oper((int)(n + 2), Mul);
         }
         if (ty != FLOAT)
             ty = INT;
@@ -1911,7 +1941,7 @@ static void expr(int lev) {
             next();
             expr(Assign);
             typecheck(Assign, t, ty);
-            ast_push3((int)b, (ty << 16) | t, Assign);
+            ast_Assign((int)b, (ty << 16) | t);
             ty = t;
             break;
         case OrAssign: // right associated
@@ -1931,19 +1961,19 @@ static void expr(int lev) {
             otk = tk;
             n += 2;
             b = n;
-            ast_push1(';');
-            ast_push2(t, Load);
+            ast_Single(';');
+            ast_Load(t);
             sz = (t >= PTR2) ? sizeof(int) : ((t >= PTR) ? tsize[(t - PTR) >> 2] : 1);
             next();
             c = n;
             expr(otk);
             if (*n == Num)
                 n[1] *= sz;
-            ast_push2((int)c, (otk < ShlAssign) ? Or + (otk - OrAssign) : Shl + (otk - ShlAssign));
+            ast_Oper((int)c, (otk < ShlAssign) ? Or + (otk - OrAssign) : Shl + (otk - ShlAssign));
             if (t == FLOAT && (otk >= AddAssign && otk <= DivAssign))
                 *n += 5;
             typecheck(*n, t, ty);
-            ast_push3((int)b, (ty << 16) | t, Assign);
+            ast_Assign((int)b, (ty << 16) | t);
             ty = t;
             break;
         case Cond: // `x?a:b` is similar to if except that it relies on else
@@ -1957,7 +1987,7 @@ static void expr(int lev) {
             expr(Cond);
             if (tc != ty)
                 die("both results need same type");
-            ast_push4((int)n, (int)c, (int)b, Cond);
+            ast_Cond((int)n, (int)c, (int)b);
             break;
         case Lor: // short circuit, the logical or
             next();
@@ -1965,7 +1995,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] || n[1];
             else {
-                ast_push2((int)b, Lor);
+                ast_Oper((int)b, Lor);
             }
             ty = INT;
             break;
@@ -1975,7 +2005,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] && n[1];
             else {
-                ast_push2((int)b, Lan);
+                ast_Oper((int)b, Lan);
             }
             ty = INT;
             break;
@@ -1986,7 +2016,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] | n[1];
             else {
-                ast_push2((int)b, Or);
+                ast_Oper((int)b, Or);
             }
             ty = INT;
             break;
@@ -1997,7 +2027,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] ^ n[1];
             else {
-                ast_push2((int)b, Xor);
+                ast_Oper((int)b, Xor);
             }
             ty = INT;
             break;
@@ -2008,7 +2038,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] & n[1];
             else {
-                ast_push2((int)b, And);
+                ast_Oper((int)b, And);
             }
             ty = INT;
             break;
@@ -2023,13 +2053,13 @@ static void expr(int lev) {
                     c1->i = (c2->f == c1->f);
                     *n = Num;
                 } else {
-                    ast_push2((int)b, EqF);
+                    ast_Oper((int)b, EqF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] == n[1];
                 else {
-                    ast_push2((int)b, Eq);
+                    ast_Oper((int)b, Eq);
                 }
             }
             ty = INT;
@@ -2045,13 +2075,13 @@ static void expr(int lev) {
                     c1->i = (c2->f != c1->f);
                     *n = Num;
                 } else {
-                    ast_push2((int)b, NeF);
+                    ast_Oper((int)b, NeF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] != n[1];
                 else {
-                    ast_push2((int)b, Ne);
+                    ast_Oper((int)b, Ne);
                 }
             }
             ty = INT;
@@ -2067,13 +2097,13 @@ static void expr(int lev) {
                     c1->i = (c2->f >= c1->f);
                     *n = Num;
                 } else {
-                    ast_push2((int)b, GeF);
+                    ast_Oper((int)b, GeF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] >= n[1];
                 else {
-                    ast_push2((int)b, Ge);
+                    ast_Oper((int)b, Ge);
                 }
             }
             ty = INT;
@@ -2089,13 +2119,13 @@ static void expr(int lev) {
                     c1->i = (c2->f < c1->f);
                     *n = Num;
                 } else {
-                    ast_push2((int)b, LtF);
+                    ast_Oper((int)b, LtF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] < n[1];
                 else {
-                    ast_push2((int)b, Lt);
+                    ast_Oper((int)b, Lt);
                 }
             }
             ty = INT;
@@ -2111,13 +2141,13 @@ static void expr(int lev) {
                     c1->i = (c2->f > c1->f);
                     *n = Num;
                 } else {
-                    ast_push2((int)b, GtF);
+                    ast_Oper((int)b, GtF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] > n[1];
                 else {
-                    ast_push2((int)b, Gt);
+                    ast_Oper((int)b, Gt);
                 }
             }
             ty = INT;
@@ -2133,13 +2163,13 @@ static void expr(int lev) {
                     c1->i = (c2->f <= c1->f);
                     *n = Num;
                 } else {
-                    ast_push2((int)b, LeF);
+                    ast_Oper((int)b, LeF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] <= n[1];
                 else {
-                    ast_push2((int)b, Le);
+                    ast_Oper((int)b, Le);
                 }
             }
             ty = INT;
@@ -2154,7 +2184,7 @@ static void expr(int lev) {
                 else
                     n[1] = b[1] << n[1];
             } else {
-                ast_push2((int)b, Shl);
+                ast_Oper((int)b, Shl);
             }
             ty = INT;
             break;
@@ -2168,7 +2198,7 @@ static void expr(int lev) {
                 else
                     n[1] = b[1] >> n[1];
             } else {
-                ast_push2((int)b, Shr);
+                ast_Oper((int)b, Shr);
             }
             ty = INT;
             break;
@@ -2182,7 +2212,7 @@ static void expr(int lev) {
                     c2 = (union conv*)&b[1];
                     c1->f = c1->f + c2->f;
                 } else {
-                    ast_push2((int)b, AddF);
+                    ast_Oper((int)b, AddF);
                 }
             } else { // both terms are either int or "int *"
                 tc = ((t | ty) & (PTR | PTR2)) ? (t >= PTR) : (t >= ty);
@@ -2200,11 +2230,11 @@ static void expr(int lev) {
                 if (*n == Num && *b == Num)
                     n[1] += b[1];
                 else if (sz != 1) {
-                    ast_push2(sz, Num);
-                    ast_push2((int)(tc ? c : b), Mul);
-                    ast_push2((int)(tc ? b : c), Add);
+                    ast_Num(sz);
+                    ast_Oper((int)(tc ? c : b), Mul);
+                    ast_Oper((int)(tc ? b : c), Add);
                 } else {
-                    ast_push2((int)b, Add);
+                    ast_Oper((int)b, Add);
                 }
             }
             break;
@@ -2218,7 +2248,7 @@ static void expr(int lev) {
                     c2 = (union conv*)&b[1];
                     c1->f = c2->f - c1->f;
                 } else {
-                    ast_push2((int)b, SubF);
+                    ast_Oper((int)b, SubF);
                 }
             } else {            // 4 cases: ptr-ptr, ptr-int, int-ptr (err), int-int
                 if (t >= PTR) { // left arg is ptr
@@ -2227,14 +2257,14 @@ static void expr(int lev) {
                         if (*n == Num && *b == Num)
                             n[1] = (b[1] - n[1]) / sz;
                         else {
-                            ast_push2((int)b, Sub);
+                            ast_Oper((int)b, Sub);
                             if (sz > 1) {
                                 if ((sz & (sz - 1)) == 0) { // 2^n
-                                    ast_push2(__builtin_popcount(sz - 1), Num);
-                                    ast_push2((int)(n + 2), Shr);
+                                    ast_Num(__builtin_popcount(sz - 1));
+                                    ast_Oper((int)(n + 2), Shr);
                                 } else {
-                                    ast_push2(sz, Num);
-                                    ast_push2((int)(n + 2), Div);
+                                    ast_Num(sz);
+                                    ast_Oper((int)(n + 2), Div);
                                 }
                             }
                         }
@@ -2245,19 +2275,19 @@ static void expr(int lev) {
                             if (*b == Num)
                                 n[1] = b[1] - n[1];
                             else {
-                                ast_push2((int)b, Sub);
+                                ast_Oper((int)b, Sub);
                             }
                         } else {
                             if (sz > 1) {
                                 if ((sz & (sz - 1)) == 0) { // 2^n
-                                    ast_push2(__builtin_popcount(sz - 1), Num);
-                                    ast_push2((int)(n + 2), Shl);
+                                    ast_Num(__builtin_popcount(sz - 1));
+                                    ast_Oper((int)(n + 2), Shl);
                                 } else {
-                                    ast_push2(sz, Num);
-                                    ast_push2((int)(n + 2), Mul);
+                                    ast_Num(sz);
+                                    ast_Oper((int)(n + 2), Mul);
                                 }
                             }
-                            ast_push2((int)b, Sub);
+                            ast_Oper((int)b, Sub);
                         }
                         ty = t;
                     }
@@ -2265,7 +2295,7 @@ static void expr(int lev) {
                     if (*n == Num && *b == Num)
                         n[1] = b[1] - n[1];
                     else {
-                        ast_push2((int)b, Sub);
+                        ast_Oper((int)b, Sub);
                     }
                     ty = INT;
                 }
@@ -2281,7 +2311,7 @@ static void expr(int lev) {
                     c2 = (union conv*)&b[1];
                     c1->f = c1->f * c2->f;
                 } else {
-                    ast_push2((int)b, MulF);
+                    ast_Oper((int)b, MulF);
                 }
             } else {
                 if (*n == Num && *b == Num)
@@ -2289,9 +2319,9 @@ static void expr(int lev) {
                 else {
                     if (n[0] == Num && n[1] > 0 && (n[1] & (n[1] - 1)) == 0) {
                         n[1] = __builtin_popcount(n[1] - 1);
-                        ast_push2((int)b, Shl); // 2^n
+                        ast_Oper((int)b, Shl); // 2^n
                     } else
-                        ast_push2((int)b, Mul);
+                        ast_Oper((int)b, Mul);
                 }
                 ty = INT;
             }
@@ -2306,8 +2336,8 @@ static void expr(int lev) {
             if (*n != Load)
                 die("bad lvalue in post-increment");
             *n = tk;
-            ast_push2(sz, Num);
-            ast_push2((int)b, (tk == Inc) ? Sub : Add);
+            ast_Num(sz);
+            ast_Oper((int)b, (tk == Inc) ? Sub : Add);
             next();
             break;
         case Div:
@@ -2320,7 +2350,7 @@ static void expr(int lev) {
                     c2 = (union conv*)&b[1];
                     c1->f = c2->f / c1->f;
                 } else {
-                    ast_push2((int)b, DivF);
+                    ast_Oper((int)b, DivF);
                 }
             } else {
                 if (*n == Num && *b == Num)
@@ -2328,9 +2358,9 @@ static void expr(int lev) {
                 else {
                     if (n[0] == Num && n[1] > 0 && (n[1] & (n[1] - 1)) == 0) {
                         n[1] = __builtin_popcount(n[1] - 1);
-                        ast_push2((int)b, Shr); // 2^n
+                        ast_Oper((int)b, Shr); // 2^n
                     } else {
-                        ast_push2((int)b, Div);
+                        ast_Oper((int)b, Div);
                     }
                 }
                 ty = INT;
@@ -2347,9 +2377,9 @@ static void expr(int lev) {
             else {
                 if (n[1] == Num && n[2] > 0 && (n[2] & (n[2] - 1)) == 0) {
                     --n[2];
-                    ast_push2((int)b, And); // 2^n
+                    ast_Oper((int)b, And); // 2^n
                 } else {
-                    ast_push2((int)b, Mod);
+                    ast_Oper((int)b, Mod);
                 }
             }
             ty = INT;
@@ -2370,13 +2400,13 @@ static void expr(int lev) {
             if (!m)
                 die("structure member not found");
             if (m->offset) {
-                ast_push2(m->offset, Num);
-                ast_push2((int)(n + 2), Add);
+                ast_Num(m->offset);
+                ast_Oper((int)(n + 2), Add);
             }
             ty = m->type;
             next();
             if (!(ty & 3)) {
-                ast_push2((ty >= PTR) ? INT : ty, Load);
+                ast_Oper((ty >= PTR) ? INT : ty, Load);
                 break;
             }
             memsub = 1;
@@ -2422,11 +2452,11 @@ static void expr(int lev) {
                     } else {
                         // generate code to add a term
                         if (factor > 1) {
-                            ast_push2(factor, Num);
-                            ast_push2((int)c, Mul);
+                            ast_Num(factor);
+                            ast_Oper((int)c, Mul);
                         }
                         if (f) {
-                            ast_push2((int)f, Add);
+                            ast_Oper((int)f, Add);
                         }
                         f = n;
                     }
@@ -2435,12 +2465,12 @@ static void expr(int lev) {
             if (dim) {
                 if (sum > 0) {
                     if (f) {
-                        ast_push2(sum, Num);
-                        ast_push2((int)f, Add);
+                        ast_Num(sum);
+                        ast_Oper((int)f, Add);
                     } else {
                         sum *= sz;
                         sz = 1;
-                        ast_push2(sum, Num);
+                        ast_Num(sum);
                     }
                 } else if (!f)
                     goto add_simple;
@@ -2449,18 +2479,18 @@ static void expr(int lev) {
                 if (*n == Num)
                     n[1] *= sz;
                 else {
-                    ast_push2(sz, Num);
-                    ast_push2((int)(n + 2), Mul);
+                    ast_Num(sz);
+                    ast_Oper((int)(n + 2), Mul);
                 }
             }
             if (*n == Num && *b == Num)
                 n[1] += b[1];
             else {
-                ast_push2((int)b, Add);
+                ast_Oper((int)b, Add);
             }
         add_simple:
             if (doload) {
-                ast_push2(((ty = t) >= PTR) ? INT : ty, Load);
+                ast_Load(((ty = t) >= PTR) ? INT : ty);
             }
             break;
         default:
@@ -3033,8 +3063,8 @@ static void check_label(int** tt) {
         if (id->class != 0 || !(id->type == 0 || id->type == -1))
             die("invalid label");
         id->type = -1; // hack for id->class deficiency
-        ast_push2((int)id, Label);
-        ast_push2((int)*tt, '{');
+        ast_Label((int)id);
+        ast_Begin((int)*tt);
         *tt = n;
         next();
         next();
@@ -3353,16 +3383,15 @@ static void stmt(int ctx) {
                 // Not declaration and must not be function, analyze inner block.
                 // e represents the address which will store pc
                 // (ld - loc) indicates memory size to allocate
-                ast_push1(';');
+                ast_Single(';');
                 while (tk != '}') {
                     int* t = n;
                     check_label(&t);
                     stmt(Loc);
-                    if (t != n) {
-                        ast_push2((int)t, '{');
-                    }
+                    if (t != n)
+                        ast_Begin((int)t);
                 }
-                ast_push2(ld - loc, Enter);
+                ast_Enter(ld - loc);
                 if (oid && n[1] >= 64)
                     printf("--> %d: move %.*s to global scope for performance.\n", oline,
                            (oid->hash & 0x3f), oid->name);
@@ -3432,18 +3461,18 @@ static void stmt(int ctx) {
                         init_array(dd, nd, j);
                     else {
                         if (b == 0)
-                            ast_push1(';');
+                            ast_Single(';');
                         if (ctx != Loc)
                             die("decl assignment for local vars only");
                         b = n;
-                        ast_push2(loc - dd->val, Loc);
+                        ast_Loc(loc - dd->val);
                         a = n;
                         i = ty;
                         expr(Assign);
                         typecheck(Assign, i, ty);
-                        ast_push3((int)a, (ty << 16) | i, Assign);
+                        ast_Assign((int)a, (ty << 16) | i);
                         ty = i;
-                        ast_push2((int)b, '{');
+                        ast_Begin((int)b);
                     }
                 }
             }
@@ -3469,7 +3498,7 @@ static void stmt(int ctx) {
             d = n;
         } else
             d = 0;
-        ast_push4((int)d, (int)b, (int)a, Cond);
+        ast_Cond((int)d, (int)b, (int)a);
         return;
     case While:
         next();
@@ -3487,7 +3516,7 @@ static void stmt(int ctx) {
         a = n; // parse body of "while"
         --brkc;
         --cntc;
-        ast_push3((int)b, (int)a, While);
+        ast_While((int)b, (int)a);
         return;
     case DoWhile:
         next();
@@ -3503,13 +3532,13 @@ static void stmt(int ctx) {
         if (tk != '(')
             die("open parenthesis expected");
         next();
-        ast_push1(';');
+        ast_Single(';');
         expr(Assign);
         b = n;
         if (tk != ')')
             die("close parenthesis expected");
         next();
-        ast_push3((int)b, (int)a, DoWhile);
+        ast_DoWhile((int)b, (int)a);
         return;
     case Switch:
         i = 0;
@@ -3532,7 +3561,7 @@ static void stmt(int ctx) {
         --swtc;
         --brkc;
         b = n;
-        ast_push3((int)b, (int)a, Switch);
+        ast_Switch((int)b, (int)a);
         if (j)
             cas = (int*)j;
         return;
@@ -3548,13 +3577,13 @@ static void stmt(int ctx) {
         j = n[1];
         n[1] -= i;
         *cas = j;
-        ast_push1(';');
+        ast_Single(';');
         if (tk != ':')
             die("colon expected");
         next();
         stmt(ctx);
         b = n;
-        ast_push3((int)b, (int)a, Case);
+        ast_Case((int)b, (int)a);
         return;
     case Break:
         if (!brkc)
@@ -3563,7 +3592,7 @@ static void stmt(int ctx) {
         if (tk != ';')
             die("semicolon expected");
         next();
-        ast_push1(Break);
+        ast_Single(Break);
         return;
     case Continue:
         if (!cntc)
@@ -3572,7 +3601,7 @@ static void stmt(int ctx) {
         if (tk != ';')
             die("semicolon expected");
         next();
-        ast_push1(Continue);
+        ast_Single(Continue);
         return;
     case Default:
         if (!swtc)
@@ -3583,7 +3612,7 @@ static void stmt(int ctx) {
         next();
         stmt(ctx);
         a = n;
-        ast_push2((int)a, Default);
+        ast_Default((int)a);
         return;
     // RETURN_stmt -> 'return' expr ';' | 'return' ';'
     case Return:
@@ -3593,7 +3622,7 @@ static void stmt(int ctx) {
             expr(Assign);
             a = n;
         }
-        ast_push2((int)a, Return);
+        ast_Return((int)a);
         if (tk != ';')
             die("semicolon expected");
         next();
@@ -3607,33 +3636,33 @@ static void stmt(int ctx) {
         if (tk != '(')
             die("open parenthesis expected");
         next();
-        ast_push1(';');
+        ast_Single(';');
         if (tk != ';')
             expr(Assign);
         while (tk == ',') {
             int* f = n;
             next();
             expr(Assign);
-            ast_push2((int)f, '{');
+            ast_Begin((int)f);
         }
         d = n;
         if (tk != ';')
             die("semicolon expected");
         next();
-        ast_push1(';');
+        ast_Single(';');
         expr(Assign);
         a = n; // Point to entry of for cond
         if (tk != ';')
             die("semicolon expected");
         next();
-        ast_push1(';');
+        ast_Single(';');
         if (tk != ')')
             expr(Assign);
         while (tk == ',') {
             int* g = n;
             next();
             expr(Assign);
-            ast_push2((int)g, '{');
+            ast_Begin((int)g);
         }
         b = n;
         if (tk != ')')
@@ -3645,14 +3674,14 @@ static void stmt(int ctx) {
         c = n;
         --brkc;
         --cntc;
-        ast_push5((int)d, (int)c, (int)b, (int)a, For);
+        ast_Func((int)d, (int)c, (int)b, (int)a, For);
         return;
     case Goto:
         next();
         if (tk != Id || (id->type != 0 && id->type != -1) || (id->class != Label && id->class != 0))
             die("goto expects label");
         id->type = -1; // hack for id->class deficiency
-        ast_push2((int)id, Goto);
+        ast_Goto((int)id);
         next();
         if (tk != ';')
             die("semicolon expected");
@@ -3661,21 +3690,20 @@ static void stmt(int ctx) {
     // stmt -> '{' stmt '}'
     case '{':
         next();
-        ast_push1(';');
+        ast_Single(';');
         while (tk != '}') {
             a = n;
             check_label(&a);
             stmt(ctx);
-            if (a != n) {
-                ast_push2((int)a, '{');
-            }
+            if (a != n)
+                ast_Begin((int)a);
         }
         next();
         return;
     // stmt -> ';'
     case ';':
         next();
-        ast_push1(';');
+        ast_Single(';');
         return;
     default:
         expr(Assign);
