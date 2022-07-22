@@ -1120,7 +1120,7 @@ static void clear_globals(void) {
 static __attribute__((__noreturn__)) void die_func(const char* func, int lne, const char* fmt,
                                                    ...) {
     printf("\n");
-#ifdef NDEBUG
+#ifndef NDEBUG
     printf("error in compiler function %s at line %d\n", func, lne);
 #endif
     printf(VT_BOLD "Error : " VT_NORMAL);
@@ -1543,6 +1543,14 @@ static void bitopcheck(int tl, int tr) {
  * Dec    --
  * Bracket [
  */
+
+static void ast_push2(int v, int k) {
+    *--n = v;
+    *--n = k;
+}
+
+static void ast_push1(int k) { *--n = k; }
+
 static void expr(int lev) {
     int t, tc, tt, nf, *b, sz, *c;
     int otk, memsub = 0;
@@ -1586,7 +1594,7 @@ static void expr(int lev) {
             nf = 0; // argument count
             while (tk != ')') {
                 expr(Assign);
-                *--n = (int)b;
+                ast_push1((int)b);
                 b = n;
                 ++t;
                 tt = tt * 2;
@@ -1617,8 +1625,7 @@ static void expr(int lev) {
         }
         // enumeration, only enums have ->class == Num
         else if ((d->class == Num) || (d->class == Func)) {
-            *--n = d->val;
-            *--n = Num;
+            ast_push2(d->val, Num);
             ty = INT;
         } else {
             // Variable get offset
@@ -1627,14 +1634,11 @@ static void expr(int lev) {
             switch (d->class) {
             case Loc:
             case Par:
-                *--n = loc - d->val;
-                *--n = Loc;
+                ast_push2(loc - d->val, Loc);
                 break;
-                // XXX
             case Func:
             case Glo:
-                *--n = d->val;
-                *--n = Num;
+                ast_push2(d->val, Num);
                 break;
             default:
                 die("undefined variable %.*s", d->hash & ADJ_MASK, d->name);
@@ -1642,28 +1646,24 @@ static void expr(int lev) {
             if ((d->type & 3) && d->class != Par) { // push reference address
                 ty = d->type & ~3;
             } else {
-                *--n = (ty = d->type & ~3);
-                *--n = Load;
+                ast_push2((ty = d->type & ~3), Load);
             }
         }
         break;
     // directly take an immediate value as the expression value
     // IMM recorded in emit sequence
     case Num:
-        *--n = tkv.i;
-        *--n = Num;
+        ast_push2(tkv.i, Num);
         next();
         ty = INT;
         break;
     case NumF:
-        *--n = tkv.i;
-        *--n = NumF;
+        ast_push2(tkv.i, NumF);
         next();
         ty = FLOAT;
         break;
     case '"': // string, as a literal in data segment
-        *--n = tkv.i;
-        *--n = Num;
+        ast_push2(tkv.i, Num);
         next();
         // continuous `"` handles C-style multiline text such as `"abc" "def"`
         while (tk == '"')
@@ -1711,9 +1711,9 @@ static void expr(int lev) {
         if (tk != ')')
             die("close parenthesis expected in sizeof");
         next();
-        *--n = (ty & 3) ? (((ty - PTR) >= PTR) ? sizeof(int) : tsize[(ty - PTR) >> 2])
-                        : ((ty >= PTR) ? sizeof(int) : tsize[ty >> 2]);
-        *--n = Num;
+        ast_push2((ty & 3) ? (((ty - PTR) >= PTR) ? sizeof(int) : tsize[(ty - PTR) >> 2])
+                           : ((ty >= PTR) ? sizeof(int) : tsize[ty >> 2]),
+                  Num);
         // just one dimension supported at the moment
         if (d != 0 && (ty & 3))
             n[1] *= (id->etype + 1);
@@ -1755,9 +1755,8 @@ static void expr(int lev) {
                         c1->f = (float)c1->i;
                     } else {
                         b = n;
-                        *--n = ITOF;
-                        *--n = (int)b;
-                        *--n = CastF;
+                        ast_push1(ITOF);
+                        ast_push2((int)b, CastF);
                     }
                 } else if (t < FLOAT && ty == FLOAT) { // int : float
                     if (*n == NumF) {
@@ -1766,9 +1765,8 @@ static void expr(int lev) {
                         c1->i = (int)c1->f;
                     } else {
                         b = n;
-                        *--n = FTOI;
-                        *--n = (int)b;
-                        *--n = CastF;
+                        ast_push1(FTOI);
+                        ast_push2((int)b, CastF);
                     }
                 } else
                     die("explicit cast required");
@@ -1781,8 +1779,7 @@ static void expr(int lev) {
                 b = n;
                 expr(Assign);
                 if (b != n) {
-                    *--n = (int)b;
-                    *--n = '{';
+                    ast_push2((int)b, '{');
                 }
             }
             if (tk != ')')
@@ -1796,8 +1793,7 @@ static void expr(int lev) {
         if (ty < PTR)
             die("bad dereference");
         ty -= PTR;
-        *--n = ty;
-        *--n = Load;
+        ast_push2(ty, Load);
         break;
     case And: // "&", take the address operation
         /* when "token" is a variable, it takes the address first and
@@ -1818,11 +1814,8 @@ static void expr(int lev) {
         if (*n == Num)
             n[1] = !n[1];
         else {
-            *--n = 0;
-            *--n = Num;
-            --n;
-            *n = (int)(n + 3);
-            *--n = Eq;
+            ast_push2(0, Num);
+            ast_push2((int)(n + 2), Eq);
         }
         ty = INT;
         break;
@@ -1834,11 +1827,8 @@ static void expr(int lev) {
         if (*n == Num)
             n[1] = ~n[1];
         else {
-            *--n = -1;
-            *--n = Num;
-            --n;
-            *n = (int)(n + 3);
-            *--n = Xor;
+            ast_push2(-1, Num);
+            ast_push2((int)(n + 2), Xor);
         }
         ty = INT;
         break;
@@ -1858,17 +1848,11 @@ static void expr(int lev) {
         else if (*n == NumF) {
             n[1] ^= 0x80000000;
         } else if (ty == FLOAT) {
-            *--n = 0xbf800000;
-            *--n = NumF;
-            --n;
-            *n = (int)(n + 3);
-            *--n = MulF;
+            ast_push2(0xbf800000, NumF);
+            ast_push2((int)(n + 2), MulF);
         } else {
-            *--n = -1;
-            *--n = Num;
-            --n;
-            *n = (int)(n + 3);
-            *--n = Mul;
+            ast_push2(-1, Num);
+            ast_push2((int)(n + 2), Mul);
         }
         if (ty != FLOAT)
             ty = INT;
@@ -1932,21 +1916,15 @@ static void expr(int lev) {
             otk = tk;
             n += 2;
             b = n;
-            *--n = ';';
-            *--n = t;
-            *--n = Load;
+            ast_push1(';');
+            ast_push2(t, Load);
             sz = (t >= PTR2) ? sizeof(int) : ((t >= PTR) ? tsize[(t - PTR) >> 2] : 1);
             next();
             c = n;
             expr(otk);
             if (*n == Num)
                 n[1] *= sz;
-            *--n = (int)c;
-            if (otk < ShlAssign) {
-                *--n = Or + (otk - OrAssign);
-            } else {
-                *--n = Shl + (otk - ShlAssign);
-            }
+            ast_push2((int)c, (otk < ShlAssign) ? Or + (otk - OrAssign) : Shl + (otk - ShlAssign));
             if (t == FLOAT && (otk >= AddAssign && otk <= DivAssign))
                 *n += 5;
             typecheck(*n, t, ty);
@@ -1978,8 +1956,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] || n[1];
             else {
-                *--n = (int)b;
-                *--n = Lor;
+                ast_push2((int)b, Lor);
             }
             ty = INT;
             break;
@@ -1989,8 +1966,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] && n[1];
             else {
-                *--n = (int)b;
-                *--n = Lan;
+                ast_push2((int)b, Lan);
             }
             ty = INT;
             break;
@@ -2001,8 +1977,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] | n[1];
             else {
-                *--n = (int)b;
-                *--n = Or;
+                ast_push2((int)b, Or);
             }
             ty = INT;
             break;
@@ -2013,8 +1988,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] ^ n[1];
             else {
-                *--n = (int)b;
-                *--n = Xor;
+                ast_push2((int)b, Xor);
             }
             ty = INT;
             break;
@@ -2025,8 +1999,7 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] & n[1];
             else {
-                *--n = (int)b;
-                *--n = And;
+                ast_push2((int)b, And);
             }
             ty = INT;
             break;
@@ -2041,15 +2014,13 @@ static void expr(int lev) {
                     c1->i = (c2->f == c1->f);
                     *n = Num;
                 } else {
-                    *--n = (int)b;
-                    *--n = EqF;
+                    ast_push2((int)b, EqF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] == n[1];
                 else {
-                    *--n = (int)b;
-                    *--n = Eq;
+                    ast_push2((int)b, Eq);
                 }
             }
             ty = INT;
@@ -2065,15 +2036,13 @@ static void expr(int lev) {
                     c1->i = (c2->f != c1->f);
                     *n = Num;
                 } else {
-                    *--n = (int)b;
-                    *--n = NeF;
+                    ast_push2((int)b, NeF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] != n[1];
                 else {
-                    *--n = (int)b;
-                    *--n = Ne;
+                    ast_push2((int)b, Ne);
                 }
             }
             ty = INT;
@@ -2089,15 +2058,13 @@ static void expr(int lev) {
                     c1->i = (c2->f >= c1->f);
                     *n = Num;
                 } else {
-                    *--n = (int)b;
-                    *--n = GeF;
+                    ast_push2((int)b, GeF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] >= n[1];
                 else {
-                    *--n = (int)b;
-                    *--n = Ge;
+                    ast_push2((int)b, Ge);
                 }
             }
             ty = INT;
@@ -2113,15 +2080,13 @@ static void expr(int lev) {
                     c1->i = (c2->f < c1->f);
                     *n = Num;
                 } else {
-                    *--n = (int)b;
-                    *--n = LtF;
+                    ast_push2((int)b, LtF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] < n[1];
                 else {
-                    *--n = (int)b;
-                    *--n = Lt;
+                    ast_push2((int)b, Lt);
                 }
             }
             ty = INT;
@@ -2137,15 +2102,13 @@ static void expr(int lev) {
                     c1->i = (c2->f > c1->f);
                     *n = Num;
                 } else {
-                    *--n = (int)b;
-                    *--n = GtF;
+                    ast_push2((int)b, GtF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] > n[1];
                 else {
-                    *--n = (int)b;
-                    *--n = Gt;
+                    ast_push2((int)b, Gt);
                 }
             }
             ty = INT;
@@ -2161,15 +2124,13 @@ static void expr(int lev) {
                     c1->i = (c2->f <= c1->f);
                     *n = Num;
                 } else {
-                    *--n = (int)b;
-                    *--n = LeF;
+                    ast_push2((int)b, LeF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] <= n[1];
                 else {
-                    *--n = (int)b;
-                    *--n = Le;
+                    ast_push2((int)b, Le);
                 }
             }
             ty = INT;
@@ -2184,8 +2145,7 @@ static void expr(int lev) {
                 else
                     n[1] = b[1] << n[1];
             } else {
-                *--n = (int)b;
-                *--n = Shl;
+                ast_push2((int)b, Shl);
             }
             ty = INT;
             break;
@@ -2199,8 +2159,7 @@ static void expr(int lev) {
                 else
                     n[1] = b[1] >> n[1];
             } else {
-                *--n = (int)b;
-                *--n = Shr;
+                ast_push2((int)b, Shr);
             }
             ty = INT;
             break;
@@ -2214,8 +2173,7 @@ static void expr(int lev) {
                     c2 = (union conv*)&b[1];
                     c1->f = c1->f + c2->f;
                 } else {
-                    *--n = (int)b;
-                    *--n = AddF;
+                    ast_push2((int)b, AddF);
                 }
             } else { // both terms are either int or "int *"
                 tc = ((t | ty) & (PTR | PTR2)) ? (t >= PTR) : (t >= ty);
@@ -2233,15 +2191,11 @@ static void expr(int lev) {
                 if (*n == Num && *b == Num)
                     n[1] += b[1];
                 else if (sz != 1) {
-                    *--n = sz;
-                    *--n = Num;
-                    *--n = (int)(tc ? c : b);
-                    *--n = Mul;
-                    *--n = (int)(tc ? b : c);
-                    *--n = Add;
+                    ast_push2(sz, Num);
+                    ast_push2((int)(tc ? c : b), Mul);
+                    ast_push2((int)(tc ? b : c), Add);
                 } else {
-                    *--n = (int)b;
-                    *--n = Add;
+                    ast_push2((int)b, Add);
                 }
             }
             break;
@@ -2255,8 +2209,7 @@ static void expr(int lev) {
                     c2 = (union conv*)&b[1];
                     c1->f = c2->f - c1->f;
                 } else {
-                    *--n = (int)b;
-                    *--n = SubF;
+                    ast_push2((int)b, SubF);
                 }
             } else {            // 4 cases: ptr-ptr, ptr-int, int-ptr (err), int-int
                 if (t >= PTR) { // left arg is ptr
@@ -2265,21 +2218,14 @@ static void expr(int lev) {
                         if (*n == Num && *b == Num)
                             n[1] = (b[1] - n[1]) / sz;
                         else {
-                            *--n = (int)b;
-                            *--n = Sub;
+                            ast_push2((int)b, Sub);
                             if (sz > 1) {
                                 if ((sz & (sz - 1)) == 0) { // 2^n
-                                    *--n = __builtin_popcount(sz - 1);
-                                    *--n = Num;
-                                    --n;
-                                    *n = (int)(n + 3);
-                                    *--n = Shr;
+                                    ast_push2(__builtin_popcount(sz - 1), Num);
+                                    ast_push2((int)(n + 2), Shr);
                                 } else {
-                                    *--n = sz;
-                                    *--n = Num;
-                                    --n;
-                                    *n = (int)(n + 3);
-                                    *--n = Div;
+                                    ast_push2(sz, Num);
+                                    ast_push2((int)(n + 2), Div);
                                 }
                             }
                         }
@@ -2290,27 +2236,19 @@ static void expr(int lev) {
                             if (*b == Num)
                                 n[1] = b[1] - n[1];
                             else {
-                                *--n = (int)b;
-                                *--n = Sub;
+                                ast_push2((int)b, Sub);
                             }
                         } else {
                             if (sz > 1) {
                                 if ((sz & (sz - 1)) == 0) { // 2^n
-                                    *--n = __builtin_popcount(sz - 1);
-                                    *--n = Num;
-                                    --n;
-                                    *n = (int)(n + 3);
-                                    *--n = Shl;
+                                    ast_push2(__builtin_popcount(sz - 1), Num);
+                                    ast_push2((int)(n + 2), Shl);
                                 } else {
-                                    *--n = sz;
-                                    *--n = Num;
-                                    --n;
-                                    *n = (int)(n + 3);
-                                    *--n = Mul;
+                                    ast_push2(sz, Num);
+                                    ast_push2((int)(n + 2), Mul);
                                 }
                             }
-                            *--n = (int)b;
-                            *--n = Sub;
+                            ast_push2((int)b, Sub);
                         }
                         ty = t;
                     }
@@ -2318,8 +2256,7 @@ static void expr(int lev) {
                     if (*n == Num && *b == Num)
                         n[1] = b[1] - n[1];
                     else {
-                        *--n = (int)b;
-                        *--n = Sub;
+                        ast_push2((int)b, Sub);
                     }
                     ty = INT;
                 }
@@ -2335,19 +2272,17 @@ static void expr(int lev) {
                     c2 = (union conv*)&b[1];
                     c1->f = c1->f * c2->f;
                 } else {
-                    *--n = (int)b;
-                    *--n = MulF;
+                    ast_push2((int)b, MulF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] *= b[1];
                 else {
-                    *--n = (int)b;
-                    if (n[1] == Num && n[2] > 0 && (n[2] & (n[2] - 1)) == 0) {
-                        n[2] = __builtin_popcount(n[2] - 1);
-                        *--n = Shl; // 2^n
+                    if (n[0] == Num && n[1] > 0 && (n[1] & (n[1] - 1)) == 0) {
+                        n[1] = __builtin_popcount(n[1] - 1);
+                        ast_push2((int)b, Shl); // 2^n
                     } else
-                        *--n = Mul;
+                        ast_push2((int)b, Mul);
                 }
                 ty = INT;
             }
@@ -2362,10 +2297,8 @@ static void expr(int lev) {
             if (*n != Load)
                 die("bad lvalue in post-increment");
             *n = tk;
-            *--n = sz;
-            *--n = Num;
-            *--n = (int)b;
-            *--n = (tk == Inc) ? Sub : Add;
+            ast_push2(sz, Num);
+            ast_push2((int)b, (tk == Inc) ? Sub : Add);
             next();
             break;
         case Div:
@@ -2378,19 +2311,17 @@ static void expr(int lev) {
                     c2 = (union conv*)&b[1];
                     c1->f = c2->f / c1->f;
                 } else {
-                    *--n = (int)b;
-                    *--n = DivF;
+                    ast_push2((int)b, DivF);
                 }
             } else {
                 if (*n == Num && *b == Num)
                     n[1] = b[1] / n[1];
                 else {
-                    *--n = (int)b;
-                    if (n[1] == Num && n[2] > 0 && (n[2] & (n[2] - 1)) == 0) {
-                        n[2] = __builtin_popcount(n[2] - 1);
-                        *--n = Shr; // 2^n
+                    if (n[0] == Num && n[1] > 0 && (n[1] & (n[1] - 1)) == 0) {
+                        n[1] = __builtin_popcount(n[1] - 1);
+                        ast_push2((int)b, Shr); // 2^n
                     } else {
-                        *--n = Div;
+                        ast_push2((int)b, Div);
                     }
                 }
                 ty = INT;
@@ -2405,12 +2336,11 @@ static void expr(int lev) {
             if (*n == Num && *b == Num)
                 n[1] = b[1] % n[1];
             else {
-                *--n = (int)b;
                 if (n[1] == Num && n[2] > 0 && (n[2] & (n[2] - 1)) == 0) {
                     --n[2];
-                    *--n = And; // 2^n
+                    ast_push2((int)b, And); // 2^n
                 } else {
-                    *--n = Mod;
+                    ast_push2((int)b, Mod);
                 }
             }
             ty = INT;
@@ -2431,17 +2361,13 @@ static void expr(int lev) {
             if (!m)
                 die("structure member not found");
             if (m->offset) {
-                *--n = m->offset;
-                *--n = Num;
-                --n;
-                *n = (int)(n + 3);
-                *--n = Add;
+                ast_push2(m->offset, Num);
+                ast_push2((int)(n + 2), Add);
             }
             ty = m->type;
             next();
             if (!(ty & 3)) {
-                *--n = (ty >= PTR) ? INT : ty;
-                *--n = Load;
+                ast_push2((ty >= PTR) ? INT : ty, Load);
                 break;
             }
             memsub = 1;
@@ -2487,14 +2413,11 @@ static void expr(int lev) {
                     } else {
                         // generate code to add a term
                         if (factor > 1) {
-                            *--n = factor;
-                            *--n = Num;
-                            *--n = (int)c;
-                            *--n = Mul;
+                            ast_push2(factor, Num);
+                            ast_push2((int)c, Mul);
                         }
                         if (f) {
-                            *--n = (int)f;
-                            *--n = Add;
+                            ast_push2((int)f, Add);
                         }
                         f = n;
                     }
@@ -2503,15 +2426,12 @@ static void expr(int lev) {
             if (dim) {
                 if (sum > 0) {
                     if (f) {
-                        *--n = sum;
-                        *--n = Num;
-                        *--n = (int)f;
-                        *--n = Add;
+                        ast_push2(sum, Num);
+                        ast_push2((int)f, Add);
                     } else {
                         sum *= sz;
                         sz = 1;
-                        *--n = sum;
-                        *--n = Num;
+                        ast_push2(sum, Num);
                     }
                 } else if (!f)
                     goto add_simple;
@@ -2520,23 +2440,18 @@ static void expr(int lev) {
                 if (*n == Num)
                     n[1] *= sz;
                 else {
-                    *--n = sz;
-                    *--n = Num;
-                    --n;
-                    *n = (int)(n + 3);
-                    *--n = Mul;
+                    ast_push2(sz, Num);
+                    ast_push2((int)(n + 2), Mul);
                 }
             }
             if (*n == Num && *b == Num)
                 n[1] += b[1];
             else {
-                *--n = (int)b;
-                *--n = Add;
+                ast_push2((int)b, Add);
             }
         add_simple:
             if (doload) {
-                *--n = ((ty = t) >= PTR) ? INT : ty;
-                *--n = Load;
+                ast_push2(((ty = t) >= PTR) ? INT : ty, Load);
             }
             break;
         default:
@@ -3109,10 +3024,8 @@ static void check_label(int** tt) {
         if (id->class != 0 || !(id->type == 0 || id->type == -1))
             die("invalid label");
         id->type = -1; // hack for id->class deficiency
-        *--n = (int)id;
-        *--n = Label;
-        *--n = (int)*tt;
-        *--n = '{';
+        ast_push2((int)id, Label);
+        ast_push2((int)*tt, '{');
         *tt = n;
         next();
         next();
@@ -3431,18 +3344,16 @@ static void stmt(int ctx) {
                 // Not declaration and must not be function, analyze inner block.
                 // e represents the address which will store pc
                 // (ld - loc) indicates memory size to allocate
-                *--n = ';';
+                ast_push1(';');
                 while (tk != '}') {
                     int* t = n;
                     check_label(&t);
                     stmt(Loc);
                     if (t != n) {
-                        *--n = (int)t;
-                        *--n = '{';
+                        ast_push2((int)t, '{');
                     }
                 }
-                *--n = ld - loc;
-                *--n = Enter;
+                ast_push2(ld - loc, Enter);
                 if (oid && n[1] >= 64)
                     printf("--> %d: move %.*s to global scope for performance.\n", oline,
                            (oid->hash & 0x3f), oid->name);
@@ -3512,12 +3423,11 @@ static void stmt(int ctx) {
                         init_array(dd, nd, j);
                     else {
                         if (b == 0)
-                            *--n = ';';
+                            ast_push1(';');
                         if (ctx != Loc)
                             die("decl assignment for local vars only");
                         b = n;
-                        *--n = loc - dd->val;
-                        *--n = Loc;
+                        ast_push2(loc - dd->val, Loc);
                         a = n;
                         i = ty;
                         expr(Assign);
@@ -3526,8 +3436,7 @@ static void stmt(int ctx) {
                         *--n = (ty << 16) | i;
                         *--n = Assign;
                         ty = i;
-                        *--n = (int)b;
-                        *--n = '{';
+                        ast_push2((int)b, '{');
                     }
                 }
             }
@@ -3592,7 +3501,7 @@ static void stmt(int ctx) {
         if (tk != '(')
             die("open parenthesis expected");
         next();
-        *--n = ';';
+        ast_push1(';');
         expr(Assign);
         b = n;
         if (tk != ')')
@@ -3641,7 +3550,7 @@ static void stmt(int ctx) {
         j = n[1];
         n[1] -= i;
         *cas = j;
-        *--n = ';';
+        ast_push1(';');
         if (tk != ':')
             die("colon expected");
         next();
@@ -3658,7 +3567,7 @@ static void stmt(int ctx) {
         if (tk != ';')
             die("semicolon expected");
         next();
-        *--n = Break;
+        ast_push1(Break);
         return;
     case Continue:
         if (!cntc)
@@ -3667,7 +3576,7 @@ static void stmt(int ctx) {
         if (tk != ';')
             die("semicolon expected");
         next();
-        *--n = Continue;
+        ast_push1(Continue);
         return;
     case Default:
         if (!swtc)
@@ -3678,8 +3587,7 @@ static void stmt(int ctx) {
         next();
         stmt(ctx);
         a = n;
-        *--n = (int)a;
-        *--n = Default;
+        ast_push2((int)a, Default);
         return;
     // RETURN_stmt -> 'return' expr ';' | 'return' ';'
     case Return:
@@ -3689,8 +3597,7 @@ static void stmt(int ctx) {
             expr(Assign);
             a = n;
         }
-        *--n = (int)a;
-        *--n = Return;
+        ast_push2((int)a, Return);
         if (tk != ';')
             die("semicolon expected");
         next();
@@ -3704,35 +3611,33 @@ static void stmt(int ctx) {
         if (tk != '(')
             die("open parenthesis expected");
         next();
-        *--n = ';';
+        ast_push1(';');
         if (tk != ';')
             expr(Assign);
         while (tk == ',') {
             int* f = n;
             next();
             expr(Assign);
-            *--n = (int)f;
-            *--n = '{';
+            ast_push2((int)f, '{');
         }
         d = n;
         if (tk != ';')
             die("semicolon expected");
         next();
-        *--n = ';';
+        ast_push1(';');
         expr(Assign);
         a = n; // Point to entry of for cond
         if (tk != ';')
             die("semicolon expected");
         next();
-        *--n = ';';
+        ast_push1(';');
         if (tk != ')')
             expr(Assign);
         while (tk == ',') {
             int* g = n;
             next();
             expr(Assign);
-            *--n = (int)g;
-            *--n = '{';
+            ast_push2((int)g, '{');
         }
         b = n;
         if (tk != ')')
@@ -3755,8 +3660,7 @@ static void stmt(int ctx) {
         if (tk != Id || (id->type != 0 && id->type != -1) || (id->class != Label && id->class != 0))
             die("goto expects label");
         id->type = -1; // hack for id->class deficiency
-        *--n = (int)id;
-        *--n = Goto;
+        ast_push2((int)id, Goto);
         next();
         if (tk != ';')
             die("semicolon expected");
@@ -3765,14 +3669,13 @@ static void stmt(int ctx) {
     // stmt -> '{' stmt '}'
     case '{':
         next();
-        *--n = ';';
+        ast_push1(';');
         while (tk != '}') {
             a = n;
             check_label(&a);
             stmt(ctx);
             if (a != n) {
-                *--n = (int)a;
-                *--n = '{';
+                ast_push2((int)a, '{');
             }
         }
         next();
@@ -3780,7 +3683,7 @@ static void stmt(int ctx) {
     // stmt -> ';'
     case ';':
         next();
-        *--n = ';';
+        ast_push1(';');
         return;
     default:
         expr(Assign);
@@ -5041,6 +4944,7 @@ static void add_defines(struct define_grp* d) {
 }
 
 int cc(int argc, char** argv) {
+
     clear_globals();
 
     if (setjmp(done_jmp))
