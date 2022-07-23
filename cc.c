@@ -1480,17 +1480,34 @@ static void ast_Func(int parm_types, int n_parms, int addr, int next, int tk) {
     Func_entry.tk = tk;
 }
 
-static void ast_Cond(int v1, int v2, int v3) {
-    *--n = v1;
-    *--n = v2;
-    *--n = v3;
-    *--n = Cond;
+typedef struct {
+    int tk;
+    int cond_part;
+    int if_part;
+    int else_part;
+} Cond_entry_t;
+#define Cond_entry (*((Cond_entry_t*)n))
+
+static void ast_Cond(int else_part, int if_part, int cond_part) {
+    n -= 4;
+    Cond_entry.else_part = else_part;
+    Cond_entry.if_part = if_part;
+    Cond_entry.cond_part = cond_part;
+    Cond_entry.tk = Cond;
 }
 
-static void ast_Assign(int v1, int v2) {
-    *--n = v1;
-    *--n = v2;
-    *--n = Assign;
+typedef struct {
+    int tk;
+    int type;
+    int right_part;
+} Assign_entry_t;
+#define Assign_entry (*((Assign_entry_t*)n))
+
+static void ast_Assign(int right_part, int type) {
+    n -= 3;
+    Assign_entry.right_part = right_part;
+    Assign_entry.type = type;
+    Assign_entry.tk = Assign;
 }
 
 static void ast_While(int v1, int v2) {
