@@ -89,6 +89,8 @@ static int ty;                  // current expression type
                                 //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
                                 // bit 2:9 - type
                                 // bit 10:11 - ptr level
+static int rtf, rtt;            // return flag and return type for current function
+static int last_jmp;
 static int loc;                 // local variable offset
 static int line;          // current line number
 static int src_opt;       // print source and assembly flag
@@ -1151,8 +1153,8 @@ static void next() {
         case '\n':
             if (src_opt) {
                 printf("%d: %.*s", line, p - lp, lp);
-                lp = p;
             }
+            lp = p;
             ++line;
         case ' ':
         case '\t':
@@ -1634,7 +1636,6 @@ static void ast_Single(int k) {
 static void expr(int lev) {
     int t, tc, tt, nf, *b, sz, *c;
     int otk, memsub = 0;
-    union conv *c1, *c2;
     struct ident_s* d;
     struct member_s* m;
 
@@ -1669,11 +1670,15 @@ static void expr(int lev) {
             }
             next();
             t = 0;
-            b = 0;
+            b = c = 0;
             tt = 0;
             nf = 0; // argument count
             while (tk != ')') {
                 expr(Assign);
+                if (c != 0) {
+                    ast_Begin((int)c);
+                    c = 0;
+                }
                 ast_Single((int)b);
                 b = n;
                 ++t;
@@ -1705,8 +1710,6 @@ static void expr(int lev) {
             ty = INT;
         } else {
             // Variable get offset
-            char* np;
-            int nl;
             switch (d->class) {
             case Loc:
             case Par:
@@ -1744,7 +1747,7 @@ static void expr(int lev) {
         // continuous `"` handles C-style multiline text such as `"abc" "def"`
         while (tk == '"')
             next();
-        data = (char*)(((int)data + sizeof(int)) & (~(sizeof(int) - 1)));
+        data = (char*)(((int)data + sizeof(int)) & -sizeof(int));
         ty = CHAR + PTR;
         break;
     /* SIZEOF_expr -> 'sizeof' '(' 'TYPE' ')'
@@ -1826,8 +1829,7 @@ static void expr(int lev) {
                 if (t == FLOAT && ty < FLOAT) { // float : int
                     if (*n == Num) {
                         *n = NumF;
-                        c1 = (union conv*)&n[1];
-                        c1->f = (float)c1->i;
+                        *((float*)&n[1]) = n[1];
                     } else {
                         b = n;
                         ast_Single(ITOF);
@@ -1836,8 +1838,7 @@ static void expr(int lev) {
                 } else if (t < FLOAT && ty == FLOAT) { // int : float
                     if (*n == NumF) {
                         *n = Num;
-                        c1 = (union conv*)&n[1];
-                        c1->i = (int)c1->f;
+                        n[1] = *((float*)&n[1]);
                     } else {
                         b = n;
                         ast_Single(FTOI);
@@ -2075,9 +2076,7 @@ static void expr(int lev) {
             typecheck(Eq, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->i = (c2->f == c1->f);
+                    n[1] = n[1] == b[1];
                     *n = Num;
                 } else {
                     ast_Oper((int)b, EqF);
@@ -2097,9 +2096,7 @@ static void expr(int lev) {
             typecheck(Ne, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->i = (c2->f != c1->f);
+                    n[1] = n[1] != b[1];
                     *n = Num;
                 } else {
                     ast_Oper((int)b, NeF);
@@ -2119,9 +2116,7 @@ static void expr(int lev) {
             typecheck(Ge, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->i = (c2->f >= c1->f);
+                    n[1] = (*((float*)&b[1]) >= *((float*)&n[1]));
                     *n = Num;
                 } else {
                     ast_Oper((int)b, GeF);
@@ -2141,9 +2136,7 @@ static void expr(int lev) {
             typecheck(Lt, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->i = (c2->f < c1->f);
+                    n[1] = (*((float*)&b[1]) < *((float*)&n[1]));
                     *n = Num;
                 } else {
                     ast_Oper((int)b, LtF);
@@ -2163,9 +2156,7 @@ static void expr(int lev) {
             typecheck(Gt, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->i = (c2->f > c1->f);
+                    n[1] = (*((float*)&b[1]) > *((float*)&n[1]));
                     *n = Num;
                 } else {
                     ast_Oper((int)b, GtF);
@@ -2185,9 +2176,7 @@ static void expr(int lev) {
             typecheck(Le, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->i = (c2->f <= c1->f);
+                    n[1] = (*((float*)&b[1]) <= *((float*)&n[1]));
                     *n = Num;
                 } else {
                     ast_Oper((int)b, LeF);
@@ -2235,9 +2224,7 @@ static void expr(int lev) {
             typecheck(Add, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->f = c1->f + c2->f;
+                    *((float*)&n[1]) = (*((float*)&b[1]) + *((float*)&n[1]));
                 } else {
                     ast_Oper((int)b, AddF);
                 }
@@ -2271,9 +2258,7 @@ static void expr(int lev) {
             typecheck(Sub, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->f = c2->f - c1->f;
+                    *((float*)&n[1]) = (*((float*)&b[1]) - *((float*)&n[1]));
                 } else {
                     ast_Oper((int)b, SubF);
                 }
@@ -2334,9 +2319,7 @@ static void expr(int lev) {
             typecheck(Mul, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->f = c1->f * c2->f;
+                    *((float*)&n[1]) = (*((float*)&n[1]) * *((float*)&b[1]));
                 } else {
                     ast_Oper((int)b, MulF);
                 }
@@ -2373,9 +2356,7 @@ static void expr(int lev) {
             typecheck(Div, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    c1 = (union conv*)&n[1];
-                    c2 = (union conv*)&b[1];
-                    c1->f = c2->f / c1->f;
+                    *((float*)&n[1]) = (*((float*)&b[1]) / *((float*)&n[1]));
                 } else {
                     ast_Oper((int)b, DivF);
                 }
@@ -2490,7 +2471,7 @@ static void expr(int lev) {
                 }
             } while (--ii >= 0);
             if (dim) {
-                if (sum > 0) {
+                if (sum != 0) {
                     if (f) {
                         ast_Num(sum);
                         ast_Oper((int)f, Add);
@@ -2527,7 +2508,7 @@ static void expr(int lev) {
 }
 
 static void init_array(struct ident_s* tn, int extent[], int dim) {
-    int i, cursor, match, coff = 0, off, *p;
+    int i, cursor, match, coff = 0, off, empty, *vi;
     int inc[3];
 
     inc[0] = extent[dim - 1];
@@ -2543,79 +2524,73 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
     case (CHAR | PTR2):
         die("Use extra dim of MAXCHAR length instead");
     case (CHAR | PTR):
-        match = '"';
+        match = CHAR + PTR;
         coff = 1;
         break; // strings
     case (INT | PTR):
-        match = Num;
+        match = INT;
         break;
     case (FLOAT | PTR):
-        match = NumF;
+        match = FLOAT;
         break;
     default:
         die("array-init must be literal ints, floats, or strings");
     }
 
-    p = (int*)tn->val;
+    vi = (int*)tn->val;
     i = 0;
     cursor = (dim - coff);
     do {
-        if (tk == Sub) {
-            next();
-            if (tk == NumF)
-                tkv.i |= 0x10000000;
-            else if (tk == Num)
-                tkv.i = 0 - tkv.i;
-            else
-                die("non-literal initializer");
-        }
-
         if (tk == '{') {
             next();
             if (cursor)
                 --cursor;
             else
                 die("overly nested initializer");
+            empty = 1;
             continue;
         } else if (tk == '}') {
             next();
             // skip remainder elements on this level (or set 0 if cmdline opt)
-            if ((off = i % inc[cursor + coff]))
+            if ((off = i % inc[cursor + coff]) || empty)
                 i += (inc[cursor + coff] - off);
             if (++cursor == dim - coff)
                 break;
-        } else if (tk == '"') {
-            if (match == '"') {
-                off = strlen((char*)tkv.i) + 1;
-                if (off > inc[0]) {
-                    off = inc[0];
-                    printf("%d: string '%s' truncated to %d chars\n", line, (char*)tkv.i, off);
+        } else {
+            expr(Cond);
+            if (*n != Num && *n != NumF)
+                die("non-literal initializer");
+
+            if (ty == CHAR + PTR) {
+                if (match == CHAR + PTR) {
+                    off = strlen((char*)n[1]) + 1;
+                    if (off > inc[0]) {
+                        off = inc[0];
+                        printf("%d: string '%s' truncated to %d chars\n", line, (char*)n[1], off);
+                    }
+                    memcpy((char*)vi + i, (char*)n[1], off);
+                    i += inc[0];
+                } else
+                    die("can't assign string to scalar");
+            } else if (ty == match) {
+                vi[i++] = n[1];
+            } else if (ty == INT) {
+                if (match == CHAR + PTR) {
+                    *((char*)vi + i) = n[1];
+                    i += inc[0];
+                } else {
+                    *((float*)(n + 1)) = (float)n[1];
+                    vi[i++] = n[1];
                 }
-                memcpy((char*)p + i, (char*)tkv.i, off);
-                i += inc[0];
-                next();
-            } else
-                die("can't assign string to scalar");
-        } else if (tk == match) {
-            p[i++] = tkv.i;
-            next();
-        } else if (tk == Num) {
-            if (match == '"') {
-                *((char*)p + i) = tkv.i;
-                i += inc[0];
-            } else {
-                tkv.f = (float)tkv.i;
-                p[i++] = tkv.i;
+            } else if (ty == FLOAT) {
+                if (match == INT) {
+                    vi[i++] = (int)*((float*)(n + 1));
+                } else
+                    die("illegal char/string initializer");
             }
-            next();
-        } else if (tk == NumF) {
-            if (match == Num) {
-                p[i++] = (int)tkv.f;
-                next();
-            } else
-                die("illegal char/string initializer");
-        } else
-            die("non-literal initializer");
+            n += 2; // clean up AST
+            empty = 0;
+        }
         if (tk == ',')
             next();
     } while (1);
@@ -2626,7 +2601,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 // native Arm machine code.
 static void gen(int* n) {
     int i = *n, j, k, l;
-    int *a = NULL, *b, *c, *d, *t;
+    int *a, *b, *c, *d, *t;
     struct ident_s* label;
 
     switch (i) {
@@ -2691,14 +2666,25 @@ static void gen(int* n) {
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
         if (n[3]) {
-            *b = (int)(e + 3);
-            *++e = JMP;
-            b = ++e;
+            if (*e == LEV) {
+                l = *b = (int)(e + 1);
+                b = 0;
+            } else {
+                l = *b = (int)(e + 3);
+                *++e = JMP;
+                b = ++e;
+            }
+            if (last_jmp < l)
+                last_jmp = l;
             gen((int*)n[3]);
         } // else statment
         // Patch the jump address field pointed to by "d" to hold the address
         // past the false branch.
-        *b = (int)(e + 1);
+        if (b != 0) {
+            *b = (int)(e + 1);
+            if (last_jmp < *b)
+                last_jmp = *b;
+        }
         break;
     // operators
     /* If current token is logical OR operator:
@@ -3056,8 +3042,32 @@ static void gen(int* n) {
     case Enter:
         *++e = ENT;
         *++e = n[1];
+        last_jmp = 0x80000000;
         gen(n + 2);
-        if (*e != LEV)
+        if (*e == LEV && last_jmp != 0x8000000) {
+            b = e;
+            while (*(b - 1) == LEV)
+                --b;
+            while (last_jmp > (int)b) {
+                do {
+                    t = le + 1;
+                    while (t < e) {
+                        if (*t == JMP || *t == BZ || *t == BNZ) {
+                            if (t[1] == last_jmp)
+                                t[1] = (int)b;
+                        }
+                        t += (*t <= ADJ || *t == SYSC) ? 2 : 1;
+                    }
+                    last_jmp -= 4;
+                } while (last_jmp != (int)b);
+                while (*(b - 1) == (int)b) {
+                    *(b - 1) = LEV;
+                    *(b - 2) = LEV;
+                    b -= 2;
+                }
+            }
+            e = b;
+        } else
             *++e = LEV;
         break;
     case Label: // target of goto
@@ -3065,6 +3075,8 @@ static void gen(int* n) {
         if (label->class != 0)
             die("duplicate label definition");
         d = e + 1;
+        if (last_jmp < (int)d)
+            last_jmp = (int)d;
         b = (int*)label->val;
         while (b != 0) {
             t = (int*)*b;
@@ -3248,6 +3260,7 @@ static void stmt(int ctx) {
     case Float:
     case Struct:
     case Union:
+        dd = id;
         switch (tk) {
         case Char:
         case Int:
@@ -3363,6 +3376,10 @@ static void stmt(int ctx) {
                 break;
             }
             next();
+            if (tk == '(') {
+                rtf = 0;
+                rtt = (ty == 0 && !memcmp(dd->name, "void", 4)) ? -1 : ty;
+            }
             dd = id;
             dd->type = ty;
             if (tk == '(') { // function
@@ -3418,6 +3435,8 @@ static void stmt(int ctx) {
                     if (t != n)
                         ast_Begin((int)t);
                 }
+                if (rtf == 0 && rtt != -1)
+                    die("expecting return value");
                 ast_Enter(ld - loc);
                 if (oid && n[1] >= 64)
                     printf("--> %d: move %.*s to global scope for performance.\n", oline,
@@ -3487,21 +3506,40 @@ static void stmt(int ctx) {
                     if (tk == '{' && (dd->type & 3))
                         init_array(dd, nd, j);
                     else {
-                        if (b == 0)
-                            ast_Single(';');
-                        if (ctx != Loc)
-                            die("decl assignment for local vars only");
-                        b = n;
-                        ast_Loc(loc - dd->val);
-                        a = n;
-                        i = ty;
-                        expr(Assign);
-                        typecheck(Assign, i, ty);
-                        ast_Assign((int)a, (ty << 16) | i);
-                        ty = i;
-                        ast_Begin((int)b);
-                    }
+                        if (ctx == Loc) {
+                            if (b == 0)
+                                ast_Single(';');
+                            b = n;
+                            ast_Loc(loc - dd->val);
+                            a = n;
+                            i = ty;
+                            expr(Assign);
+                            typecheck(Assign, i, ty);
+                            ast_Assign((int)a, (ty << 16) | i);
+                            ty = i;
+                            ast_Begin((int)b);
+                        } else { // ctx == Glo
+                            i = ty;
+                            expr(Cond);
+                            typecheck(Assign, i, ty);
+                            if (ty == CHAR + PTR && (dd->type & 3) != 1)
+                                die("use decl char foo[nn] = \"...\";");
+                            if ((*n == Num && (i == CHAR || i == INT)) ||
+                                (*n == NumF && i == FLOAT))
+                                *((int*)dd->val) = tkv.i;
+                            else if (ty == CHAR + PTR) {
+                                i = strlen((char*)tkv.i) + 1;
+                                if (i > (dd->etype + 1)) {
+                                    i = dd->etype + 1;
+                                    printf("%d: string truncated to width\n", line);
+                                }
+                                memcpy((char*)dd->val, (char*)tkv.i, i);
+                            } else
+                                die("global assignment must eval to lit expr");
+                            n += 2;
+                        }
                 }
+            }
             }
             if (ctx != Par && tk == ',')
                 next();
@@ -3648,7 +3686,14 @@ static void stmt(int ctx) {
         if (tk != ';') {
             expr(Assign);
             a = n;
+            if (rtt == -1)
+                die("not expecting return value");
+            typecheck(Eq, rtt, ty);
+        } else {
+            if (rtt != -1)
+                die("return value expected");
         }
+        rtf = 1; // signal a return statement exisits
         ast_Return((int)a);
         if (tk != ';')
             die("semicolon expected");
@@ -5148,10 +5193,9 @@ int cc(int argc, char** argv) {
         die("could not allocate stack area");
     bp = sp = (int*)((int)sp + STACK_BYTES - 4);
     push_int(EXIT); // call exit if main returns
-    int* t = sp;
     push_int(argc);
     push_ptr(argv);
-    push_ptr(t);
+    push_ptr(sp + 2);
 
     // run...
     a.i = 0;
