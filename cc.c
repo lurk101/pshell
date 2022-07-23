@@ -62,10 +62,10 @@ extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 extern void get_screen_xy(int* x, int* y);
 
-static char *p, *lp;           // current position in source code
-static char* data;             // data/bss pointer
-static char* src;              //
-static int* base_sp;           // stack
+static char *p, *lp;            // current position in source code
+static char* data;              // data/bss pointer
+static char* src;               //
+static int* base_sp;            // stack
 static int *e, *le, *text_base; // current position in emitted code
 static int* cas;                // case statement patch-up pointer
 static int* def;                // default statement patch-up pointer
@@ -92,20 +92,20 @@ static int ty;                  // current expression type
 static int rtf, rtt;            // return flag and return type for current function
 static int last_jmp;
 static int loc;                 // local variable offset
-static int line;          // current line number
-static int src_opt;       // print source and assembly flag
-static int trc_opt;       // Trace instruction.
-static int* n;            // current position in emitted abstract syntax tree
-                          // With an AST, the compiler is not limited to generate
-                          // code on the fly with parsing.
-                          // This capability allows function parameter code to be
-                          // emitted and pushed on the stack in the proper
-                          // right-to-left order.
-static int ld;            // local variable depth
-static int pplev, pplevt; // preprocessor conditional level
-static int oline, osize;  // for optimization suggestion
-                          //
-static int* ast;          // abstract tree
+static int line;                // current line number
+static int src_opt;             // print source and assembly flag
+static int trc_opt;             // Trace instruction.
+static int* n;                  // current position in emitted abstract syntax tree
+                                // With an AST, the compiler is not limited to generate
+                                // code on the fly with parsing.
+                                // This capability allows function parameter code to be
+                                // emitted and pushed on the stack in the proper
+                                // right-to-left order.
+static int ld;                  // local variable depth
+static int pplev, pplevt;       // preprocessor conditional level
+static int oline, osize;        // for optimization suggestion
+                                //
+static int* ast;                // abstract tree
 
 // identifier
 #define MAX_IR 64 // maxim number of local variable or function parameters
@@ -114,7 +114,6 @@ struct ident_s {
     int tk; // type-id or keyword
     int hash;
     char* name; // name of this identifier
-    int pad;    // pad to multiple of 8 bytes
     /* fields starting with 'h' were designed to save and restore
      * the global class/type/val in order to handle the case if a
      * function declares a local with the same name as a global.
@@ -138,7 +137,6 @@ struct member_s {
     int offset;
     int type;
     int etype;
-    int pad;
 };
 
 static struct member_s** members; // array (indexed by type) of struct member lists
@@ -2020,9 +2018,10 @@ static void expr(int lev) {
         case Lor: // short circuit, the logical or
             next();
             expr(Lan);
-            if (*n == Num && *b == Num)
-                n[1] = b[1] || n[1];
-            else {
+            if (*n == Num && *b == Num) {
+                b[1] = b[1] || n[1];
+                n = b;
+            } else {
                 ast_Oper((int)b, Lor);
             }
             ty = INT;
@@ -2030,9 +2029,10 @@ static void expr(int lev) {
         case Lan: // short circuit, logic and
             next();
             expr(Or);
-            if (*n == Num && *b == Num)
-                n[1] = b[1] && n[1];
-            else {
+            if (*n == Num && *b == Num) {
+                b[1] = b[1] && n[1];
+                n = b;
+            } else {
                 ast_Oper((int)b, Lan);
             }
             ty = INT;
@@ -2041,9 +2041,10 @@ static void expr(int lev) {
             next();
             expr(Xor);
             bitopcheck(t, ty);
-            if (*n == Num && *b == Num)
-                n[1] = b[1] | n[1];
-            else {
+            if (*n == Num && *b == Num) {
+                b[1] = b[1] | n[1];
+                n = b;
+            } else {
                 ast_Oper((int)b, Or);
             }
             ty = INT;
@@ -2052,9 +2053,10 @@ static void expr(int lev) {
             next();
             expr(And);
             bitopcheck(t, ty);
-            if (*n == Num && *b == Num)
-                n[1] = b[1] ^ n[1];
-            else {
+            if (*n == Num && *b == Num) {
+                b[1] = b[1] ^ n[1];
+                n = b;
+            } else {
                 ast_Oper((int)b, Xor);
             }
             ty = INT;
@@ -2063,9 +2065,10 @@ static void expr(int lev) {
             next();
             expr(Eq);
             bitopcheck(t, ty);
-            if (*n == Num && *b == Num)
-                n[1] = b[1] & n[1];
-            else {
+            if (*n == Num && *b == Num) {
+                b[1] = b[1] & n[1];
+                n = b;
+            } else {
                 ast_Oper((int)b, And);
             }
             ty = INT;
@@ -2082,9 +2085,10 @@ static void expr(int lev) {
                     ast_Oper((int)b, EqF);
                 }
             } else {
-                if (*n == Num && *b == Num)
-                    n[1] = b[1] == n[1];
-                else {
+                if (*n == Num && *b == Num) {
+                    b[1] = b[1] == n[1];
+                    n = b;
+                } else {
                     ast_Oper((int)b, Eq);
                 }
             }
@@ -2096,15 +2100,17 @@ static void expr(int lev) {
             typecheck(Ne, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    n[1] = n[1] != b[1];
-                    *n = Num;
+                    b[1] = n[1] != b[1];
+                    *b = Num;
+                    n = b;
                 } else {
                     ast_Oper((int)b, NeF);
                 }
             } else {
-                if (*n == Num && *b == Num)
-                    n[1] = b[1] != n[1];
-                else {
+                if (*n == Num && *b == Num) {
+                    b[1] = b[1] != n[1];
+                    n = b;
+                } else {
                     ast_Oper((int)b, Ne);
                 }
             }
@@ -2116,15 +2122,16 @@ static void expr(int lev) {
             typecheck(Ge, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    n[1] = (*((float*)&b[1]) >= *((float*)&n[1]));
+                    b[1] = (*((float*)&b[1]) >= *((float*)&n[1]));
                     *n = Num;
                 } else {
                     ast_Oper((int)b, GeF);
                 }
             } else {
-                if (*n == Num && *b == Num)
-                    n[1] = b[1] >= n[1];
-                else {
+                if (*n == Num && *b == Num) {
+                    b[1] = b[1] >= n[1];
+                    n = b;
+                } else {
                     ast_Oper((int)b, Ge);
                 }
             }
@@ -2136,15 +2143,16 @@ static void expr(int lev) {
             typecheck(Lt, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    n[1] = (*((float*)&b[1]) < *((float*)&n[1]));
+                    b[1] = (*((float*)&b[1]) < *((float*)&n[1]));
                     *n = Num;
                 } else {
                     ast_Oper((int)b, LtF);
                 }
             } else {
-                if (*n == Num && *b == Num)
-                    n[1] = b[1] < n[1];
-                else {
+                if (*n == Num && *b == Num) {
+                    b[1] = b[1] < n[1];
+                    n = b;
+                } else {
                     ast_Oper((int)b, Lt);
                 }
             }
@@ -2162,9 +2170,10 @@ static void expr(int lev) {
                     ast_Oper((int)b, GtF);
                 }
             } else {
-                if (*n == Num && *b == Num)
-                    n[1] = b[1] > n[1];
-                else {
+                if (*n == Num && *b == Num) {
+                    b[1] = b[1] > n[1];
+                    n = b;
+                } else {
                     ast_Oper((int)b, Gt);
                 }
             }
@@ -2182,9 +2191,10 @@ static void expr(int lev) {
                     ast_Oper((int)b, LeF);
                 }
             } else {
-                if (*n == Num && *b == Num)
-                    n[1] = b[1] <= n[1];
-                else {
+                if (*n == Num && *b == Num) {
+                    b[1] = b[1] <= n[1];
+                    n = b;
+                } else {
                     ast_Oper((int)b, Le);
                 }
             }
@@ -2195,10 +2205,8 @@ static void expr(int lev) {
             expr(Add);
             bitopcheck(t, ty);
             if (*n == Num && *b == Num) {
-                if (n[1] < 0)
-                    n[1] = b[1] >> -n[1];
-                else
-                    n[1] = b[1] << n[1];
+                b[1] = (n[1] < 0) ? b[1] >> -n[1] : b[1] << n[1];
+                n = b;
             } else {
                 ast_Oper((int)b, Shl);
             }
@@ -2209,10 +2217,8 @@ static void expr(int lev) {
             expr(Add);
             bitopcheck(t, ty);
             if (*n == Num && *b == Num) {
-                if (n[1] < 0)
-                    n[1] = b[1] << -n[1];
-                else
-                    n[1] = b[1] >> n[1];
+                b[1] = (n[1] < 0) ? b[1] << -n[1] : b[1] >> n[1];
+                n = b;
             } else {
                 ast_Oper((int)b, Shr);
             }
@@ -2241,9 +2247,10 @@ static void expr(int lev) {
                     b[1] *= sz;
                     sz = 1;
                 }
-                if (*n == Num && *b == Num)
-                    n[1] += b[1];
-                else if (sz != 1) {
+                if (*n == Num && *b == Num) {
+                    b[1] += n[1];
+                    n = b;
+                } else if (sz != 1) {
                     ast_Num(sz);
                     ast_Oper((int)(tc ? c : b), Mul);
                     ast_Oper((int)(tc ? b : c), Add);
@@ -2266,9 +2273,10 @@ static void expr(int lev) {
                 if (t >= PTR) { // left arg is ptr
                     sz = (t >= PTR2) ? sizeof(int) : tsize[(t - PTR) >> 2];
                     if (ty >= PTR) { // ptr - ptr
-                        if (*n == Num && *b == Num)
-                            n[1] = (b[1] - n[1]) / sz;
-                        else {
+                        if (*n == Num && *b == Num) {
+                            b[1] = (b[1] - n[1]) / sz;
+                            n = b;
+                        } else {
                             ast_Oper((int)b, Sub);
                             if (sz > 1) {
                                 if ((sz & (sz - 1)) == 0) { // 2^n
@@ -2304,9 +2312,10 @@ static void expr(int lev) {
                         ty = t;
                     }
                 } else { // int - int
-                    if (*n == Num && *b == Num)
-                        n[1] = b[1] - n[1];
-                    else {
+                    if (*n == Num && *b == Num) {
+                        b[1] = b[1] - n[1];
+                        n = b;
+                    } else {
                         ast_Oper((int)b, Sub);
                     }
                     ty = INT;
@@ -2319,14 +2328,16 @@ static void expr(int lev) {
             typecheck(Mul, t, ty);
             if (ty == FLOAT) {
                 if (*n == NumF && *b == NumF) {
-                    *((float*)&n[1]) = (*((float*)&n[1]) * *((float*)&b[1]));
+                    *((float*)&b[1]) = (*((float*)&n[1]) * *((float*)&b[1]));
+                    n = b;
                 } else {
                     ast_Oper((int)b, MulF);
                 }
             } else {
-                if (*n == Num && *b == Num)
-                    n[1] *= b[1];
-                else {
+                if (*n == Num && *b == Num) {
+                    b[1] *= n[1];
+                    n = b;
+                } else {
                     if (n[0] == Num && n[1] > 0 && (n[1] & (n[1] - 1)) == 0) {
                         n[1] = __builtin_popcount(n[1] - 1);
                         ast_Oper((int)b, Shl); // 2^n
@@ -2361,9 +2372,10 @@ static void expr(int lev) {
                     ast_Oper((int)b, DivF);
                 }
             } else {
-                if (*n == Num && *b == Num)
-                    n[1] = b[1] / n[1];
-                else {
+                if (*n == Num && *b == Num) {
+                    b[1] /= n[1];
+                    n = b;
+                } else {
                     if (n[0] == Num && n[1] > 0 && (n[1] & (n[1] - 1)) == 0) {
                         n[1] = __builtin_popcount(n[1] - 1);
                         ast_Oper((int)b, Shr); // 2^n
@@ -2380,9 +2392,10 @@ static void expr(int lev) {
             typecheck(Mod, t, ty);
             if (ty == FLOAT)
                 die("use fmodf() for float modulo");
-            if (*n == Num && *b == Num)
-                n[1] = b[1] % n[1];
-            else {
+            if (*n == Num && *b == Num) {
+                b[1] %= n[1];
+                n = b;
+            } else {
                 if (n[1] == Num && n[2] > 0 && (n[2] & (n[2] - 1)) == 0) {
                     --n[2];
                     ast_Oper((int)b, And); // 2^n
@@ -2491,9 +2504,10 @@ static void expr(int lev) {
                     ast_Oper((int)(n + 2), Mul);
                 }
             }
-            if (*n == Num && *b == Num)
-                n[1] += b[1];
-            else {
+            if (*n == Num && *b == Num) {
+                b[1] += n[1];
+                n = b;
+            } else {
                 ast_Oper((int)b, Add);
             }
         add_simple:
@@ -3522,20 +3536,22 @@ static void stmt(int ctx) {
                             i = ty;
                             expr(Cond);
                             typecheck(Assign, i, ty);
+                            if (*n != Num && *n != NumF)
+                                die("global assignment must eval to lit expr");
                             if (ty == CHAR + PTR && (dd->type & 3) != 1)
                                 die("use decl char foo[nn] = \"...\";");
                             if ((*n == Num && (i == CHAR || i == INT)) ||
                                 (*n == NumF && i == FLOAT))
-                                *((int*)dd->val) = tkv.i;
+                                *((int*)dd->val) = n[1];
                             else if (ty == CHAR + PTR) {
-                                i = strlen((char*)tkv.i) + 1;
+                                i = strlen((char*)n[1]) + 1;
                                 if (i > (dd->etype + 1)) {
                                     i = dd->etype + 1;
                                     printf("%d: string truncated to width\n", line);
                                 }
-                                memcpy((char*)dd->val, (char*)tkv.i, i);
+                                memcpy((char*)dd->val, (char*)n[1], i);
                             } else
-                                die("global assignment must eval to lit expr");
+                                die("unsupported global initializer");
                             n += 2;
                         }
                 }
