@@ -1462,12 +1462,22 @@ typedef struct {
 } two_wrd_entry_t;
 #define two_words (*((two_wrd_entry_t*)n))
 
-static void ast_Func(int v1, int v2, int v3, int v4, int k) {
-    *--n = v1;
-    *--n = v2;
-    *--n = v3;
-    *--n = v4;
-    *--n = k;
+typedef struct {
+    int tk;
+    int next;
+    int addr;
+    int n_parms;
+    int parm_types;
+} Func_entry_t;
+#define Func_entry (*((Func_entry_t*)n))
+
+static void ast_Func(int parm_types, int n_parms, int addr, int next, int tk) {
+    n -= 5;
+    Func_entry.parm_types = parm_types;
+    Func_entry.n_parms = n_parms;
+    Func_entry.addr = addr;
+    Func_entry.next = next;
+    Func_entry.tk = tk;
 }
 
 static void ast_Cond(int v1, int v2, int v3) {
