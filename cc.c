@@ -3203,11 +3203,10 @@ static void loc_array_decl(int ct, int extent[3], int* dims, int* et, int* size)
     }
 }
 
-static void disassemble(int* base, int* le, int* e, int i_count) {
+static void disassemble(int* le, int* e, int i_count) {
     while (le < e) {
-        base -= i_count;
         le -= i_count;
-        int off = le - base; // Func IR instruction memory offset
+        int off = le - text_base; // Func IR instruction memory offset
         printf("%04d: ", off);
         printf("%08x ", *++le);
         if ((*le <= ADJ) || (*le == SYSC))
@@ -3218,7 +3217,7 @@ static void disassemble(int* base, int* le, int* e, int i_count) {
         if (*le < ADJ) {
             struct ident_s* scan;
             ++le;
-            if (*le > (int)base && *le <= (int)e)
+            if (*le > (int)text_base && *le <= (int)e)
                 printf(" %04d\n", off + ((*le - (int)le) >> 2) + 1);
             else if (*(le - 1) == LEA && !i_count) {
                 int ii = 0;
@@ -3498,7 +3497,7 @@ static void stmt(int ctx) {
                 if (src_opt) {
                     printf("%d: %.*s\n", line, p - lp, lp);
                     lp = p;
-                    disassemble(0, se, e, 0);
+                    disassemble(se, e, 0);
                 }
             unwind_func:
                 id = sym;
@@ -4033,7 +4032,7 @@ static int run(void) {
     run_level++;
 #endif
     uint32_t last_t = time_us_32();
-    int *this_pc, *base_pc;
+    int* this_pc;
     int i, sysc, strl, irqn;
     unsigned us, ms, mask;
     struct file_handle *h, *last_h;
@@ -4078,7 +4077,6 @@ static int run(void) {
             break;
         // enter subroutine
         case ENT:
-            base_pc = this_pc;
             push_ptr(bp);
             bp = sp;
             push_n(*pc++);
@@ -4973,7 +4971,7 @@ static int run(void) {
             if (run_level == 0)
 #endif
             {
-                disassemble(base_pc, this_pc, this_pc + 2, 1);
+                disassemble(this_pc, this_pc + 2, 1);
                 printf("\n");
                 printf("acc          %08x (as int) %d\n", a.i, a.i);
                 printf("accf         %f\n", a.f);
