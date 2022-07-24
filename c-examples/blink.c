@@ -9,4 +9,5 @@ int main() {
         gpio_put(LED_PIN, tic ^= 1);
         sleep_ms(500);
     }
+    return 0;
 }

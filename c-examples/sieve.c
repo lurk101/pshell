@@ -2,7 +2,7 @@
 
 char s[100];
 
-int sieve() {
+void sieve() {
     int i, j;
     for (i = 2; i < sizeof(s); i++)
         for (j = i + i; j < sizeof(s); j += i)

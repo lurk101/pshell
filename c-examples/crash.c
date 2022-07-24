@@ -2,4 +2,5 @@
 
 int main() {
     *((int*)3) = 0; // unaligneid store
+    return 0;
 }

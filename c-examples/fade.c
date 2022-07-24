@@ -36,4 +36,5 @@ int main() {
     pwm_init(slice, (int)&config, true);
     while (1)
         wfi();
+    return 0;
 }

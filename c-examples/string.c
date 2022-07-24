@@ -22,4 +22,5 @@ int main(int ac, char* av[]) {
     free(a);
     free(b);
     free(c);
+    return 0;
 }

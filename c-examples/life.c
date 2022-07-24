@@ -103,4 +103,5 @@ int main() {
     set(35, 3);
     while (true)
         next_gen();
+    return 0;
 }

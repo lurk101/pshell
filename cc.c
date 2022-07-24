@@ -1380,6 +1380,222 @@ static void next() {
     }
 }
 
+typedef struct {
+    int tk;
+    int v1;
+} Double_entry_t;
+#define Double_entry(a) (*((Double_entry_t*)a))
+
+typedef struct {
+    int tk;
+    int next;
+    int addr;
+    int n_parms;
+    int parm_types;
+} Func_entry_t;
+#define Func_entry(a) (*((Func_entry_t*)a))
+
+static void ast_Func(int parm_types, int n_parms, int addr, int next, int tk) {
+    n -= 5;
+    Func_entry(n).parm_types = parm_types;
+    Func_entry(n).n_parms = n_parms;
+    Func_entry(n).addr = addr;
+    Func_entry(n).next = next;
+    Func_entry(n).tk = tk;
+}
+
+typedef struct {
+    int tk;
+    int cond_part;
+    int if_part;
+    int else_part;
+} Cond_entry_t;
+#define Cond_entry(a) (*((Cond_entry_t*)a))
+
+static void ast_Cond(int else_part, int if_part, int cond_part) {
+    n -= 4;
+    Cond_entry(n).else_part = else_part;
+    Cond_entry(n).if_part = if_part;
+    Cond_entry(n).cond_part = cond_part;
+    Cond_entry(n).tk = Cond;
+}
+
+typedef struct {
+    int tk;
+    int type;
+    int right_part;
+} Assign_entry_t;
+#define Assign_entry(a) (*((Assign_entry_t*)a))
+
+static void ast_Assign(int right_part, int type) {
+    n -= 3;
+    Assign_entry(n).right_part = right_part;
+    Assign_entry(n).type = type;
+    Assign_entry(n).tk = Assign;
+}
+
+typedef struct {
+    int tk;
+    int v2;
+    int v1;
+} While_entry_t;
+#define While_entry(a) (*((While_entry_t*)a))
+
+static void ast_While(int v1, int v2) {
+    n -= 3;
+    While_entry(n).v1 = v1;
+    While_entry(n).v2 = v2;
+    While_entry(n).tk = While;
+}
+
+typedef struct {
+    int tk;
+    int v2;
+    int v1;
+} DoWhile_entry_t;
+#define DoWhile_entry(a) (*((DoWhile_entry_t*)a))
+
+static void ast_DoWhile(int v1, int v2) {
+    n -= 3;
+    DoWhile_entry(n).v1 = v1;
+    DoWhile_entry(n).v2 = v2;
+    DoWhile_entry(n).tk = DoWhile;
+}
+
+typedef struct {
+    int tk;
+    int v2;
+    int v1;
+} Switch_entry_t;
+#define Switch_entry(a) (*((Switch_entry_t*)a))
+
+static void ast_Switch(int v1, int v2) {
+    n -= 3;
+    Switch_entry(n).v1 = v1;
+    Switch_entry(n).v2 = v2;
+    Switch_entry(n).tk = Switch;
+}
+
+typedef struct {
+    int tk;
+    int v2;
+    int v1;
+} Case_entry_t;
+#define Case_entry(a) (*((Case_entry_t*)a))
+
+static void ast_Case(int v1, int v2) {
+    n -= 3;
+    Case_entry(n).v1 = v1;
+    Case_entry(n).v2 = v2;
+    Case_entry(n).tk = Case;
+}
+
+// two word entries
+static void ast_Return(int v1) {
+    n -= 2;
+    Double_entry(n).tk = Return;
+    Double_entry(n).v1 = v1;
+}
+
+typedef struct {
+    int tk;
+    int oprnd;
+} Oper_entry_t;
+#define Oper_entry(a) (*((Oper_entry_t*)a))
+
+static void ast_Oper(int oprnd, int op) {
+    n -= 2;
+    Oper_entry(n).tk = op;
+    Oper_entry(n).oprnd = oprnd;
+}
+
+static void ast_Num(int v1) {
+    n -= 2;
+    Double_entry(n).tk = Num;
+    Double_entry(n).v1 = v1;
+}
+
+static void ast_Label(int v1) {
+    n -= 2;
+    Double_entry(n).tk = Label;
+    Double_entry(n).v1 = v1;
+}
+
+static void ast_Enter(int v1) {
+    n -= 2;
+    Double_entry(n).tk = Enter;
+    Double_entry(n).v1 = v1;
+}
+
+static void ast_Goto(int v1) {
+    n -= 2;
+    Double_entry(n).tk = Goto;
+    Double_entry(n).v1 = v1;
+}
+
+static void ast_Default(int v1) {
+    n -= 2;
+    Double_entry(n).tk = Default;
+    Double_entry(n).v1 = v1;
+}
+
+static void ast_NumF(int v1) {
+    n -= 2;
+    Double_entry(n).tk = NumF;
+    Double_entry(n).v1 = v1;
+}
+
+static void ast_Loc(int v1) {
+    n -= 2;
+    Double_entry(n).tk = Loc;
+    Double_entry(n).v1 = v1;
+}
+
+static void ast_Load(int v1) {
+    n -= 2;
+    Double_entry(n).tk = Load;
+    Double_entry(n).v1 = v1;
+}
+
+typedef struct {
+    int tk;
+    int val;
+} CastF_entry_t;
+#define CastF_entry(a) (*((CastF_entry_t*)a))
+
+static void ast_CastF(int v1) {
+    n -= 2;
+    CastF_entry(n).tk = CastF;
+    CastF_entry(n).val = v1;
+}
+
+typedef struct {
+    int tk;
+    int addr;
+} Begin_entry_t;
+#define Begin_entry(a) (*((Begin_entry_t*)a))
+
+static void ast_Begin(int v1) {
+    n -= 2;
+    Begin_entry(n).tk = '{';
+    Begin_entry(n).addr = v1;
+}
+
+// single word entry
+
+typedef struct {
+    int tk;
+} Single_entry_t;
+#define Single_entry(a) (*((Single_entry_t*)a))
+
+#define ast_Tk(a) (Single_entry(a).tk)
+#define ast_NumVal(a) (Double_entry(a).v1)
+
+static void ast_Single(int k) {
+    n--;
+    Single_entry(n).tk = k;
+}
+
 // verify binary operations are legal
 static void typecheck(int op, int tl, int tr) {
     int pt = 0, it = 0, st = 0;
@@ -1403,9 +1619,9 @@ static void typecheck(int op, int tl, int tr) {
             ; // ptr + int or int + ptr ok
         else if (op == Sub && pt == 2 && it == 1)
             ; // ptr - int ok
-        else if (op == Assign && pt == 2 && *n == Num && n[1] == 0)
+        else if (op == Assign && pt == 2 && ast_Tk(n) == Num && ast_NumVal(n) == 0)
             ; // ok
-        else if (op >= Eq && op <= Le && *n == Num && n[1] == 0)
+        else if (op >= Eq && op <= Le && ast_Tk(n) == Num && ast_NumVal(n) == 0)
             ; // ok
         else
             die("bad pointer arithmetic");
@@ -1455,181 +1671,6 @@ static void bitopcheck(int tl, int tr) {
  * Dec    --
  * Bracket [
  */
-
-typedef struct {
-    int tk;
-    int v1;
-} two_wrd_entry_t;
-#define two_words (*((two_wrd_entry_t*)n))
-
-typedef struct {
-    int tk;
-    int next;
-    int addr;
-    int n_parms;
-    int parm_types;
-} Func_entry_t;
-#define Func_entry (*((Func_entry_t*)n))
-
-static void ast_Func(int parm_types, int n_parms, int addr, int next, int tk) {
-    n -= 5;
-    Func_entry.parm_types = parm_types;
-    Func_entry.n_parms = n_parms;
-    Func_entry.addr = addr;
-    Func_entry.next = next;
-    Func_entry.tk = tk;
-}
-
-typedef struct {
-    int tk;
-    int cond_part;
-    int if_part;
-    int else_part;
-} Cond_entry_t;
-#define Cond_entry (*((Cond_entry_t*)n))
-
-static void ast_Cond(int else_part, int if_part, int cond_part) {
-    n -= 4;
-    Cond_entry.else_part = else_part;
-    Cond_entry.if_part = if_part;
-    Cond_entry.cond_part = cond_part;
-    Cond_entry.tk = Cond;
-}
-
-typedef struct {
-    int tk;
-    int type;
-    int right_part;
-} Assign_entry_t;
-#define Assign_entry (*((Assign_entry_t*)n))
-
-static void ast_Assign(int right_part, int type) {
-    n -= 3;
-    Assign_entry.right_part = right_part;
-    Assign_entry.type = type;
-    Assign_entry.tk = Assign;
-}
-
-static void ast_While(int v1, int v2) {
-    *--n = v1;
-    *--n = v2;
-    *--n = While;
-}
-
-static void ast_DoWhile(int v1, int v2) {
-    *--n = v1;
-    *--n = v2;
-    *--n = DoWhile;
-}
-
-static void ast_Switch(int v1, int v2) {
-    *--n = v1;
-    *--n = v2;
-    *--n = Switch;
-}
-
-static void ast_Case(int v1, int v2) {
-    *--n = v1;
-    *--n = v2;
-    *--n = Case;
-}
-
-// two word entries
-static void ast_Return(int v1) {
-    n -= 2;
-    two_words.tk = Return;
-    two_words.v1 = v1;
-}
-
-static void ast_Oper(int v1, int op) {
-    n -= 2;
-    two_words.tk = op;
-    two_words.v1 = v1;
-}
-
-static void ast_Num(int v1) {
-    n -= 2;
-    two_words.tk = Num;
-    two_words.v1 = v1;
-}
-
-static void ast_Label(int v1) {
-    n -= 2;
-    two_words.tk = Label;
-    two_words.v1 = v1;
-}
-
-static void ast_Enter(int v1) {
-    n -= 2;
-    two_words.tk = Enter;
-    two_words.v1 = v1;
-}
-
-static void ast_Goto(int v1) {
-    n -= 2;
-    two_words.tk = Goto;
-    two_words.v1 = v1;
-}
-
-static void ast_Default(int v1) {
-    n -= 2;
-    two_words.tk = Default;
-    two_words.v1 = v1;
-}
-
-static void ast_NumF(int v1) {
-    n -= 2;
-    two_words.tk = NumF;
-    two_words.v1 = v1;
-}
-
-static void ast_Loc(int v1) {
-    n -= 2;
-    two_words.tk = Loc;
-    two_words.v1 = v1;
-}
-
-static void ast_Load(int v1) {
-    n -= 2;
-    two_words.tk = Load;
-    two_words.v1 = v1;
-}
-
-typedef struct {
-    int tk;
-    int val;
-} CastF_entry_t;
-#define CastF_entry (*((CastF_entry_t*)n))
-
-static void ast_CastF(int v1) {
-    n -= 2;
-    CastF_entry.tk = CastF;
-    CastF_entry.val = v1;
-}
-
-typedef struct {
-    int tk;
-    int addr;
-} Begin_entry_t;
-#define Begin_entry (*((Begin_entry_t*)n))
-
-static void ast_Begin(int v1) {
-    n -= 2;
-    Begin_entry.tk = '{';
-    Begin_entry.addr = v1;
-}
-
-// single word entry
-
-typedef struct {
-    int tk;
-} Single_entry_t;
-#define Single_entry (*((Single_entry_t*)n))
-
-static void ast_Single(int k) {
-    n--;
-    Single_entry.tk = k;
-}
 
 static void expr(int lev) {
     int t, tc, tt, nf, *b, sz, *c;
@@ -1792,7 +1833,7 @@ static void expr(int lev) {
                          : ((ty >= PTR) ? sizeof(int) : tsize[ty >> 2]));
         // just one dimension supported at the moment
         if (d != 0 && (ty & 3))
-            n[1] *= (id->etype + 1);
+            ast_NumVal(n) *= (id->etype + 1);
         ty = INT;
         break;
     // Type cast or parenthesis
@@ -1825,18 +1866,18 @@ static void expr(int lev) {
             expr(Inc); // cast has precedence as Inc(++)
             if (t != ty && (t == FLOAT || ty == FLOAT)) {
                 if (t == FLOAT && ty < FLOAT) { // float : int
-                    if (*n == Num) {
-                        *n = NumF;
-                        *((float*)&n[1]) = n[1];
+                    if (ast_Tk(n) == Num) {
+                        ast_Tk(n) = NumF;
+                        *((float*)&ast_NumVal(n)) = ast_NumVal(n);
                     } else {
                         b = n;
                         ast_Single(ITOF);
                         ast_CastF((int)b);
                     }
                 } else if (t < FLOAT && ty == FLOAT) { // int : float
-                    if (*n == NumF) {
-                        *n = Num;
-                        n[1] = *((float*)&n[1]);
+                    if (ast_Tk(n) == NumF) {
+                        ast_Tk(n) = Num;
+                        ast_NumVal(n) = *((float*)&ast_NumVal(n));
                     } else {
                         b = n;
                         ast_Single(FTOI);
@@ -1874,7 +1915,7 @@ static void expr(int lev) {
          */
         next();
         expr(Inc);
-        if (*n != Load)
+        if (ast_Tk(n) != Load)
             die("bad address-of");
         n += 2;
         ty += PTR;
@@ -1884,8 +1925,8 @@ static void expr(int lev) {
         expr(Inc);
         if (ty > ATOM_TYPE && ty < PTR)
             die("!(struct/union) is meaningless");
-        if (*n == Num)
-            n[1] = !n[1];
+        if (ast_Tk(n) == Num)
+            ast_NumVal(n) = !ast_NumVal(n);
         else {
             ast_Num(0);
             ast_Oper((int)(n + 2), Eq);
@@ -1897,8 +1938,8 @@ static void expr(int lev) {
         expr(Inc);
         if (ty > ATOM_TYPE)
             die("~ptr is illegal");
-        if (*n == Num)
-            n[1] = ~n[1];
+        if (ast_Tk(n) == Num)
+            ast_NumVal(n) = ~ast_NumVal(n);
         else {
             ast_Num(-1);
             ast_Oper((int)(n + 2), Xor);
@@ -1916,10 +1957,10 @@ static void expr(int lev) {
         expr(Inc);
         if (ty > ATOM_TYPE)
             die("unary '-' illegal on ptr");
-        if (*n == Num)
-            n[1] = -n[1];
-        else if (*n == NumF) {
-            n[1] ^= 0x80000000;
+        if (ast_Tk(n) == Num)
+            ast_NumVal(n) = -ast_NumVal(n);
+        else if (ast_Tk(n) == NumF) {
+            ast_NumVal(n) ^= 0x80000000;
         } else if (ty == FLOAT) {
             ast_NumF(0xbf800000);
             ast_Oper((int)(n + 2), MulF);
@@ -1937,9 +1978,9 @@ static void expr(int lev) {
         expr(Inc);
         if (ty == FLOAT)
             die("no ++/-- on float");
-        if (*n != Load)
+        if (ast_Tk(n) != Load)
             die("bad lvalue in pre-increment");
-        *n = t;
+        ast_Tk(n) = t;
         break;
     case 0:
         die("unexpected EOF in expression");
@@ -1959,7 +2000,7 @@ static void expr(int lev) {
                 die("Cannot assign to array type lvalue");
             // the left part is processed by the variable part of `tk=ID`
             // and pushes the address
-            if (*n != Load)
+            if (ast_Tk(n) != Load)
                 die("bad lvalue in assignment");
             // get the value of the right part `expr` as the result of `a=expr`
             n += 2;
@@ -1982,7 +2023,7 @@ static void expr(int lev) {
         case ModAssign:
             if (t & 3)
                 die("Cannot assign to array type lvalue");
-            if (*n != Load)
+            if (ast_Tk(n) != Load)
                 die("bad lvalue in assignment");
             otk = tk;
             n += 2;
@@ -1993,12 +2034,12 @@ static void expr(int lev) {
             next();
             c = n;
             expr(otk);
-            if (*n == Num)
-                n[1] *= sz;
+            if (ast_Tk(n) == Num)
+                ast_NumVal(n) *= sz;
             ast_Oper((int)c, (otk < ShlAssign) ? Or + (otk - OrAssign) : Shl + (otk - ShlAssign));
             if (t == FLOAT && (otk >= AddAssign && otk <= DivAssign))
-                *n += 5;
-            typecheck(*n, t, ty);
+                ast_Tk(n) += 5;
+            typecheck(ast_Tk(n), t, ty);
             ast_Assign((int)b, (ty << 16) | t);
             ty = t;
             break;
@@ -2018,8 +2059,8 @@ static void expr(int lev) {
         case Lor: // short circuit, the logical or
             next();
             expr(Lan);
-            if (*n == Num && *b == Num) {
-                b[1] = b[1] || n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) = ast_NumVal(b) || ast_NumVal(n);
                 n = b;
             } else {
                 ast_Oper((int)b, Lor);
@@ -2029,8 +2070,8 @@ static void expr(int lev) {
         case Lan: // short circuit, logic and
             next();
             expr(Or);
-            if (*n == Num && *b == Num) {
-                b[1] = b[1] && n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) = ast_NumVal(b) && ast_NumVal(n);
                 n = b;
             } else {
                 ast_Oper((int)b, Lan);
@@ -2041,8 +2082,8 @@ static void expr(int lev) {
             next();
             expr(Xor);
             bitopcheck(t, ty);
-            if (*n == Num && *b == Num) {
-                b[1] = b[1] | n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) = ast_NumVal(b) | ast_NumVal(n);
                 n = b;
             } else {
                 ast_Oper((int)b, Or);
@@ -2053,8 +2094,8 @@ static void expr(int lev) {
             next();
             expr(And);
             bitopcheck(t, ty);
-            if (*n == Num && *b == Num) {
-                b[1] = b[1] ^ n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) = ast_NumVal(b) ^ ast_NumVal(n);
                 n = b;
             } else {
                 ast_Oper((int)b, Xor);
@@ -2065,8 +2106,8 @@ static void expr(int lev) {
             next();
             expr(Eq);
             bitopcheck(t, ty);
-            if (*n == Num && *b == Num) {
-                b[1] = b[1] & n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) = ast_NumVal(b) & ast_NumVal(n);
                 n = b;
             } else {
                 ast_Oper((int)b, And);
@@ -2078,15 +2119,15 @@ static void expr(int lev) {
             expr(Ge);
             typecheck(Eq, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    n[1] = n[1] == b[1];
-                    *n = Num;
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    ast_NumVal(n) = ast_NumVal(n) == ast_NumVal(b);
+                    ast_Tk(n) = Num;
                 } else {
                     ast_Oper((int)b, EqF);
                 }
             } else {
-                if (*n == Num && *b == Num) {
-                    b[1] = b[1] == n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) = ast_NumVal(b) == ast_NumVal(n);
                     n = b;
                 } else {
                     ast_Oper((int)b, Eq);
@@ -2099,16 +2140,16 @@ static void expr(int lev) {
             expr(Ge);
             typecheck(Ne, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    b[1] = n[1] != b[1];
-                    *b = Num;
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    ast_NumVal(b) = ast_NumVal(n) != ast_NumVal(b);
+                    ast_Tk(b) = Num;
                     n = b;
                 } else {
                     ast_Oper((int)b, NeF);
                 }
             } else {
-                if (*n == Num && *b == Num) {
-                    b[1] = b[1] != n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) = ast_NumVal(b) != ast_NumVal(n);
                     n = b;
                 } else {
                     ast_Oper((int)b, Ne);
@@ -2121,15 +2162,15 @@ static void expr(int lev) {
             expr(Shl);
             typecheck(Ge, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    b[1] = (*((float*)&b[1]) >= *((float*)&n[1]));
-                    *n = Num;
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    ast_NumVal(b) = (*((float*)&ast_NumVal(b)) >= *((float*)&ast_NumVal(n)));
+                    ast_Tk(n) = Num;
                 } else {
                     ast_Oper((int)b, GeF);
                 }
             } else {
-                if (*n == Num && *b == Num) {
-                    b[1] = b[1] >= n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) = ast_NumVal(b) >= ast_NumVal(n);
                     n = b;
                 } else {
                     ast_Oper((int)b, Ge);
@@ -2142,15 +2183,15 @@ static void expr(int lev) {
             expr(Shl);
             typecheck(Lt, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    b[1] = (*((float*)&b[1]) < *((float*)&n[1]));
-                    *n = Num;
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    ast_NumVal(b) = (*((float*)&ast_NumVal(b)) < *((float*)&ast_NumVal(n)));
+                    ast_Tk(n) = Num;
                 } else {
                     ast_Oper((int)b, LtF);
                 }
             } else {
-                if (*n == Num && *b == Num) {
-                    b[1] = b[1] < n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) = ast_NumVal(b) < ast_NumVal(n);
                     n = b;
                 } else {
                     ast_Oper((int)b, Lt);
@@ -2163,15 +2204,15 @@ static void expr(int lev) {
             expr(Shl);
             typecheck(Gt, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    n[1] = (*((float*)&b[1]) > *((float*)&n[1]));
-                    *n = Num;
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    ast_NumVal(n) = (*((float*)&ast_NumVal(b)) > *((float*)&ast_NumVal(n)));
+                    ast_Tk(n) = Num;
                 } else {
                     ast_Oper((int)b, GtF);
                 }
             } else {
-                if (*n == Num && *b == Num) {
-                    b[1] = b[1] > n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) = ast_NumVal(b) > ast_NumVal(n);
                     n = b;
                 } else {
                     ast_Oper((int)b, Gt);
@@ -2184,15 +2225,15 @@ static void expr(int lev) {
             expr(Shl);
             typecheck(Le, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    n[1] = (*((float*)&b[1]) <= *((float*)&n[1]));
-                    *n = Num;
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    ast_NumVal(n) = (*((float*)&ast_NumVal(b)) <= *((float*)&ast_NumVal(n)));
+                    ast_Tk(n) = Num;
                 } else {
                     ast_Oper((int)b, LeF);
                 }
             } else {
-                if (*n == Num && *b == Num) {
-                    b[1] = b[1] <= n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) = ast_NumVal(b) <= ast_NumVal(n);
                     n = b;
                 } else {
                     ast_Oper((int)b, Le);
@@ -2204,8 +2245,9 @@ static void expr(int lev) {
             next();
             expr(Add);
             bitopcheck(t, ty);
-            if (*n == Num && *b == Num) {
-                b[1] = (n[1] < 0) ? b[1] >> -n[1] : b[1] << n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) = (ast_NumVal(n) < 0) ? ast_NumVal(b) >> -ast_NumVal(n)
+                                                    : ast_NumVal(b) << ast_NumVal(n);
                 n = b;
             } else {
                 ast_Oper((int)b, Shl);
@@ -2216,8 +2258,9 @@ static void expr(int lev) {
             next();
             expr(Add);
             bitopcheck(t, ty);
-            if (*n == Num && *b == Num) {
-                b[1] = (n[1] < 0) ? b[1] << -n[1] : b[1] >> n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) = (ast_NumVal(n) < 0) ? ast_NumVal(b) << -ast_NumVal(n)
+                                                    : ast_NumVal(b) >> ast_NumVal(n);
                 n = b;
             } else {
                 ast_Oper((int)b, Shr);
@@ -2229,8 +2272,9 @@ static void expr(int lev) {
             expr(Mul);
             typecheck(Add, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    *((float*)&n[1]) = (*((float*)&b[1]) + *((float*)&n[1]));
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    *((float*)&ast_NumVal(n)) =
+                        (*((float*)&ast_NumVal(b)) + *((float*)&ast_NumVal(n)));
                 } else {
                     ast_Oper((int)b, AddF);
                 }
@@ -2240,15 +2284,15 @@ static void expr(int lev) {
                 if (tc)
                     ty = t;
                 sz = (ty >= PTR2) ? sizeof(int) : ((ty >= PTR) ? tsize[(ty - PTR) >> 2] : 1);
-                if (*n == Num && tc) {
-                    n[1] *= sz;
+                if (ast_Tk(n) == Num && tc) {
+                    ast_NumVal(n) *= sz;
                     sz = 1;
-                } else if (*b == Num && !tc) {
-                    b[1] *= sz;
+                } else if (ast_Tk(b) == Num && !tc) {
+                    ast_NumVal(b) *= sz;
                     sz = 1;
                 }
-                if (*n == Num && *b == Num) {
-                    b[1] += n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) += ast_NumVal(n);
                     n = b;
                 } else if (sz != 1) {
                     ast_Num(sz);
@@ -2264,8 +2308,9 @@ static void expr(int lev) {
             expr(Mul);
             typecheck(Sub, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    *((float*)&n[1]) = (*((float*)&b[1]) - *((float*)&n[1]));
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    *((float*)&ast_NumVal(n)) =
+                        (*((float*)&ast_NumVal(b)) - *((float*)&ast_NumVal(n)));
                 } else {
                     ast_Oper((int)b, SubF);
                 }
@@ -2273,8 +2318,8 @@ static void expr(int lev) {
                 if (t >= PTR) { // left arg is ptr
                     sz = (t >= PTR2) ? sizeof(int) : tsize[(t - PTR) >> 2];
                     if (ty >= PTR) { // ptr - ptr
-                        if (*n == Num && *b == Num) {
-                            b[1] = (b[1] - n[1]) / sz;
+                        if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                            ast_NumVal(b) = (ast_NumVal(b) - ast_NumVal(n)) / sz;
                             n = b;
                         } else {
                             ast_Oper((int)b, Sub);
@@ -2290,10 +2335,10 @@ static void expr(int lev) {
                         }
                         ty = INT;
                     } else { // ptr - int
-                        if (*n == Num) {
-                            n[1] *= sz;
-                            if (*b == Num)
-                                n[1] = b[1] - n[1];
+                        if (ast_Tk(n) == Num) {
+                            ast_NumVal(n) *= sz;
+                            if (ast_Tk(b) == Num)
+                                ast_NumVal(n) = ast_NumVal(b) - ast_NumVal(n);
                             else {
                                 ast_Oper((int)b, Sub);
                             }
@@ -2312,8 +2357,8 @@ static void expr(int lev) {
                         ty = t;
                     }
                 } else { // int - int
-                    if (*n == Num && *b == Num) {
-                        b[1] = b[1] - n[1];
+                    if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                        ast_NumVal(b) = ast_NumVal(b) - ast_NumVal(n);
                         n = b;
                     } else {
                         ast_Oper((int)b, Sub);
@@ -2327,19 +2372,20 @@ static void expr(int lev) {
             expr(Inc);
             typecheck(Mul, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    *((float*)&b[1]) = (*((float*)&n[1]) * *((float*)&b[1]));
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    *((float*)&ast_NumVal(b)) *= *((float*)&ast_NumVal(n));
                     n = b;
                 } else {
                     ast_Oper((int)b, MulF);
                 }
             } else {
-                if (*n == Num && *b == Num) {
-                    b[1] *= n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) *= ast_NumVal(n);
                     n = b;
                 } else {
-                    if (n[0] == Num && n[1] > 0 && (n[1] & (n[1] - 1)) == 0) {
-                        n[1] = __builtin_popcount(n[1] - 1);
+                    if (ast_Tk(n) == Num && ast_NumVal(n) > 0 &&
+                        (ast_NumVal(n) & (ast_NumVal(n) - 1)) == 0) {
+                        ast_NumVal(n) = __builtin_popcount(ast_NumVal(n) - 1);
                         ast_Oper((int)b, Shl); // 2^n
                     } else
                         ast_Oper((int)b, Mul);
@@ -2354,9 +2400,9 @@ static void expr(int lev) {
             if (ty == FLOAT)
                 die("no ++/-- on float");
             sz = (ty >= PTR2) ? sizeof(int) : ((ty >= PTR) ? tsize[(ty - PTR) >> 2] : 1);
-            if (*n != Load)
+            if (ast_Tk(n) != Load)
                 die("bad lvalue in post-increment");
-            *n = tk;
+            ast_Tk(n) = tk;
             ast_Num(sz);
             ast_Oper((int)b, (tk == Inc) ? Sub : Add);
             next();
@@ -2366,18 +2412,20 @@ static void expr(int lev) {
             expr(Inc);
             typecheck(Div, t, ty);
             if (ty == FLOAT) {
-                if (*n == NumF && *b == NumF) {
-                    *((float*)&n[1]) = (*((float*)&b[1]) / *((float*)&n[1]));
+                if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
+                    *((float*)&ast_NumVal(n)) =
+                        (*((float*)&ast_NumVal(b)) / *((float*)&ast_NumVal(n)));
                 } else {
                     ast_Oper((int)b, DivF);
                 }
             } else {
-                if (*n == Num && *b == Num) {
-                    b[1] /= n[1];
+                if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                    ast_NumVal(b) /= ast_NumVal(n);
                     n = b;
                 } else {
-                    if (n[0] == Num && n[1] > 0 && (n[1] & (n[1] - 1)) == 0) {
-                        n[1] = __builtin_popcount(n[1] - 1);
+                    if (ast_Tk(n) == Num && ast_NumVal(n) > 0 &&
+                        (ast_NumVal(n) & (ast_NumVal(n) - 1)) == 0) {
+                        ast_NumVal(n) = __builtin_popcount(ast_NumVal(n) - 1);
                         ast_Oper((int)b, Shr); // 2^n
                     } else {
                         ast_Oper((int)b, Div);
@@ -2392,11 +2440,11 @@ static void expr(int lev) {
             typecheck(Mod, t, ty);
             if (ty == FLOAT)
                 die("use fmodf() for float modulo");
-            if (*n == Num && *b == Num) {
-                b[1] %= n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) %= ast_NumVal(n);
                 n = b;
             } else {
-                if (n[1] == Num && n[2] > 0 && (n[2] & (n[2] - 1)) == 0) {
+                if (ast_NumVal(n) == Num && n[2] > 0 && (n[2] & (n[2] - 1)) == 0) {
                     --n[2];
                     ast_Oper((int)b, And); // 2^n
                 } else {
@@ -2407,7 +2455,7 @@ static void expr(int lev) {
             break;
         case Dot:
             t += PTR;
-            if (n[0] == Load && n[1] > ATOM_TYPE && n[1] < PTR)
+            if (ast_Tk(n) == Load && ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR)
                 n += 2; // struct
         case Arrow:
             if (t <= PTR + ATOM_TYPE || t >= PTR2)
@@ -2463,12 +2511,12 @@ static void expr(int lev) {
                     factor *=
                         ((dim == 3 && ii >= 1) ? ((ee & 0x7ff) + 1)
                                                : ((dim == 2 && ii == 1) ? ((ee & 0xffff) + 1) : 1));
-                    if (*n == Num) {
+                    if (ast_Tk(n) == Num) {
                         // elision with struct offset for efficiency
-                        if (*b == Add && b[2] == Num)
-                            b[3] += factor * n[1] * sz;
+                        if (ast_Tk(b) == Add && b[2] == Num)
+                            b[3] += factor * ast_NumVal(n) * sz;
                         else
-                            sum += factor * n[1];
+                            sum += factor * ast_NumVal(n);
                         n += 2; // delete the subscript constant
                     } else {
                         // generate code to add a term
@@ -2497,15 +2545,15 @@ static void expr(int lev) {
                     goto add_simple;
             }
             if (sz > 1) {
-                if (*n == Num)
-                    n[1] *= sz;
+                if (ast_Tk(n) == Num)
+                    ast_NumVal(n) *= sz;
                 else {
                     ast_Num(sz);
                     ast_Oper((int)(n + 2), Mul);
                 }
             }
-            if (*n == Num && *b == Num) {
-                b[1] += n[1];
+            if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
+                ast_NumVal(b) += ast_NumVal(n);
                 n = b;
             } else {
                 ast_Oper((int)b, Add);
@@ -2572,29 +2620,30 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
                 break;
         } else {
             expr(Cond);
-            if (*n != Num && *n != NumF)
+            if (ast_Tk(n) != Num && ast_Tk(n) != NumF)
                 die("non-literal initializer");
 
             if (ty == CHAR + PTR) {
                 if (match == CHAR + PTR) {
-                    off = strlen((char*)n[1]) + 1;
+                    off = strlen((char*)ast_NumVal(n)) + 1;
                     if (off > inc[0]) {
                         off = inc[0];
-                        printf("%d: string '%s' truncated to %d chars\n", line, (char*)n[1], off);
+                        printf("%d: string '%s' truncated to %d chars\n", line,
+                               (char*)ast_NumVal(n), off);
                     }
-                    memcpy((char*)vi + i, (char*)n[1], off);
+                    memcpy((char*)vi + i, (char*)ast_NumVal(n), off);
                     i += inc[0];
                 } else
                     die("can't assign string to scalar");
             } else if (ty == match) {
-                vi[i++] = n[1];
+                vi[i++] = ast_NumVal(n);
             } else if (ty == INT) {
                 if (match == CHAR + PTR) {
-                    *((char*)vi + i) = n[1];
+                    *((char*)vi + i) = ast_NumVal(n);
                     i += inc[0];
                 } else {
-                    *((float*)(n + 1)) = (float)n[1];
-                    vi[i++] = n[1];
+                    *((float*)(n + 1)) = (float)ast_NumVal(n);
+                    vi[i++] = ast_NumVal(n);
                 }
             } else if (ty == FLOAT) {
                 if (match == INT) {
@@ -2614,45 +2663,45 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 // With a modular code generator, new targets can be easily supported such as
 // native Arm machine code.
 static void gen(int* n) {
-    int i = *n, j, k, l;
+    int i = ast_Tk(n), j, k, l;
     int *a, *b, *c, *d, *t;
     struct ident_s* label;
 
     switch (i) {
     case Num:
         *++e = IMM;
-        *++e = n[1];
+        *++e = ast_NumVal(n);
         break; // int value
     case NumF:
         *++e = IMMF;
-        *++e = n[1];
+        *++e = ast_NumVal(n);
         break; // float value
     case Load:
         gen(n + 2);                         // load the value
-        if (n[1] > ATOM_TYPE && n[1] < PTR) // unreachable?
+        if (ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR) // unreachable?
             die("struct copies not yet supported");
-        *++e = (n[1] >= PTR) ? LI : LC + (n[1] >> 2);
+        *++e = (ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2);
         break;
     case Loc:
         *++e = LEA;
-        *++e = n[1];
+        *++e = ast_NumVal(n);
         break; // get address of variable
     case '{':
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         gen(n + 2);
         break;   // parse AST expr or stmt
     case Assign: // assign the value to variables
         gen((int*)n[2]);
         *++e = PSH;
         gen(n + 3);
-        l = n[1] & 0xffff;
+        l = ast_NumVal(n) & 0xffff;
         // Add SC/SI instruction to save value in register to variable address
         // held on stack.
         if (l > ATOM_TYPE && l < PTR)
             die("struct assign not yet supported");
-        if ((n[1] >> 16) == FLOAT && l == INT)
+        if ((ast_NumVal(n) >> 16) == FLOAT && l == INT)
             *++e = FTOI;
-        else if ((n[1] >> 16) == INT && l == FLOAT)
+        else if ((ast_NumVal(n) >> 16) == INT && l == FLOAT)
             *++e = ITOF;
         *++e = (l >= PTR) ? SI : SC + (l >> 2);
         break;
@@ -2660,15 +2709,17 @@ static void gen(int* n) {
     case Dec:
         gen(n + 2);
         *++e = PSH;
-        *++e = (n[1] == CHAR) ? LC : LI;
+        *++e = (ast_NumVal(n) == CHAR) ? LC : LI;
         *++e = PSH;
         *++e = IMM;
-        *++e = (n[1] >= PTR2) ? sizeof(int) : ((n[1] >= PTR) ? tsize[(n[1] - PTR) >> 2] : 1);
+        *++e = (ast_NumVal(n) >= PTR2)
+                   ? sizeof(int)
+                   : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1);
         *++e = (i == Inc) ? ADD : SUB;
-        *++e = (n[1] == CHAR) ? SC : SI;
+        *++e = (ast_NumVal(n) == CHAR) ? SC : SI;
         break;
     case Cond:           // if else condition case
-        gen((int*)n[1]); // condition
+        gen((int*)ast_NumVal(n)); // condition
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
         *++e = BZ;
@@ -2681,10 +2732,10 @@ static void gen(int* n) {
         // Point "b" to the jump address field to be patched later.
         if (n[3]) {
             if (*e == LEV) {
-                l = *b = (int)(e + 1);
+                l = ast_Tk(b) = (int)(e + 1);
                 b = 0;
             } else {
-                l = *b = (int)(e + 3);
+                l = ast_Tk(b) = (int)(e + 3);
                 *++e = JMP;
                 b = ++e;
             }
@@ -2695,9 +2746,9 @@ static void gen(int* n) {
         // Patch the jump address field pointed to by "d" to hold the address
         // past the false branch.
         if (b != 0) {
-            *b = (int)(e + 1);
-            if (last_jmp < *b)
-                last_jmp = *b;
+            ast_Tk(b) = (int)(e + 1);
+            if (last_jmp < ast_Tk(b))
+                last_jmp = ast_Tk(b);
         }
         break;
     // operators
@@ -2709,18 +2760,18 @@ static void gen(int* n) {
      * the RHS expression.
      */
     case Lor:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = BNZ;
         b = ++e;
         gen(n + 2);
-        *b = (int)(e + 1);
+        ast_Tk(b) = (int)(e + 1);
         break;
     case Lan:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = BZ;
         b = ++e;
         gen(n + 2);
-        *b = (int)(e + 1);
+        ast_Tk(b) = (int)(e + 1);
         break;
     /* If current token is bitwise OR operator:
      * Add "PSH" instruction to push LHS value in register to stack.
@@ -2728,177 +2779,177 @@ static void gen(int* n) {
      * Add "OR" instruction to compute the result.
      */
     case Or:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = OR;
         break;
     case Xor:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = XOR;
         break;
     case And:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = AND;
         break;
     case Eq:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = EQ;
         break;
     case Ne:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = NE;
         break;
     case Ge:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = GE;
         break;
     case Lt:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = LT;
         break;
     case Gt:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = GT;
         break;
     case Le:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = LE;
         break;
     case Shl:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = SHL;
         break;
     case Shr:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = SHR;
         break;
     case Add:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = ADD;
         break;
     case Sub:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = SUB;
         break;
     case Mul:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = MUL;
         break;
     case Div:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = DIV;
         break;
     case Mod:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSH;
         gen(n + 2);
         *++e = MOD;
         break;
     case AddF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = ADDF;
         break;
     case SubF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = SUBF;
         break;
     case MulF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = MULF;
         break;
     case DivF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = DIVF;
         break;
     case EqF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = EQF;
         break;
     case NeF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = NEF;
         break;
     case GeF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = GEF;
         break;
     case LtF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = LTF;
         break;
     case GtF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = GTF;
         break;
     case LeF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = PSHF;
         gen(n + 2);
         *++e = LEF;
         break;
     case CastF:
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         *++e = n[2];
         break;
     case Func:
     case Syscall:
-        b = (int*)n[1];
+        b = (int*)ast_NumVal(n);
         k = b ? n[3] : 0;
         if (k) {
             l = n[4] >> 10;
             if (!(a = (int*)sys_malloc(sizeof(int) * (k + 1))))
                 die("no cache memory");
             j = 0;
-            while (*b) {
+            while (ast_Tk(b)) {
                 a[j++] = (int)b;
-                b = (int*)*b;
+                b = (int*)ast_Tk(b);
             }
             int sj = j;
             while (j >= 0) { // push arguments
@@ -2939,7 +2990,7 @@ static void gen(int* n) {
         brks = 0;
         c = cnts;
         cnts = 0;
-        gen((int*)n[1]); // loop body
+        gen((int*)ast_NumVal(n)); // loop body
         if (i == While)
             *a = (int)(e + 1);
         while (cnts) {
@@ -2952,7 +3003,7 @@ static void gen(int* n) {
         *++e = BNZ;
         *++e = (int)d;
         while (brks) {
-            t = (int*)*brks;
+            t = (int*)brks;
             *brks = (int)(e + 1);
             brks = t;
         }
@@ -2976,18 +3027,18 @@ static void gen(int* n) {
         cnts = c;
         gen((int*)n[2]); // increment
         *a = (int)(e + 1);
-        gen((int*)n[1]); // condition
+        gen((int*)ast_NumVal(n)); // condition
         *++e = BNZ;
         *++e = (int)d;
         while (brks) {
-            t = (int*)*brks;
+            t = (int*)brks;
             *brks = (int)(e + 1);
             brks = t;
         }
         brks = b;
         break;
     case Switch:
-        gen((int*)n[1]); // condition
+        gen((int*)ast_NumVal(n)); // condition
         a = cas;
         *++e = JMP;
         cas = ++e;
@@ -2999,7 +3050,7 @@ static void gen(int* n) {
         *cas = def ? (int)def : (int)(e + 1);
         cas = a;
         while (brks) {
-            t = (int*)*brks;
+            t = (int*)brks;
             *brks = (int)(e + 1);
             brks = t;
         }
@@ -3014,7 +3065,7 @@ static void gen(int* n) {
         *++e = PSH;
         i = *cas;
         *cas = (int)e;
-        gen((int*)n[1]); // condition
+        gen((int*)ast_NumVal(n)); // condition
         if (*(e - 1) != IMM)
             die("case label not a numeric literal");
         *++e = SUB;
@@ -3038,7 +3089,7 @@ static void gen(int* n) {
         cnts = e;
         break;
     case Goto:
-        label = (struct ident_s*)n[1];
+        label = (struct ident_s*)ast_NumVal(n);
         *++e = JMP;
         *++e = label->val;
         if (label->class == 0)
@@ -3046,16 +3097,16 @@ static void gen(int* n) {
         break;
     case Default:
         def = e + 1;
-        gen((int*)n[1]);
+        gen((int*)ast_NumVal(n));
         break;
     case Return:
-        if (n[1])
-            gen((int*)n[1]);
+        if (ast_NumVal(n))
+            gen((int*)ast_NumVal(n));
         *++e = LEV;
         break;
     case Enter:
         *++e = ENT;
-        *++e = n[1];
+        *++e = ast_NumVal(n);
         last_jmp = 0x80000000;
         gen(n + 2);
         if (*e == LEV && last_jmp != 0x8000000) {
@@ -3085,7 +3136,7 @@ static void gen(int* n) {
             *++e = LEV;
         break;
     case Label: // target of goto
-        label = (struct ident_s*)n[1];
+        label = (struct ident_s*)ast_NumVal(n);
         if (label->class != 0)
             die("duplicate label definition");
         d = e + 1;
@@ -3093,8 +3144,8 @@ static void gen(int* n) {
             last_jmp = (int)d;
         b = (int*)label->val;
         while (b != 0) {
-            t = (int*)*b;
-            *b = (int)d;
+            t = (int*)ast_Tk(b);
+            ast_Tk(b) = (int)d;
             b = t;
         }
         label->val = (int)d;
@@ -3134,15 +3185,15 @@ static void loc_array_decl(int ct, int extent[3], int* dims, int* et, int* size)
             next();
         } else {
             expr(Cond);
-            if (*n != Num)
+            if (ast_Tk(n) != Num)
                 die("non-const array size");
-            if (n[1] <= 0)
+            if (ast_NumVal(n) <= 0)
                 die("non-positive array dimension");
             if (tk != ']')
                 die("missing ]");
             next();
-            extent[*dims] = n[1];
-            *size *= n[1];
+            extent[*dims] = ast_NumVal(n);
+            *size *= ast_NumVal(n);
             n += 2;
         }
         ++*dims;
@@ -3247,9 +3298,9 @@ static void stmt(int ctx) {
                 if (tk == Assign) {
                     next();
                     expr(Cond);
-                    if (*n != Num)
+                    if (ast_Tk(n) != Num)
                         die("bad enum initializer");
-                    i = n[1];
+                    i = ast_NumVal(n);
                     n += 2; // Set enum value
                 }
                 dd->class = Num;
@@ -3452,7 +3503,7 @@ static void stmt(int ctx) {
                 if (rtf == 0 && rtt != -1)
                     die("expecting return value");
                 ast_Enter(ld - loc);
-                if (oid && n[1] >= 64)
+                if (oid && ast_NumVal(n) >= 64)
                     printf("--> %d: move %.*s to global scope for performance.\n", oline,
                            (oid->hash & 0x3f), oid->name);
                 cas = 0;
@@ -3536,20 +3587,20 @@ static void stmt(int ctx) {
                             i = ty;
                             expr(Cond);
                             typecheck(Assign, i, ty);
-                            if (*n != Num && *n != NumF)
+                            if (ast_Tk(n) != Num && ast_Tk(n) != NumF)
                                 die("global assignment must eval to lit expr");
                             if (ty == CHAR + PTR && (dd->type & 3) != 1)
                                 die("use decl char foo[nn] = \"...\";");
-                            if ((*n == Num && (i == CHAR || i == INT)) ||
-                                (*n == NumF && i == FLOAT))
-                                *((int*)dd->val) = n[1];
+                            if ((ast_Tk(n) == Num && (i == CHAR || i == INT)) ||
+                                (ast_Tk(n) == NumF && i == FLOAT))
+                                *((int*)dd->val) = ast_NumVal(n);
                             else if (ty == CHAR + PTR) {
-                                i = strlen((char*)n[1]) + 1;
+                                i = strlen((char*)ast_NumVal(n)) + 1;
                                 if (i > (dd->etype + 1)) {
                                     i = dd->etype + 1;
                                     printf("%d: string truncated to width\n", line);
                                 }
-                                memcpy((char*)dd->val, (char*)n[1], i);
+                                memcpy((char*)dd->val, (char*)ast_NumVal(n), i);
                             } else
                                 die("unsupported global initializer");
                             n += 2;
@@ -3653,10 +3704,10 @@ static void stmt(int ctx) {
         next();
         expr(Or);
         a = n;
-        if (*n != Num)
+        if (ast_Tk(n) != Num)
             die("case label not a numeric literal");
-        j = n[1];
-        n[1] -= i;
+        j = ast_NumVal(n);
+        ast_NumVal(n) -= i;
         *cas = j;
         ast_Single(';');
         if (tk != ':')
@@ -5121,9 +5172,9 @@ int cc(int argc, char** argv) {
             if (tk == Assign) {
                 next();
                 expr(Cond);
-                if (*n != Num)
+                if (ast_Tk(n) != Num)
                     die("bad -D initializer");
-                i = n[1];
+                i = ast_NumVal(n);
                 n += 2;
             }
             dd->class = Num;

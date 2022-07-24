@@ -6,4 +6,4 @@ float F(int i) {
     return 1.0 + (float)i / (2.0 * (float)i + 1.0) * F(i + 1);
 }
 
-int main() { printf("The value of Pi is %f\n", 2.0 * F(1)); }
+int main() { return printf("The value of Pi is %f\n", 2.0 * F(1)); }
