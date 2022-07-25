@@ -30,6 +30,7 @@
 #include "version.h"
 #include "vi.h"
 #include "xmodem.h"
+#include "dgreadln.h"
 
 #define COPYRIGHT "\u00a9" // for UTF8
 //#define COPYRIGHT "(c)" // for ASCII
@@ -65,8 +66,6 @@ static void echo_key(char c) {
         putchar('\n');
 }
 
-typedef void (*cmd_func_t)(void);
-
 static const char* search_cmds(int len);
 
 static void parse_cmd(void) {
@@ -74,40 +73,10 @@ static void parse_cmd(void) {
     char* cp = cmd_buffer;
     char* cp_end = cp + sizeof(cmd_buffer);
     char c;
-    do {
-        c = x_getchar();
-        if (c == '\t') {
-            bool infirst = true;
-            for (char* p = cmd_buffer; p < cp; p++)
-                if ((*p == ' ') || (*p == ',')) {
-                    infirst = false;
-                    break;
-                }
-            if (infirst) {
-                const char* p = search_cmds(cp - cmd_buffer);
-                if (p) {
-                    while (*p) {
-                        *cp++ = *p;
-                        echo_key(*p++);
-                    }
-                    *cp++ = ' ';
-                    echo_key(' ');
-                }
-            }
-            continue;
-        }
-        echo_key(c);
-        if (c == '\b') {
-            if (cp != cmd_buffer) {
-                cp--;
-                printf(" \b");
-                fflush(stdout);
-            }
-        } else if (cp < cp_end)
-            *cp++ = c;
-    } while ((c != '\r') && (c != '\n'));
-    // parse buffer
-    cp = cmd_buffer;
+    char prom[128];
+    extern char* full_path(const char* name);
+    snprintf(prom,128,VT_BOLD "%s: " VT_NORMAL, full_path(""));
+    cp = dgreadln(cmd_buffer,mounted,prom);
     bool not_last = true;
     for (argc = 0; not_last && (argc < MAX_ARGS); argc++) {
         while ((*cp == ' ') || (*cp == ',') || (*cp == '='))
@@ -575,14 +544,8 @@ static void version_cmd(void) {
     result[0] = 0;
 }
 
-typedef struct {
-    const char* name;
-    cmd_func_t func;
-    const char* descr;
-} cmd_t;
-
 // clang-format off
-static cmd_t cmd_table[] = {
+cmd_t cmd_table[] = {
     {"cat",     cat_cmd,        "display text file"},
     {"cc",      cc_cmd,         "run C source file. cc -h for compiler help"},
     {"cd",      cd_cmd,         "change directory"},
@@ -601,7 +564,8 @@ static cmd_t cmd_table[] = {
 	{"version", version_cmd,    "display pshel version"},
     {"vi",      vi_cmd,         "editor"},
     {"xget",    get_cmd,        "get file (xmodem)"},
-    {"xput",    put_cmd,        "put file (xmodem)"}
+    {"xput",    put_cmd,        "put file (xmodem)"},
+	{0}
 };
 // clang-format on
 
@@ -609,7 +573,7 @@ static const char* search_cmds(int len) {
     if (len == 0)
         return NULL;
     int i, last_i, count = 0;
-    for (i = 0; i < sizeof cmd_table / sizeof cmd_table[0]; i++)
+    for (i = 0; cmd_table[i].name; i++)
         if (strncmp(cmd_buffer, cmd_table[i].name, len) == 0) {
             last_i = i;
             count++;
@@ -671,7 +635,7 @@ static bool screen_size(void) {
 
 static void help(void) {
     printf("\n");
-    for (int i = 0; i < sizeof cmd_table / sizeof cmd_table[0]; i++)
+    for (int i = 0; cmd_table[i].name; i++)
         printf("%7s - %s\n", cmd_table[i].name, cmd_table[i].descr);
 }
 
@@ -754,7 +718,7 @@ int main(void) {
         if (argc) {
             if (!strcmp(argv[0], "q"))
                 quit_cmd();
-            for (i = 0; i < sizeof cmd_table / sizeof cmd_table[0]; i++)
+            for (i = 0; cmd_table[i].name; i++)
                 if (strcmp(argv[0], cmd_table[i].name) == 0) {
                     cmd_table[i].func();
                     if (result[0])

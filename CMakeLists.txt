@@ -64,6 +64,7 @@ add_executable(${PSHELL}
     main.c
     xmodem.c xmodem.h
     crc16.c crc16.h
+    dgreadln.c dgreadln.h
     fs.c fs.h
     vi.c vi.h
     cc.c cc.h
