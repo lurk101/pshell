@@ -1,3 +1,7 @@
+What's new in version 1.1.7
+
+- constant expressions for global declarations
+
 What's new in version 1.1.6
 
 - command history and recall added to the shell
