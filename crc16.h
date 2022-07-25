@@ -6,4 +6,3 @@
 #include <stdint.h>
 
 uint16_t crc16_ccitt(const void* buf, int len);
-

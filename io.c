@@ -1,16 +1,15 @@
 
 #if LIB_PICO_STDIO_UART
-	#include "pico/stdio_uart.h"
+#include "pico/stdio_uart.h"
 #endif
 #if LIB_PICO_STDIO_USB
-	#include "pico/stdio_usb.h"
+#include "pico/stdio_usb.h"
 #endif
 
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
 
 #include "io.h"
-
 
 #if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
 #define SDK14 1

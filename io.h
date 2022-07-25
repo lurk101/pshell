@@ -1,8 +1,8 @@
 #ifndef __UART_H_
 #define __UART_H_
 
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 int ioinit(void);
 

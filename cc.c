@@ -29,8 +29,8 @@
 #include <hardware/spi.h>
 #include <hardware/sync.h>
 
-#include <pico/time.h>
 #include <pico/stdio.h>
+#include <pico/time.h>
 
 #include "cc.h"
 #include "fs.h"
@@ -90,7 +90,7 @@ static int ty;                  // current expression type
                                 // bit 2:9 - type
                                 // bit 10:11 - ptr level
 static int rtf, rtt;            // return flag and return type for current function
-static int last_jmp;
+static int last_jmp;            //
 static int loc;                 // local variable offset
 static int line;                // current line number
 static int src_opt;             // print source and assembly flag
@@ -108,7 +108,7 @@ static int oline, osize;        // for optimization suggestion
 static int* ast;                // abstract tree
 
 // identifier
-#define MAX_IR 64 // maxim number of local variable or function parameters
+#define MAX_IR 64 // maximum number of local variable or function parameters
 
 struct ident_s {
     int tk; // type-id or keyword
@@ -141,32 +141,88 @@ struct member_s {
 
 static struct member_s** members; // array (indexed by type) of struct member lists
 
-// clang-format off
 // tokens and classes (operators last and in precedence order)
 // ( >= 128 so not to collide with ASCII-valued tokens)
 enum {
     Func = 128,
-    Syscall, Main, Glo, Par, Loc, Keyword, Id, Load, Enter, Num, NumF, Enum,
-    Char, Int, Float, Struct, Union, Sizeof, Return, Goto, Break, Continue,
-    If, DoWhile, While, For, Switch, Case, Default, Else, Label,
-    Assign, // operator =, keep Assign as highest priority operator
-    OrAssign, XorAssign, AndAssign, ShlAssign,
-    ShrAssign, // |=, ^=, &=, <<=, >>=
-    AddAssign, SubAssign, MulAssign, DivAssign,
-    ModAssign, // +=, -=, *=, /=, %=
-    Cond,      // operator: ?
-    Lor, Lan, Or, Xor,
-    And, // operator: ||, &&, |, ^, &
-    Eq, Ne, Ge, Lt, Gt,
-    Le, // operator: ==, !=, >=, <, >, <=
-    Shl, Shr, Add, Sub, Mul, Div,
-    Mod, // operator: <<, >>, +, -, *, /, %
-    AddF, SubF, MulF,
-    DivF, // float type operators (hidden)
-    EqF, NeF, GeF, LtF, GtF, LeF, CastF, Inc, Dec, Dot, Arrow,
-    Bracket // operator: ++, --, ., ->, [
+    Syscall,
+    Main,
+    Glo,
+    Par,
+    Loc,
+    Keyword,
+    Id,
+    Load,
+    Enter,
+    Num,
+    NumF,
+    Enum,
+    Char,
+    Int,
+    Float,
+    Struct,
+    Union,
+    Sizeof,
+    Return,
+    Goto,
+    Break,
+    Continue,
+    If,
+    DoWhile,
+    While,
+    For,
+    Switch,
+    Case,
+    Default,
+    Else,
+    Label,
+    Assign,   // operator =, keep Assign as highest priority operator
+    OrAssign, // |=, ^=, &=, <<=, >>=
+    XorAssign,
+    AndAssign,
+    ShlAssign,
+    ShrAssign,
+    AddAssign, // +=, -=, *=, /=, %=
+    SubAssign,
+    MulAssign,
+    DivAssign,
+    ModAssign,
+    Cond, // operator: ?
+    Lor,  // operator: ||, &&, |, ^, &
+    Lan,
+    Or,
+    Xor,
+    And,
+    Eq, // operator: ==, !=, >=, <, >, <=
+    Ne,
+    Ge,
+    Lt,
+    Gt,
+    Le,
+    Shl, // operator: <<, >>, +, -, *, /, %
+    Shr,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    AddF, // float type operators (hidden)
+    SubF,
+    MulF,
+    DivF,
+    EqF,
+    NeF,
+    GeF,
+    LtF,
+    GtF,
+    LeF,
+    CastF,
+    Inc, // operator: ++, --, ., ->, [
+    Dec,
+    Dot,
+    Arrow,
+    Bracket
 };
-// clang-format on
 
 // opcodes
 /* The instruction set is designed for building intermediate representation.
@@ -1121,8 +1177,8 @@ static void next() {
             tk = (tk << 6) + (p - pp); // hash plus symbol length
             // hash value is used for fast comparison. Since it is inaccurate,
             // we have to validate the memory content as well.
-            for (id = sym; id->tk; ++id) {      // find one free slot in table
-                if (tk == id->hash &&           // if token is found (hash match), overwrite
+            for (id = sym; id->tk; ++id) { // find one free slot in table
+                if (tk == id->hash &&      // if token is found (hash match), overwrite
                     !memcmp(id->name, pp, p - pp)) {
                     tk = id->tk;
                     return;
@@ -2664,7 +2720,7 @@ static void gen(int* n) {
         *++e = ast_NumVal(n);
         break; // float value
     case Load:
-        gen(n + 2);                         // load the value
+        gen(n + 2);                                           // load the value
         if (ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR) // unreachable?
             die("struct copies not yet supported");
         *++e = (ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2);
@@ -2705,7 +2761,7 @@ static void gen(int* n) {
         *++e = (i == Inc) ? ADD : SUB;
         *++e = (ast_NumVal(n) == CHAR) ? SC : SI;
         break;
-    case Cond:           // if else condition case
+    case Cond:                    // if else condition case
         gen((int*)ast_NumVal(n)); // condition
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
@@ -3590,8 +3646,8 @@ static void stmt(int ctx) {
                                 die("unsupported global initializer");
                             n += 2;
                         }
+                    }
                 }
-            }
             }
             if (ctx != Par && tk == ',')
                 next();
@@ -4032,7 +4088,6 @@ static int run(void) {
     run_level++;
 #endif
     uint32_t last_t = time_us_32();
-    int* this_pc;
     int i, sysc, strl, irqn;
     unsigned us, ms, mask;
     struct file_handle *h, *last_h;
@@ -4052,7 +4107,25 @@ static int run(void) {
         }
 #endif
 #endif
-        this_pc = pc;
+        if (trc_opt)
+#if WITH_IRQ
+            if (run_level == 0)
+#endif
+            {
+                disassemble(pc, pc + 2, 1);
+                printf("\n");
+                printf("acc          %08x (as int) %d\n", a.i, a.i);
+                printf("accf         %f\n", a.f);
+                printf("stk [%6d] %08x %08x %08x %08x\n", (int)(sp - base_sp), *((int*)sp),
+                       *((int*)sp + 1), *((int*)sp + 2), *((int*)sp + 3));
+                printf("    (as int) %08d %08d %08d %08d\n", *((int*)sp), *((int*)sp + 1),
+                       *((int*)sp + 2), *((int*)sp + 3));
+                printf("  (as float) %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
+                       *((float*)sp + 2), *((float*)sp + 3));
+                if (trc_opt > 1)
+                    if (x_getchar() == 3)
+                        run_die("user interrupted!!");
+            }
         i = *pc++;
         switch (i) {
         case LEA:
@@ -4966,25 +5039,6 @@ static int run(void) {
         default:
             run_die("unknown instruction = %d %s!\n", i);
         }
-        if (trc_opt)
-#if WITH_IRQ
-            if (run_level == 0)
-#endif
-            {
-                disassemble(this_pc, this_pc + 2, 1);
-                printf("\n");
-                printf("acc          %08x (as int) %d\n", a.i, a.i);
-                printf("accf         %f\n", a.f);
-                printf("stk [%6d] %08x %08x %08x %08x\n", (int)(sp - base_sp), *((int*)sp),
-                       *((int*)sp + 1), *((int*)sp + 2), *((int*)sp + 3));
-                printf("    (as int) %08d %08d %08d %08d\n", *((int*)sp), *((int*)sp + 1),
-                       *((int*)sp + 2), *((int*)sp + 3));
-                printf("  (as float) %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
-                       *((float*)sp + 2), *((float*)sp + 3));
-                if (trc_opt > 1)
-                    if (x_getchar() == 3)
-                        run_die("user interrupted!!");
-            }
     }
 exit_called:
     return a.i;

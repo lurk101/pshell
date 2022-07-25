@@ -25,12 +25,12 @@
 #include "pico/sync.h"
 
 #include "cc.h"
+#include "dgreadln.h"
 #include "fs.h"
 #include "io.h"
 #include "version.h"
 #include "vi.h"
 #include "xmodem.h"
-#include "dgreadln.h"
 
 #define COPYRIGHT "\u00a9" // for UTF8
 //#define COPYRIGHT "(c)" // for ASCII
@@ -66,33 +66,6 @@ static void echo_key(char c) {
         putchar('\n');
 }
 
-static const char* search_cmds(int len);
-
-static void parse_cmd(void) {
-    // read line into buffer
-    char* cp = cmd_buffer;
-    char* cp_end = cp + sizeof(cmd_buffer);
-    char c;
-    char prom[128];
-    extern char* full_path(const char* name);
-    snprintf(prom,128,VT_BOLD "%s: " VT_NORMAL, full_path(""));
-    cp = dgreadln(cmd_buffer,mounted,prom);
-    bool not_last = true;
-    for (argc = 0; not_last && (argc < MAX_ARGS); argc++) {
-        while ((*cp == ' ') || (*cp == ',') || (*cp == '='))
-            cp++; // skip blanks
-        if ((*cp == '\r') || (*cp == '\n'))
-            break;
-        argv[argc] = cp; // start of string
-        while ((*cp != ' ') && (*cp != ',') && (*cp != '=') && (*cp != '\r') && (*cp != '\n'))
-            cp++; // skip non blank
-        if ((*cp == '\r') || (*cp == '\n'))
-            not_last = false;
-        *cp++ = 0; // terminate string
-    }
-    argv[argc] = NULL;
-}
-
 char* full_path(const char* name) {
     if (name == NULL)
         return NULL;
@@ -109,6 +82,29 @@ char* full_path(const char* name) {
         }
     }
     return path;
+}
+
+static void parse_cmd(void) {
+    // read line into buffer
+    char* cp = cmd_buffer;
+    char* cp_end = cp + sizeof(cmd_buffer);
+    char prompt[128];
+    snprintf(prompt, sizeof(prompt), VT_BOLD "%s: " VT_NORMAL, full_path(""));
+    cp = dgreadln(cmd_buffer, mounted, prompt);
+    bool not_last = true;
+    for (argc = 0; not_last && (argc < MAX_ARGS); argc++) {
+        while ((*cp == ' ') || (*cp == ',') || (*cp == '='))
+            cp++; // skip blanks
+        if ((*cp == '\r') || (*cp == '\n'))
+            break;
+        argv[argc] = cp; // start of string
+        while ((*cp != ' ') && (*cp != ',') && (*cp != '=') && (*cp != '\r') && (*cp != '\n'))
+            cp++; // skip non blank
+        if ((*cp == '\r') || (*cp == '\n'))
+            not_last = false;
+        *cp++ = 0; // terminate string
+    }
+    argv[argc] = NULL;
 }
 
 static void xmodem_cb(uint8_t* buf, uint32_t len) {
@@ -139,9 +135,9 @@ static void put_cmd(void) {
         strcpy(result, "Can't create file");
         return;
     }
-	set_translate_crlf(false);
+    set_translate_crlf(false);
     xmodemReceive(xmodem_cb);
-	set_translate_crlf(true);
+    set_translate_crlf(true);
     int pos = fs_file_seek(&file, 0, LFS_SEEK_END);
     fs_file_close(&file);
     sprintf(result, "\nfile transfered, size: %d\n", pos);
@@ -322,9 +318,9 @@ static void get_cmd(void) {
         strcpy(result, "error reading file");
         goto err1;
     }
-	set_translate_crlf(false);
+    set_translate_crlf(false);
     xmodemTransmit(buf, len);
-	set_translate_crlf(true);
+    set_translate_crlf(true);
     printf("\nfile transfered, size: %d\n", len);
 err1:
     free(buf);
@@ -588,7 +584,7 @@ static bool screen_size(void) {
     screen_x = 80;
     screen_y = 24;
     do {
-		set_translate_crlf(false);
+        set_translate_crlf(false);
         printf(VT_ESC "[999;999H" VT_ESC "[6n");
         fflush(stdout);
         int k = x_getchar_timeout_us(100000);
@@ -603,7 +599,7 @@ static bool screen_size(void) {
         }
         if (cp == cmd_buffer)
             break;
-		set_translate_crlf(true);
+        set_translate_crlf(true);
         if (cmd_buffer[0] != '[')
             break;
         *cp = 0;

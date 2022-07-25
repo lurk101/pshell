@@ -14,17 +14,17 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "hardware/timer.h"
 
-#include "pico/time.h"
 #include "pico/stdio.h"
+#include "pico/time.h"
 
 #include "fs.h"
-#include "vi.h"
 #include "io.h"
+#include "vi.h"
 
 extern char* full_path(const char* name);
 
@@ -236,11 +236,11 @@ struct globals {
     int last_modified_count; // = -1;
     int cmdcnt;              // repetition count
     uint32_t rows, columns;  // the terminal screen is this size
-    int crow, ccol;        // cursor is on Crow x Ccol
-    int offset;            // chars scrolled off the screen to the left
-    int have_status_msg;   // is default edit status needed?
-                           // [don't make int16_t!]
-    int last_status_cksum; // hash of current status line
+    int crow, ccol;          // cursor is on Crow x Ccol
+    int offset;              // chars scrolled off the screen to the left
+    int have_status_msg;     // is default edit status needed?
+                             // [don't make int16_t!]
+    int last_status_cksum;   // hash of current status line
     char* current_filename;
     char* screenbegin; // index into text[], of top line on the screen
     char* screen;      // pointer to the virtual screen buffer
@@ -248,15 +248,15 @@ struct globals {
     int tabstop;
     int last_search_char;    // last char searched for (int because of Unicode)
     int16_t last_search_cmd; // command used to invoke last char search
-    char last_input_char; // last char read from user
-    char undo_queue_state; // One of UNDO_INS, UNDO_DEL, UNDO_EMPTY
+    char last_input_char;    // last char read from user
+    char undo_queue_state;   // One of UNDO_INS, UNDO_DEL, UNDO_EMPTY
 
-    int16_t adding2q;      // are we currently adding user input to q
-    int lmc_len;           // length of last_modifying_cmd
-    char *ioq, *ioq_start; // pointer to string for get_one_char to "read"
-    int dotcnt;            // number of times to repeat '.' command
+    int16_t adding2q;          // are we currently adding user input to q
+    int lmc_len;               // length of last_modifying_cmd
+    char *ioq, *ioq_start;     // pointer to string for get_one_char to "read"
+    int dotcnt;                // number of times to repeat '.' command
     char* last_search_pattern; // last pattern from a '/' or '?' search
-    int indentcol; // column of recently autoindent, 0 or -1
+    int indentcol;             // column of recently autoindent, 0 or -1
     int16_t cmd_error;
 
     // former statics
@@ -267,14 +267,14 @@ struct globals {
     // a few references only
     uint16_t YDreg; //,Ureg;// default delete register and orig line for "U"
 #define Ureg 27
-    char* reg[28];    // named register a-z, "D", and "U" 0-25,26,27
-    char regtype[28]; // buffer type: WHOLE, MULTI or PARTIAL
-    char* mark[28];   // user marks points somewhere in text[]-  a-z and previous context ''
+    char* reg[28];      // named register a-z, "D", and "U" 0-25,26,27
+    char regtype[28];   // buffer type: WHOLE, MULTI or PARTIAL
+    char* mark[28];     // user marks points somewhere in text[]-  a-z and previous context ''
     int cindex;         // saved character index for up/down motion
     int16_t keep_index; // retain saved character index
     char readbuffer[KEYCODE_BUFFER_SIZE];
 #define STATUS_BUFFER_LEN 200
-    char status_buffer[STATUS_BUFFER_LEN]; // messages to the user
+    char status_buffer[STATUS_BUFFER_LEN];  // messages to the user
     char last_modifying_cmd[MAX_INPUT_LEN]; // last modifying cmd for "."
     char get_input_line_buf[MAX_INPUT_LEN]; // former static
 
@@ -799,8 +799,8 @@ static void refresh(int full_screen) {
 
 // sleep for 'h' 1/100 seconds, return 1/0 if stdin is (ready for read)/(not ready)
 static int sleep(int ms) {
-	if (ms)
-    	sleep_ms(ms);
+    if (ms)
+        sleep_ms(ms);
     return nextchar();
 }
 
@@ -833,9 +833,8 @@ static const char esccmds[] = {
      */
     'f' | 0x80, KEYCODE_ALT_RIGHT, 'b' | 0x80, KEYCODE_ALT_LEFT, 'O', 'A' | 0x80, KEYCODE_UP, 'O',
     'B' | 0x80, KEYCODE_DOWN, 'O', 'C' | 0x80, KEYCODE_RIGHT, 'O', 'D' | 0x80, KEYCODE_LEFT, 'O',
-    'H' | 0x80, KEYCODE_HOME, 'O', 'F' | 0x80, KEYCODE_END,
-    '[', 'A' | 0x80, KEYCODE_UP, '[', 'B' | 0x80, KEYCODE_DOWN, '[', 'C' | 0x80, KEYCODE_RIGHT, '[',
-    'D' | 0x80, KEYCODE_LEFT,
+    'H' | 0x80, KEYCODE_HOME, 'O', 'F' | 0x80, KEYCODE_END, '[', 'A' | 0x80, KEYCODE_UP, '[',
+    'B' | 0x80, KEYCODE_DOWN, '[', 'C' | 0x80, KEYCODE_RIGHT, '[', 'D' | 0x80, KEYCODE_LEFT,
     /* ESC [ 1 ; 2 x, where x = A/B/C/D: Shift-<arrow> */
     /* ESC [ 1 ; 3 x, where x = A/B/C/D: Alt-<arrow> - implemented below */
     /* ESC [ 1 ; 4 x, where x = A/B/C/D: Alt-Shift-<arrow> */
@@ -1794,8 +1793,7 @@ static int file_insert(const char* fn, char* p, int initial) {
         // There was a partial read, shrink unused space
         p = text_hole_delete(p + cnt, p + size - 1, NO_UNDO);
         status_line_bold("can't read '%s'", fn);
-    }
-    else {
+    } else {
         undo_push_insert(p, size, ALLOW_UNDO);
     }
 fi:
@@ -2108,8 +2106,7 @@ static char* get_one_address(char* p, int* result, int* valid) {
             p++;
             addr = count_lines(text, end - 1);
             got_addr = true;
-        }
-        else if (!got_addr && *p == '\'') { // is this a mark addr
+        } else if (!got_addr && *p == '\'') { // is this a mark addr
             p++;
             c = tolower(*p);
             p++;
@@ -2125,8 +2122,7 @@ static char* get_one_address(char* p, int* result, int* valid) {
             }
             addr = count_lines(text, q);
             got_addr = true;
-        }
-        else if (!got_addr && (*p == '/' || *p == '?')) { // a search pattern
+        } else if (!got_addr && (*p == '/' || *p == '?')) { // a search pattern
             c = *p;
             q = strchrnul(p + 1, c);
             if (p + 1 != q) {
@@ -2155,8 +2151,7 @@ static char* get_one_address(char* p, int* result, int* valid) {
             }
             addr = count_lines(text, q);
             got_addr = true;
-        }
-        else if (isdigit(*p)) {
+        } else if (isdigit(*p)) {
             num = 0;
             while (isdigit(*p))
                 num = num * 10 + *p++ - '0';
@@ -2393,9 +2388,8 @@ static void colon(char* buf) {
             dot = find_line(e); // what line is #e
             dot_skip_over_ws();
         }
-    }
-    else if (cmd[0] == '=' && !cmd[1]) { // where is the address
-        if (!GOT_ADDRESS) {              // no addr given- use defaults
+    } else if (cmd[0] == '=' && !cmd[1]) { // where is the address
+        if (!GOT_ADDRESS) {                // no addr given- use defaults
             e = count_lines(text, dot);
         }
         status_line("%d", e);
@@ -2436,10 +2430,8 @@ static void colon(char* buf) {
         // how many lines in text[]?
         li = count_lines(text, end - 1);
         status_line("'%s'%s"
-                        " %uL, %uC",
-                    fn, (size < 0 ? " [New file]" : ""),
-                        li,
-                    (int)(end - text));
+                    " %uL, %uC",
+                    fn, (size < 0 ? " [New file]" : ""), li, (int)(end - text));
     } else if (strncmp(cmd, "file", i) == 0) { // what File is this
         if (e >= 0) {
             status_line_bold("No address allowed on this command");
@@ -2841,8 +2833,7 @@ static int find_range(char** start, char** stop, int cmd) {
 
     if (cmd == 'Y') {
         c = 'y';
-    } else
-    {
+    } else {
         c = get_motion_char();
     }
 
@@ -3723,7 +3714,7 @@ static void run_cmds(char* p) {
 static void edit_file(char* fn) {
     int c;
 
-    editing = 1; // 0 = exit, 1 = one file, 2 = multiple files
+    editing = 1;               // 0 = exit, 1 = one file, 2 = multiple files
     new_screen(rows, columns); // get memory for virtual screen
     init_text_buffer(fn);
 
