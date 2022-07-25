@@ -1,3 +1,7 @@
+What's new in version 1.1.6
+
+- command history and recall added to the shell
+
 What's new in version 1.1.5
 
 - formalized three cmake build options
