@@ -36,6 +36,12 @@
 #include "fs.h"
 #include "io.h"
 
+#ifdef NDEBUG
+#define Inline inline
+#else
+#define Inline
+#endif
+
 #define K 1024
 
 #define DATA_BYTES (16 * K)
@@ -1463,6 +1469,24 @@ static void ast_Func(int parm_types, int n_parms, int addr, int next, int tk) {
 
 typedef struct {
     int tk;
+    int cond;
+    int incr;
+    int body;
+    int init;
+} For_entry_t;
+#define For_entry(a) (*((For_entry_t*)a))
+
+static void ast_For(int init, int body, int incr, int cond) {
+    n -= 5;
+    For_entry(n).init = init;
+    For_entry(n).body = body;
+    For_entry(n).incr = incr;
+    For_entry(n).cond = cond;
+    For_entry(n).tk = For;
+}
+
+typedef struct {
+    int tk;
     int cond_part;
     int if_part;
     int else_part;
@@ -1493,58 +1517,58 @@ static void ast_Assign(int right_part, int type) {
 
 typedef struct {
     int tk;
-    int v2;
-    int v1;
+    int body;
+    int cond;
 } While_entry_t;
 #define While_entry(a) (*((While_entry_t*)a))
 
-static void ast_While(int v1, int v2) {
+static void ast_While(int cond, int body, int tk) {
     n -= 3;
-    While_entry(n).v1 = v1;
-    While_entry(n).v2 = v2;
-    While_entry(n).tk = While;
+    While_entry(n).cond = cond;
+    While_entry(n).body = body;
+    While_entry(n).tk = tk;
 }
 
 typedef struct {
     int tk;
-    int v2;
-    int v1;
-} DoWhile_entry_t;
-#define DoWhile_entry(a) (*((DoWhile_entry_t*)a))
-
-static void ast_DoWhile(int v1, int v2) {
-    n -= 3;
-    DoWhile_entry(n).v1 = v1;
-    DoWhile_entry(n).v2 = v2;
-    DoWhile_entry(n).tk = DoWhile;
-}
-
-typedef struct {
-    int tk;
-    int v2;
-    int v1;
+    int cond;
+    int cas;
 } Switch_entry_t;
 #define Switch_entry(a) (*((Switch_entry_t*)a))
 
-static void ast_Switch(int v1, int v2) {
+static void ast_Switch(int cas, int cond) {
     n -= 3;
-    Switch_entry(n).v1 = v1;
-    Switch_entry(n).v2 = v2;
+    Switch_entry(n).cas = cas;
+    Switch_entry(n).cond = cond;
     Switch_entry(n).tk = Switch;
 }
 
 typedef struct {
     int tk;
-    int v2;
-    int v1;
+    int next;
+    int expr;
 } Case_entry_t;
 #define Case_entry(a) (*((Case_entry_t*)a))
 
-static void ast_Case(int v1, int v2) {
+static void ast_Case(int expr, int next) {
     n -= 3;
-    Case_entry(n).v1 = v1;
-    Case_entry(n).v2 = v2;
+    Case_entry(n).expr = expr;
+    Case_entry(n).next = next;
     Case_entry(n).tk = Case;
+}
+
+typedef struct {
+    int tk;
+    int val;
+    int way;
+} CastF_entry_t;
+#define CastF_entry(a) (*((CastF_entry_t*)a))
+
+static void ast_CastF(int way, int val) {
+    n -= 3;
+    CastF_entry(n).tk = CastF;
+    CastF_entry(n).val = val;
+    CastF_entry(n).way = way;
 }
 
 // two word entries
@@ -1612,18 +1636,6 @@ static void ast_Load(int v1) {
     n -= 2;
     Double_entry(n).tk = Load;
     Double_entry(n).v1 = v1;
-}
-
-typedef struct {
-    int tk;
-    int val;
-} CastF_entry_t;
-#define CastF_entry(a) (*((CastF_entry_t*)a))
-
-static void ast_CastF(int v1) {
-    n -= 2;
-    CastF_entry(n).tk = CastF;
-    CastF_entry(n).val = v1;
 }
 
 typedef struct {
@@ -1930,8 +1942,7 @@ static void expr(int lev) {
                         *((float*)&ast_NumVal(n)) = ast_NumVal(n);
                     } else {
                         b = n;
-                        ast_Single(ITOF);
-                        ast_CastF((int)b);
+                        ast_CastF(ITOF, (int)b);
                     }
                 } else if (t < FLOAT && ty == FLOAT) { // int : float
                     if (ast_Tk(n) == NumF) {
@@ -1939,8 +1950,7 @@ static void expr(int lev) {
                         ast_NumVal(n) = *((float*)&ast_NumVal(n));
                     } else {
                         b = n;
-                        ast_Single(FTOI);
-                        ast_CastF((int)b);
+                        ast_CastF(FTOI, (int)b);
                     }
                 } else
                     die("explicit cast required");
@@ -2558,11 +2568,11 @@ static void expr(int lev) {
                                                : ((dim == 2 && ii == 1) ? ((ee & 0xffff) + 1) : 1));
                     if (ast_Tk(n) == Num) {
                         // elision with struct offset for efficiency
-                        if (ast_Tk(b) == Add && b[2] == Num)
-                            b[3] += factor * ast_NumVal(n) * sz;
+                        if (ast_Tk(b) == Add && ast_Tk(b + 1) == Num)
+                            ast_NumVal(b + 1) += factor * ast_NumVal(n) * sz;
                         else
                             sum += factor * ast_NumVal(n);
-                        n += 2; // delete the subscript constant
+                        n += sizeof(Double_entry_t) / sizeof(int); // delete the subscript constant
                     } else {
                         // generate code to add a term
                         if (factor > 1) {
@@ -2735,7 +2745,7 @@ static void gen(int* n) {
         gen(n + 2);
         break;   // parse AST expr or stmt
     case Assign: // assign the value to variables
-        gen((int*)n[2]);
+        gen((int*)Assign_entry(n).right_part);
         *++e = PSH;
         gen(n + 3);
         l = ast_NumVal(n) & 0xffff;
@@ -2762,19 +2772,19 @@ static void gen(int* n) {
         *++e = (i == Inc) ? ADD : SUB;
         *++e = (ast_NumVal(n) == CHAR) ? SC : SI;
         break;
-    case Cond:                    // if else condition case
-        gen((int*)ast_NumVal(n)); // condition
+    case Cond:                              // if else condition case
+        gen((int*)Cond_entry(n).cond_part); // condition
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
         *++e = BZ;
         b = ++e;
-        gen((int*)n[2]); // expression
+        gen((int*)Cond_entry(n).if_part); // expression
         // Patch the jump address field pointed to by "b" to hold the address
         // of false branch. "+ 3" counts the "JMP" instruction added below.
         //
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
-        if (n[3]) {
+        if (Cond_entry(n).else_part) {
             if (*e == LEV) {
                 l = ast_Tk(b) = (int)(e + 1);
                 b = 0;
@@ -2785,7 +2795,7 @@ static void gen(int* n) {
             }
             if (last_jmp < l)
                 last_jmp = l;
-            gen((int*)n[3]);
+            gen((int*)Cond_entry(n).else_part);
         } // else statment
         // Patch the jump address field pointed to by "d" to hold the address
         // past the false branch.
@@ -2979,15 +2989,15 @@ static void gen(int* n) {
         *++e = LEF;
         break;
     case CastF:
-        gen((int*)ast_NumVal(n));
-        *++e = n[2];
+        gen((int*)CastF_entry(n).val);
+        *++e = CastF_entry(n).way;
         break;
     case Func:
     case Syscall:
-        b = (int*)ast_NumVal(n);
-        k = b ? n[3] : 0;
+        b = (int*)Func_entry(n).next;
+        k = b ? Func_entry(n).n_parms : 0;
         if (k) {
-            l = n[4] >> 10;
+            l = Func_entry(n).parm_types >> 10;
             if (!(a = (int*)sys_malloc(sizeof(int) * (k + 1))))
                 die("no cache memory");
             j = 0;
@@ -3010,17 +3020,17 @@ static void gen(int* n) {
             a = NULL;
             if (i == Syscall) {
                 *++e = IMM;
-                *++e = (sj + 1) | ((n[4] >> 10) << 10);
+                *++e = (sj + 1) | ((Func_entry(n).parm_types >> 10) << 10);
             }
         }
         if (i == Syscall)
             *++e = SYSC;
         if (i == Func)
             *++e = JSR;
-        *++e = n[2];
-        if (n[3]) {
+        *++e = Func_entry(n).addr;
+        if (Func_entry(n).n_parms) {
             *++e = ADJ;
-            *++e = (i == Syscall) ? n[4] : n[3];
+            *++e = (i == Syscall) ? Func_entry(n).parm_types : Func_entry(n).n_parms;
         }
         break;
     case While:
@@ -3034,7 +3044,7 @@ static void gen(int* n) {
         brks = 0;
         c = cnts;
         cnts = 0;
-        gen((int*)ast_NumVal(n)); // loop body
+        gen((int*)While_entry(n).body); // loop body
         if (i == While)
             *a = (int)(e + 1);
         while (cnts) {
@@ -3043,7 +3053,7 @@ static void gen(int* n) {
             cnts = t;
         }
         cnts = c;
-        gen((int*)n[2]); // condition
+        gen((int*)While_entry(n).cond); // condition
         *++e = BNZ;
         *++e = (int)d;
         while (brks) {
@@ -3054,7 +3064,7 @@ static void gen(int* n) {
         brks = b;
         break;
     case For:
-        gen((int*)n[4]); // init
+        gen((int*)For_entry(n).init); // init
         *++e = JMP;
         a = ++e;
         d = (e + 1);
@@ -3062,16 +3072,16 @@ static void gen(int* n) {
         brks = 0;
         c = cnts;
         cnts = 0;
-        gen((int*)n[3]); // loop body
+        gen((int*)For_entry(n).body); // loop body
         while (cnts) {
             t = (int*)*cnts;
             *cnts = (int)(e + 1);
             cnts = t;
         }
         cnts = c;
-        gen((int*)n[2]); // increment
+        gen((int*)For_entry(n).incr); // increment
         *a = (int)(e + 1);
-        gen((int*)ast_NumVal(n)); // condition
+        gen((int*)For_entry(n).cond); // condition
         *++e = BNZ;
         *++e = (int)d;
         while (brks) {
@@ -3082,14 +3092,14 @@ static void gen(int* n) {
         brks = b;
         break;
     case Switch:
-        gen((int*)ast_NumVal(n)); // condition
+        gen((int*)Switch_entry(n).cond); // condition
         a = cas;
         *++e = JMP;
         cas = ++e;
         b = brks;
         d = def;
         brks = def = 0;
-        gen((int*)n[2]); // case statment
+        gen((int*)Switch_entry(n).cas); // case statment
         // deal with no default inside switch case
         *cas = def ? (int)def : (int)(e + 1);
         cas = a;
@@ -3116,9 +3126,9 @@ static void gen(int* n) {
         *++e = BNZ;
         cas = ++e;
         *e = i + e[-3];
-        if (*(int*)n[2] == Switch)
+        if (*((int*)Case_entry(n).expr) == Switch)
             a = cas;
-        gen((int*)n[2]); // expression
+        gen((int*)Case_entry(n).expr); // expression
         if (a != 0)
             cas = a;
         break;
@@ -3690,7 +3700,7 @@ static void stmt(int ctx) {
         a = n; // parse body of "while"
         --brkc;
         --cntc;
-        ast_While((int)b, (int)a);
+        ast_While((int)b, (int)a, While);
         return;
     case DoWhile:
         next();
@@ -3712,7 +3722,7 @@ static void stmt(int ctx) {
         if (tk != ')')
             die("close parenthesis expected");
         next();
-        ast_DoWhile((int)b, (int)a);
+        ast_While((int)b, (int)a, DoWhile);
         return;
     case Switch:
         i = 0;
@@ -3855,7 +3865,7 @@ static void stmt(int ctx) {
         c = n;
         --brkc;
         --cntc;
-        ast_Func((int)d, (int)c, (int)b, (int)a, For);
+        ast_For((int)d, (int)c, (int)b, (int)a);
         return;
     case Goto:
         next();
@@ -3894,7 +3904,7 @@ static void stmt(int ctx) {
     }
 }
 
-static inline float i_as_f(int i) {
+static Inline float i_as_f(int i) {
     union {
         int i;
         float f;
@@ -3903,7 +3913,7 @@ static inline float i_as_f(int i) {
     return u.f;
 }
 
-static inline int f_as_i(float f) {
+static Inline int f_as_i(float f) {
     union {
         int i;
         float f;
@@ -3940,7 +3950,7 @@ static int common_vfunc(int ac, int sflag, int* sp) {
 }
 
 #if WITH_KBD_HALT
-static inline void check_kbd_halt(void) {
+static Inline void check_kbd_halt(void) {
     int key = x_getchar_timeout_us(0);
     if ((key == 27) || (key == 3)) // check for escape
         run_die("user interrupted!!");
@@ -3957,52 +3967,52 @@ static int *bp, *pc, *sp;
 #define enable()
 #endif
 
-static inline float pop_float(void) {
+static Inline float pop_float(void) {
     disable();
     float r = *((float*)sp++);
     enable();
     return r;
 }
 
-static inline int* pop_ptr(void) {
+static Inline int* pop_ptr(void) {
     disable();
     void* p = (int*)(*sp++);
     enable();
     return p;
 }
 
-static inline int pop_int(void) {
+static Inline int pop_int(void) {
     disable();
     int i = *sp++;
     enable();
     return i;
 }
 
-static inline void push_ptr(void* p) {
+static Inline void push_ptr(void* p) {
     disable();
     *--sp = (int)p;
     enable();
 }
 
-static inline void push_int(int i) {
+static Inline void push_int(int i) {
     disable();
     *--sp = i;
     enable();
 }
 
-static inline void push_float(float f) {
+static Inline void push_float(float f) {
     disable();
     *((float*)--sp) = f;
     enable();
 }
 
-static inline void push_n(int n) {
+static Inline void push_n(int n) {
     disable();
     sp -= n;
     enable();
 }
 
-static inline void pop_n(int n) {
+static Inline void pop_n(int n) {
     disable();
     sp += n;
     enable();
@@ -5252,7 +5262,7 @@ int cc(int argc, char** argv) {
     if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
         sys_free(fd);
         fd = NULL;
-        die("could not open %s \n", fp);
+        die("could not open %s \n", fn);
     }
     sys_free(fn);
 

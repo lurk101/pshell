@@ -14,8 +14,8 @@
     strncmp, strncpy, strrchr
 
     // math
-    acosf, acoshf, asinf, asinhf, atan2f, atanf, atanhf, cosf, coshf, log10f, logf, powf,
-    sinf, sinhf, sqrtf, tanf, tanhf
+    acosf, acoshf, asinf, asinhf, atan2f, atanf, atanhf, cosf, coshf, fmodf, log10f,
+    logf, powf, sinf, sinhf, sqrtf, tanf, tanhf
 
     // sync
     wfi
@@ -36,6 +36,7 @@
     gpio_set_input_enabled, gpio_set_input_hysteresis_enabled, gpio_set_irq_callback,
     gpio_set_irq_enabled, gpio_set_irq_enabled_with_callback, gpio_set_irqover, gpio_set_mask,
     gpio_set_oeover, gpio_set_outover, gpio_set_pulls, gpio_set_slew_rate, gpio_xor_mask
+
     // pwm
     pwm_advance_count, pwm_clear_irq, pwm_config_set_clkdiv, pwm_config_set_clkdiv_int,
     pwm_config_set_clkdiv_int_frac, pwm_config_set_clkdiv_mode, pwm_config_set_output_polarity,
@@ -45,6 +46,7 @@
     pwm_set_clkdiv, pwm_set_clkdiv_int_frac, pwm_set_clkdiv_mode, pwm_set_counter, pwm_set_enabled,
     pwm_set_gpio_level, pwm_set_irq_enabled, pwm_set_irq_mask_enabled, pwm_set_mask_enabled,
     pwm_set_output_polarity, pwm_set_phase_correct, pwm_set_wrap
+
     // adc
     adc_fifo_drain, adc_fifo_get, adc_fifo_get_blocking, adc_fifo_get_level, adc_fifo_is_empty,
     adc_fifo_setup, adc_get_selected_input, adc_gpio_init, adc_init, adc_irq_set_enabled,
