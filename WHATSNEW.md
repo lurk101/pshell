@@ -1,5 +1,7 @@
 What's new in version 1.1.9
 
+- moved all source files to their own directory
+
 What's new in version 1.1.8
 
 - mostly readability reorganization of compiler source

@@ -61,16 +61,16 @@ endif()
 add_subdirectory(littlefs)
 
 add_executable(${PSHELL}
-    main.c
-    xmodem.c xmodem.h
-    crc16.c crc16.h
-    dgreadln.c dgreadln.h
-    fs.c fs.h
-    vi.c vi.h
-    cc.c cc.h
-    io.c io.h
-    cc_printf.S
-    version.h)
+    src/main.c
+    src/xmodem.c src/xmodem.h
+    src/crc16.c src/crc16.h
+    src/dgreadln.c src/dgreadln.h
+    src/fs.c src/fs.h
+    src/vi.c src/vi.h
+    src/cc.c src/cc.h
+    src/io.c src/io.h
+    src/cc_printf.S
+    src/version.h)
 
 if (USB_CONSOLE)
   pico_enable_stdio_uart(${PSHELL} 0)
