@@ -1698,6 +1698,8 @@ static void bitopcheck(int tl, int tr) {
         die("bit operation on non-int types");
 }
 
+static bool is_power_of_2(int n) { return ((n - 1) & n) == 0; }
+
 /* expression parsing
  * lev represents an operator.
  * because each operator `token` is arranged in order of priority,
@@ -2372,7 +2374,7 @@ static void expr(int lev) {
                         } else {
                             ast_Oper((int)b, Sub);
                             if (sz > 1) {
-                                if ((sz & (sz - 1)) == 0) { // 2^n
+                                if (is_power_of_2(sz)) { // 2^n
                                     ast_Num(__builtin_popcount(sz - 1));
                                     ast_Oper((int)(n + 2), Shr);
                                 } else {
@@ -2393,7 +2395,7 @@ static void expr(int lev) {
                             }
                         } else {
                             if (sz > 1) {
-                                if ((sz & (sz - 1)) == 0) { // 2^n
+                                if (is_power_of_2(sz)) { // 2^n
                                     ast_Num(__builtin_popcount(sz - 1));
                                     ast_Oper((int)(n + 2), Shl);
                                 } else {
@@ -2430,8 +2432,7 @@ static void expr(int lev) {
                     ast_NumVal(b) *= ast_NumVal(n);
                     n = b;
                 } else {
-                    if (ast_Tk(n) == Num && ast_NumVal(n) > 0 &&
-                        (ast_NumVal(n) & (ast_NumVal(n) - 1)) == 0) {
+                    if (ast_Tk(n) == Num && ast_NumVal(n) > 0 && is_power_of_2(ast_NumVal(n))) {
                         ast_NumVal(n) = __builtin_popcount(ast_NumVal(n) - 1);
                         ast_Oper((int)b, Shl); // 2^n
                     } else
@@ -2470,8 +2471,7 @@ static void expr(int lev) {
                     ast_NumVal(b) /= ast_NumVal(n);
                     n = b;
                 } else {
-                    if (ast_Tk(n) == Num && ast_NumVal(n) > 0 &&
-                        (ast_NumVal(n) & (ast_NumVal(n) - 1)) == 0) {
+                    if (ast_Tk(n) == Num && ast_NumVal(n) > 0 && is_power_of_2(ast_NumVal(n))) {
                         ast_NumVal(n) = __builtin_popcount(ast_NumVal(n) - 1);
                         ast_Oper((int)b, Shr); // 2^n
                     } else
@@ -2490,8 +2490,8 @@ static void expr(int lev) {
                 ast_NumVal(b) %= ast_NumVal(n);
                 n = b;
             } else {
-                if (ast_NumVal(n) == Num && n[2] > 0 && (n[2] & (n[2] - 1)) == 0) {
-                    --n[2];
+                if (ast_Tk(n) == Num && ast_NumVal(n) > 0 && is_power_of_2(ast_NumVal(n))) {
+                    --ast_NumVal(n);
                     ast_Oper((int)b, And); // 2^n
                 } else
                     ast_Oper((int)b, Mod);
@@ -2610,7 +2610,6 @@ static void expr(int lev) {
         }
     }
 }
-
 static void init_array(struct ident_s* tn, int extent[], int dim) {
     int i, cursor, match, coff = 0, off, empty, *vi;
     int inc[3];
@@ -2670,7 +2669,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
                 if (match == CHAR + PTR2) {
                     vi[i++] = ast_NumVal(n);
                 } else if (match == CHAR + PTR) {
-                    off = strlen((char*)n[1]) + 1;
+                    off = strlen((char*)ast_NumVal(n)) + 1;
                     if (off > inc[0]) {
                         off = inc[0];
                         printf("%d: string '%s' truncated to %d chars\n", line,
