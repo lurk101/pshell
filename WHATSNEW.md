@@ -1,3 +1,11 @@
+What's new in version 1.1.8
+
+- mostly readability reorganization of compiler source
+- added missing fmodf function since it's recommended by the compiler
+- fixed missed opportunity optimizing modulus operator. (port introduced bug)
+- updated functions list
+- added lorenz simulation example
+
 What's new in version 1.1.7
 
 - constant expressions for global declarations
