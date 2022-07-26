@@ -437,6 +437,7 @@ enum {
     SYSC_logf,
     SYSC_log10f,
     SYSC_powf,
+    SYSC_fmodf,
     // hardware/sync.h
     SYSC_wfi,
     // hardware/timer.h
@@ -696,6 +697,7 @@ static const struct {
     {"logf", 1 | (1 << 5) | (1 << 10)},
     {"log10f", 1 | (1 << 5) | (1 << 10)},
     {"powf", 2 | (2 << 5) | (0b11 << 10)},
+    {"fmodf", 2 | (2 << 5) | (0b11 << 10)},
     // sync
     {"wfi", 0},
     // time
@@ -1756,7 +1758,7 @@ static void expr(int lev) {
                     die("Unknown external function %s", d->name);
                 d->val = ix;
                 d->type =
-                    (((ix >= SYSC_sqrtf) && (ix <= SYSC_powf)) || (ix == SYSC_frequency_count_mhz))
+                    (((ix >= SYSC_sqrtf) && (ix < SYSC_wfi)) || (ix == SYSC_frequency_count_mhz))
                         ? FLOAT
                         : INT;
                 d->etype = externs[ix].etype;
@@ -4378,6 +4380,9 @@ static int run(void) {
                 break;
             case SYSC_powf:
                 a.f = powf(*((float*)sp + 1), *((float*)sp));
+                break;
+            case SYSC_fmodf:
+                a.f = fmodf(*((float*)sp + 1), *((float*)sp));
                 break;
             case SYSC_rand:
                 a.i = rand();
