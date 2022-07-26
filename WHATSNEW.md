@@ -1,3 +1,5 @@
+What's new in version 1.1.9
+
 What's new in version 1.1.8
 
 - mostly readability reorganization of compiler source
