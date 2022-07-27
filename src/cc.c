@@ -395,8 +395,10 @@ enum {
     SYSC_getchar_timeout_us,
     SYSC_putchar,
     SYSC_open,
+    SYSC_opendir,
     SYSC_close,
     SYSC_read,
+    SYSC_readdir,
     SYSC_write,
     SYSC_lseek,
     SYSC_rename,
@@ -652,8 +654,10 @@ static const struct {
     {"getchar_timeout_us", 1},
     {"putchar", 1},
     {"open", 2},
+    {"opendir", 1},
     {"close", 1},
     {"read", 3},
+    {"readdir", 2},
     {"write", 3},
     {"lseek", 3},
     {"rename", 2},
@@ -1072,7 +1076,11 @@ static struct {
 
 struct file_handle {
     struct file_handle* next;
-    lfs_file_t file;
+    bool is_dir;
+    union {
+        lfs_file_t file;
+        lfs_dir_t dir;
+    } u;
 } * file_list;
 
 static void clear_globals(void) {
@@ -4420,9 +4428,24 @@ static int run(void) {
                 break;
             case SYSC_open:
                 h = sys_malloc(sizeof(struct file_handle));
+                h->is_dir = false;
                 if (!h)
                     run_die("no file handle memory");
-                if (fs_file_open(&h->file, full_path((char*)sp[1]), sp[0]) < LFS_ERR_OK) {
+                if (fs_file_open(&h->u.file, full_path((char*)sp[1]), sp[0]) < LFS_ERR_OK) {
+                    sys_free(h);
+                    a.i = 0;
+                    break;
+                }
+                a.i = (int)h;
+                h->next = file_list;
+                file_list = h;
+                break;
+            case SYSC_opendir:
+                h = sys_malloc(sizeof(struct file_handle));
+                h->is_dir = true;
+                if (!h)
+                    run_die("no directory handle memory");
+                if (fs_dir_open(&h->u.dir, full_path((char*)sp[0])) < LFS_ERR_OK) {
                     sys_free(h);
                     a.i = 0;
                     break;
@@ -4437,7 +4460,10 @@ static int run(void) {
                 while (h) {
                     if (h == (struct file_handle*)sp[0]) {
                         last_h->next = h->next;
-                        fs_file_close(&h->file);
+                        if (h->is_dir)
+                            fs_dir_close(&h->u.dir);
+                        else
+                            fs_file_close(&h->u.file);
                         sys_free(h);
                         break;
                     }
@@ -4449,15 +4475,23 @@ static int run(void) {
                 break;
             case SYSC_read:
                 h = (struct file_handle*)sp[2];
-                a.i = fs_file_read(&h->file, (void*)sp[1], sp[0]);
+                if (h->is_dir)
+                    run_die("use readdir to read from directories");
+                a.i = fs_file_read(&h->u.file, (void*)sp[1], sp[0]);
+                break;
+            case SYSC_readdir:
+                h = (struct file_handle*)sp[1];
+                if (!h->is_dir)
+                    run_die("use read to read from files");
+                a.i = fs_dir_read(&h->u.dir, (void*)sp[0]);
                 break;
             case SYSC_write:
                 h = (struct file_handle*)sp[2];
-                a.i = fs_file_write(&h->file, (void*)sp[1], sp[0]);
+                a.i = fs_file_write(&h->u.file, (void*)sp[1], sp[0]);
                 break;
             case SYSC_lseek:
                 h = (struct file_handle*)sp[2];
-                a.i = fs_file_seek(&h->file, sp[1], sp[0]);
+                a.i = fs_file_seek(&h->u.file, sp[1], sp[0]);
                 break;
             case SYSC_rename:
                 fp = full_path((void*)sp[1]);
@@ -5331,7 +5365,10 @@ done:
     if (fd)
         fs_file_close(fd);
     while (file_list) {
-        fs_file_close(&file_list->file);
+        if (file_list->is_dir)
+            fs_dir_close(&file_list->u.dir);
+        else
+            fs_file_close(&file_list->u.file);
         file_list = file_list->next;
     }
     while (malloc_list) {

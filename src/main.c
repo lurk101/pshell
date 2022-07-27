@@ -28,6 +28,7 @@
 #include "dgreadln.h"
 #include "fs.h"
 #include "io.h"
+#include "tar.h"
 #include "version.h"
 #include "vi.h"
 #include "xmodem.h"
@@ -493,6 +494,13 @@ static void cc_cmd(void) {
     result[0] = 0;
 }
 
+static void tar_cmd(void) {
+    if (check_mount(true))
+        return;
+    tar(argc, argv);
+    result[0] = 0;
+}
+
 static void vi_cmd(void) {
     if (check_mount(true))
         return;
@@ -556,6 +564,7 @@ cmd_t cmd_table[] = {
     {"reboot",  reboot_cmd,     "Restart system"},
     {"rm",      rm_cmd,         "remove file or directory"},
     {"status",  status_cmd,     "filesystem status"},
+    {"tar",     tar_cmd,        "tar archiver"},
     {"unmount", unmount_cmd,    "unmount filesystem"},
 	{"version", version_cmd,    "display pshel version"},
     {"vi",      vi_cmd,         "editor"},

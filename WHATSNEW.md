@@ -1,6 +1,7 @@
 What's new in version 1.1.9
 
 - moved all source files to their own directory
+- Added Unix compatible tar command
 
 What's new in version 1.1.8
 
