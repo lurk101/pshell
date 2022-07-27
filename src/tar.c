@@ -5,11 +5,9 @@
 #include "fs.h"
 #include "tar.h"
 
-#define BLOCKSIZE 512
-
 extern char* full_path(char* name);
 
-struct posix_header {   /* byte offset */
+struct posix_hdr {   /* byte offset */
     char name[100];     /*   0 */
     char mode[8];       /* 100 */
     char uid[8];        /* 108 */
@@ -27,9 +25,11 @@ struct posix_header {   /* byte offset */
     char devminor[8];   /* 337 */
     char prefix[155];   /* 345 */
     char pad[12];       /* 500 */
-};
+};                      /* 512 */
 
-static struct posix_header* header;
+#define BLK_SZ sizeof(struct posix_hdr)
+
+static struct posix_hdr* hdr;
 
 static char* path;
 static int root_len;
@@ -50,29 +50,29 @@ static bool tar_file(struct lfs_info* info) {
         printf("can't open %s\n", path);
         return false;
     }
-    memset(header, 0, BLOCKSIZE);
-    strcpy(header->name, path + root_len);
-    sprintf(header->size, "%011o", info->size);
-    memset(header->chksum, ' ', 8);
-    memcpy(header->magic, "ustar ", 6);
-    strcpy(header->version, " ");
-    strcpy(header->mode, "0777");
-    header->typeflag = '0';
+    memset(hdr, 0, BLK_SZ);
+    strcpy(hdr->name, path + root_len);
+    sprintf(hdr->size, "%011o", info->size);
+    memset(hdr->chksum, ' ', 8);
+    memcpy(hdr->magic, "ustar ", 6);
+    strcpy(hdr->version, " ");
+    strcpy(hdr->mode, "0777");
+    hdr->typeflag = '0';
     unsigned cks = 0;
-    for (int i = 0; i < BLOCKSIZE; i++)
-        cks += ((unsigned char*)header)[i];
-    sprintf(header->chksum, "%07o", cks);
-    if (fs_file_write(&tar_f, header, BLOCKSIZE) < LFS_ERR_OK) {
-        printf("error writing %s\n", header->name);
+    for (int i = 0; i < BLK_SZ; i++)
+        cks += ((unsigned char*)hdr)[i];
+    sprintf(hdr->chksum, "%07o", cks);
+    if (fs_file_write(&tar_f, hdr, BLK_SZ) < LFS_ERR_OK) {
+        printf("error writing %s\n", hdr->name);
         return false;
     }
     int len = info->size;
     while (len > 0) {
-        if (fs_file_read(&in_f, header, BLOCKSIZE) < LFS_ERR_OK) {
-            printf("can't read %s\n", full_path(header->name));
+        if (fs_file_read(&in_f, hdr, BLK_SZ) < LFS_ERR_OK) {
+            printf("can't read %s\n", full_path(hdr->name));
             return false;
         }
-        if (fs_file_write(&tar_f, header, BLOCKSIZE) < LFS_ERR_OK) {
+        if (fs_file_write(&tar_f, hdr, BLK_SZ) < LFS_ERR_OK) {
             printf("can't write tar file\n");
             return false;
         }
@@ -93,7 +93,7 @@ static bool tar_dir(struct lfs_info* info) {
         strcat(path, info->name);
     lfs_dir_t in_d;
     if (fs_dir_open(&in_d, path) < LFS_ERR_OK) {
-        printf("can't open %s\n", header->name);
+        printf("can't open %s\n", hdr->name);
         return false;
     }
     while (true) {
@@ -114,48 +114,67 @@ static bool tar_dir(struct lfs_info* info) {
     return true;
 }
 
-static void tar_list(void) {
-    printf("\n");
-    while (true) {
-        if (fs_file_read(&tar_f, header, BLOCKSIZE) < LFS_ERR_OK) {
-            printf("error reading tar file\n");
-            return;
-        }
-        if (header->name[0] == 0)
-            break;
-        printf("%s\n", header->name);
-        int l = strtol(header->size, NULL, 8);
-        l = (l + BLOCKSIZE - 1) & (~(BLOCKSIZE - 1));
-        fs_file_seek(&tar_f, l, LFS_SEEK_CUR);
-    }
+static bool prepare_directories(const char* fn) {
+	char* name = strdup(fn);
+	if (!name)
+		return false;
+	char* last_cp = name;
+	char* cp = strchr(name, '/');
+	while (cp) {
+		*cp = 0;
+    	struct lfs_info info;
+    	if (fs_stat(last_cp, &info) < LFS_ERR_OK) {
+			if (fs_mkdir(name) < LFS_ERR_OK) {
+				printf("unable to create %s directory\n", name);
+				free(name);
+				return false;
+			}
+    	} else if (info.type != LFS_TYPE_DIR) {
+			printf("can't replace file %s with directory\n", name);
+			free(name);
+			return false;
+		}
+		last_cp = cp;
+		*last_cp = '/';
+		cp = strchr(cp + 1, '/');
+	}
+	free(name);
 }
 
 void tar(int ac, char* av[]) {
+	enum {
+		NO_OP = 0,
+		CREATE_OP,
+		LIST_OP,
+		EXTRACT_OP
+	} op = NO_OP;
+
     if (ac < 3) {
     help:
         printf("\ntar [-][t|c|x]f tarball file_or_dir [... file_or_dir]\n");
         return;
     }
-    bool create;
-    bool list = false;
     char* cp = av[1];
     if (*cp == '-')
         ++cp;
-    if (*cp == 'c')
-        create = true;
-    else if (*cp == 'x')
-        create = false;
-    else if (*cp == 't')
-        list = true;
-    else
-        goto help;
+	switch (*cp) {
+	case 'c':
+		op = CREATE_OP;
+		break;
+	case 't':
+		op = LIST_OP;
+		break;
+	case 'x':
+		op = EXTRACT_OP;
+		break;
+	default:
+		goto help;
+	}
     ++cp;
-    if (*cp != 'f')
+    if (*cp != 'f') // seems redundant, for Unix copatibility
         goto help;
-    if (!list && ac < 4)
-        goto help;
-    header = malloc(sizeof(struct posix_header));
-    if (!header) {
+    hdr = malloc(sizeof(struct posix_hdr));
+    if (!hdr) {
         printf("no memory");
         return;
     }
@@ -167,7 +186,7 @@ void tar(int ac, char* av[]) {
     strcpy(path, full_path(""));
     root_len = strlen(path);
     int mode = LFS_O_RDONLY;
-    if (create)
+    if (op = CREATE_OP)
         mode = LFS_O_WRONLY | LFS_O_CREAT;
     tar_fn = strdup(full_path(av[2]));
     if (!tar_fn) {
@@ -178,11 +197,29 @@ void tar(int ac, char* av[]) {
         printf("Can't open %s\n", tar_fn);
         goto bail2;
     }
-    if (list) {
-        tar_list();
-        goto bail1;
-    }
-    if (create) {
+	switch (op) {
+	case LIST_OP:
+	case EXTRACT_OP:
+    	printf("\n");
+    	while (true) {
+        	if (fs_file_read(&tar_f, hdr, BLK_SZ) < LFS_ERR_OK) {
+            	printf("error reading tar file\n");
+            	return;
+        	}
+        	if (hdr->name[0] == 0)
+            	break;
+        	int l = strtol(hdr->size, NULL, 8);
+			if (op == LIST_OP) {
+        		printf("%s\n", hdr->name);
+        		l = (l + BLK_SZ - 1) & (~(BLK_SZ - 1));
+        		fs_file_seek(&tar_f, l, LFS_SEEK_CUR);
+			} else {
+				if (!prepare_directories(hdr->name))
+					goto bail1;
+			}
+    	}
+		break;
+	case CREATE_OP:
         for (int an = 3; an < ac; an++) {
             char* name = av[an];
             struct lfs_info info;
@@ -198,14 +235,16 @@ void tar(int ac, char* av[]) {
             if (!rc)
                 goto bail1;
         }
-        memset(header, 0, BLOCKSIZE);
-        fs_file_write(&tar_f, header, BLOCKSIZE);
-        fs_file_write(&tar_f, header, BLOCKSIZE);
+        memset(hdr, 0, BLK_SZ);
+        fs_file_write(&tar_f, hdr, BLK_SZ);
+        fs_file_write(&tar_f, hdr, BLK_SZ);
+		break;
     }
+
 bail1:
     fs_file_close(&tar_f);
 bail2:
-    free(header);
+    free(hdr);
     if (path)
         free(path);
     if (tar_fn)

@@ -679,7 +679,7 @@ int main(void) {
                     "under certain conditions. See LICENSE file for details.\n");
     version_cmd();
     printf("\nconsole on %s [%u X %u]\n\n"
-           "enter command, hit return for help\n\n",
+           "enter command or hit ENTER for help\n\n",
            uart ? "UART" : "USB", screen_x, screen_y);
     if (!detected) {
         printf("\nYour terminal does not respond to standard VT100 escape sequences"
