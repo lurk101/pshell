@@ -76,7 +76,7 @@ static bool tar_file(struct lfs_info* info) {
             printf("can't write tar file\n");
             return false;
         }
-        len -= 512;
+        len -= BLK_SZ;
     }
     fs_file_close(&in_f);
     printf("%s archived\n", path + root_len);
@@ -114,31 +114,25 @@ static bool tar_dir(struct lfs_info* info) {
     return true;
 }
 
-static bool prepare_directories(const char* fn) {
-    char* name = strdup(fn);
-    if (!name)
-        return false;
-    char* last_cp = name;
-    char* cp = strchr(name, '/');
+static bool create_directories(char* fn) {
+    char* cp = strchr(fn, '/');
     while (cp) {
         *cp = 0;
         struct lfs_info info;
-        if (fs_stat(full_path(name), &info) < LFS_ERR_OK) {
-            if (fs_mkdir(full_path(name)) < LFS_ERR_OK) {
-                printf("unable to create %s directory\n", name);
-                free(name);
+        char* fp = full_path(fn);
+        if (fs_stat(fp, &info) < LFS_ERR_OK) {
+            if (fs_mkdir(fp) < LFS_ERR_OK) {
+                printf("unable to create %s directory\n", fn);
                 return false;
             }
         } else if (info.type != LFS_TYPE_DIR) {
-            printf("can't replace file %s with directory\n", name);
-            free(name);
+            printf("can't replace file %s with directory\n", fn);
             return false;
         }
-        last_cp = cp;
-        *last_cp = '/';
+        *cp = '/';
         cp = strchr(cp + 1, '/');
     }
-    free(name);
+    return true;
 }
 
 void tar(int ac, char* av[]) {
@@ -212,7 +206,7 @@ void tar(int ac, char* av[]) {
                 fs_file_seek(&tar_f, l, LFS_SEEK_CUR);
             } else {
                 printf("extracting %s\n", hdr->name);
-                if (!prepare_directories(hdr->name))
+                if (!create_directories(hdr->name))
                     goto bail1;
                 lfs_file_t out_f;
                 if (fs_file_open(&out_f, full_path(hdr->name), LFS_O_WRONLY | LFS_O_CREAT) <
@@ -220,13 +214,13 @@ void tar(int ac, char* av[]) {
                     printf("could not create file %s\n", hdr->name);
                     goto bail1;
                 }
-                while (l >= 0) {
+                while (l > 0) {
                     if (fs_file_read(&tar_f, hdr, BLK_SZ) < LFS_ERR_OK) {
                         printf("error reading tar file\n");
                         fs_file_close(&out_f);
                         goto bail1;
                     }
-                    if (fs_file_write(&out_f, hdr, l > BLK_SZ ? BLK_SZ : l) < LFS_ERR_OK) {
+                    if (fs_file_write(&out_f, hdr, l >= BLK_SZ ? BLK_SZ : l) < LFS_ERR_OK) {
                         printf("error writing file\n");
                         fs_file_close(&out_f);
                         goto bail1;
