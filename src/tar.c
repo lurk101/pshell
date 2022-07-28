@@ -7,7 +7,7 @@
 
 extern char* full_path(char* name);
 
-struct posix_hdr {   /* byte offset */
+struct posix_hdr {      /* byte offset */
     char name[100];     /*   0 */
     char mode[8];       /* 100 */
     char uid[8];        /* 108 */
@@ -76,7 +76,7 @@ static bool tar_file(struct lfs_info* info) {
             printf("can't write tar file\n");
             return false;
         }
-        len -= 512;
+        len -= BLK_SZ;
     }
     fs_file_close(&in_f);
     printf("%s archived\n", path + root_len);
@@ -114,65 +114,56 @@ static bool tar_dir(struct lfs_info* info) {
     return true;
 }
 
-static bool prepare_directories(const char* fn) {
-	char* name = strdup(fn);
-	if (!name)
-		return false;
-	char* last_cp = name;
-	char* cp = strchr(name, '/');
-	while (cp) {
-		*cp = 0;
-    	struct lfs_info info;
-    	if (fs_stat(last_cp, &info) < LFS_ERR_OK) {
-			if (fs_mkdir(name) < LFS_ERR_OK) {
-				printf("unable to create %s directory\n", name);
-				free(name);
-				return false;
-			}
-    	} else if (info.type != LFS_TYPE_DIR) {
-			printf("can't replace file %s with directory\n", name);
-			free(name);
-			return false;
-		}
-		last_cp = cp;
-		*last_cp = '/';
-		cp = strchr(cp + 1, '/');
-	}
-	free(name);
+static bool create_directories(char* fn) {
+    char* cp = strchr(fn, '/');
+    while (cp) {
+        *cp = 0;
+        struct lfs_info info;
+        char* fp = full_path(fn);
+        if (fs_stat(fp, &info) < LFS_ERR_OK) {
+            if (fs_mkdir(fp) < LFS_ERR_OK) {
+                printf("unable to create %s directory\n", fn);
+                return false;
+            }
+        } else if (info.type != LFS_TYPE_DIR) {
+            printf("can't replace file %s with directory\n", fn);
+            return false;
+        }
+        *cp = '/';
+        cp = strchr(cp + 1, '/');
+    }
+    return true;
 }
 
 void tar(int ac, char* av[]) {
-	enum {
-		NO_OP = 0,
-		CREATE_OP,
-		LIST_OP,
-		EXTRACT_OP
-	} op = NO_OP;
+
+    enum { NO_OP = 0, CREATE_OP, LIST_OP, EXTRACT_OP } op = NO_OP;
 
     if (ac < 3) {
     help:
-        printf("\ntar [-][t|c|x]f tarball file_or_dir [... file_or_dir]\n");
+        printf("\ntar [-][t|c|x] tarball_file [file_or_dir [... file_or_dir]]\n\n"
+               "-t   show tar file contents\n"
+               "-c   create tar file from files\n"
+               "-x   extract tar file contents\n");
         return;
     }
     char* cp = av[1];
     if (*cp == '-')
         ++cp;
-	switch (*cp) {
-	case 'c':
-		op = CREATE_OP;
-		break;
-	case 't':
-		op = LIST_OP;
-		break;
-	case 'x':
-		op = EXTRACT_OP;
-		break;
-	default:
-		goto help;
-	}
-    ++cp;
-    if (*cp != 'f') // seems redundant, for Unix copatibility
+    switch (*cp) {
+    case 'c':
+        op = CREATE_OP;
+        break;
+    case 't':
+        op = LIST_OP;
+        break;
+    case 'x':
+        op = EXTRACT_OP;
+        break;
+    default:
         goto help;
+    }
+    path = tar_fn = NULL;
     hdr = malloc(sizeof(struct posix_hdr));
     if (!hdr) {
         printf("no memory");
@@ -186,40 +177,61 @@ void tar(int ac, char* av[]) {
     strcpy(path, full_path(""));
     root_len = strlen(path);
     int mode = LFS_O_RDONLY;
-    if (op = CREATE_OP)
+    if (op == CREATE_OP)
         mode = LFS_O_WRONLY | LFS_O_CREAT;
     tar_fn = strdup(full_path(av[2]));
     if (!tar_fn) {
         printf("no memory");
-        return;
+        goto bail2;
     }
     if (fs_file_open(&tar_f, tar_fn, mode) < LFS_ERR_OK) {
         printf("Can't open %s\n", tar_fn);
         goto bail2;
     }
-	switch (op) {
-	case LIST_OP:
-	case EXTRACT_OP:
-    	printf("\n");
-    	while (true) {
-        	if (fs_file_read(&tar_f, hdr, BLK_SZ) < LFS_ERR_OK) {
-            	printf("error reading tar file\n");
-            	return;
-        	}
-        	if (hdr->name[0] == 0)
-            	break;
-        	int l = strtol(hdr->size, NULL, 8);
-			if (op == LIST_OP) {
-        		printf("%s\n", hdr->name);
-        		l = (l + BLK_SZ - 1) & (~(BLK_SZ - 1));
-        		fs_file_seek(&tar_f, l, LFS_SEEK_CUR);
-			} else {
-				if (!prepare_directories(hdr->name))
-					goto bail1;
-			}
-    	}
-		break;
-	case CREATE_OP:
+    switch (op) {
+    case LIST_OP:
+    case EXTRACT_OP:
+        printf("\n");
+        while (true) {
+            if (fs_file_read(&tar_f, hdr, BLK_SZ) < LFS_ERR_OK) {
+                printf("error reading tar file\n");
+                return;
+            }
+            if (hdr->name[0] == 0)
+                break;
+            int l = strtol(hdr->size, NULL, 8);
+            if (op == LIST_OP) {
+                printf("%s\n", hdr->name);
+                l = (l + BLK_SZ - 1) & (~(BLK_SZ - 1));
+                fs_file_seek(&tar_f, l, LFS_SEEK_CUR);
+            } else {
+                printf("extracting %s\n", hdr->name);
+                if (!create_directories(hdr->name))
+                    goto bail1;
+                lfs_file_t out_f;
+                if (fs_file_open(&out_f, full_path(hdr->name), LFS_O_WRONLY | LFS_O_CREAT) <
+                    LFS_ERR_OK) {
+                    printf("could not create file %s\n", hdr->name);
+                    goto bail1;
+                }
+                while (l > 0) {
+                    if (fs_file_read(&tar_f, hdr, BLK_SZ) < LFS_ERR_OK) {
+                        printf("error reading tar file\n");
+                        fs_file_close(&out_f);
+                        goto bail1;
+                    }
+                    if (fs_file_write(&out_f, hdr, l >= BLK_SZ ? BLK_SZ : l) < LFS_ERR_OK) {
+                        printf("error writing file\n");
+                        fs_file_close(&out_f);
+                        goto bail1;
+                    }
+                    l -= BLK_SZ;
+                }
+                fs_file_close(&out_f);
+            }
+        }
+        break;
+    case CREATE_OP:
         for (int an = 3; an < ac; an++) {
             char* name = av[an];
             struct lfs_info info;
@@ -238,7 +250,7 @@ void tar(int ac, char* av[]) {
         memset(hdr, 0, BLK_SZ);
         fs_file_write(&tar_f, hdr, BLK_SZ);
         fs_file_write(&tar_f, hdr, BLK_SZ);
-		break;
+        break;
     }
 
 bail1:

@@ -374,6 +374,69 @@ static void rm_cmd(void) {
     sprintf(result, "%s %s removed", isdir ? "directory" : "file", fp);
 }
 
+static char rmdir_path[256];
+
+static bool clean_dir(char* name) {
+    int path_len = strlen(rmdir_path);
+    if (path_len)
+        strcat(rmdir_path, "/");
+    strcat(rmdir_path, name);
+    lfs_dir_t dir_f;
+    if (fs_dir_open(&dir_f, rmdir_path) < LFS_ERR_OK) {
+        printf("can't open %s directory\n", rmdir_path);
+        return false;
+    }
+    struct lfs_info info;
+    while (fs_dir_read(&dir_f, &info) > 0)
+        if (info.type == LFS_TYPE_DIR && strcmp(info.name, ".") && strcmp(info.name, ".."))
+            if (!clean_dir(info.name)) {
+                fs_dir_close(&dir_f);
+                return false;
+            }
+    fs_dir_rewind(&dir_f);
+    while (fs_dir_read(&dir_f, &info) > 0) {
+        if (info.type == LFS_TYPE_REG) {
+            int plen = strlen(rmdir_path);
+            strcat(rmdir_path, "/");
+            strcat(rmdir_path, info.name);
+            if (fs_remove(rmdir_path) < LFS_ERR_OK) {
+                printf("can't remove %s", rmdir_path);
+                fs_dir_close(&dir_f);
+                return false;
+            }
+            printf("%s removed\n", rmdir_path);
+            rmdir_path[plen] = 0;
+        }
+    }
+    fs_dir_close(&dir_f);
+    if (fs_remove(rmdir_path) < LFS_ERR_OK) {
+        sprintf(result, "can't remove %s", rmdir_path);
+        return false;
+    }
+    printf("%s removed\n", rmdir_path);
+    rmdir_path[path_len] = 0;
+    return true;
+}
+
+static void rmdir_cmd(void) {
+    if (check_mount(true))
+        return;
+    if (check_name())
+        return;
+    struct lfs_info info;
+    char* fp = full_path(argv[1]);
+    if (fs_stat(fp, &info) < LFS_ERR_OK) {
+        sprintf(result, "%s not found", full_path(argv[1]));
+        return;
+    }
+    if (info.type != LFS_TYPE_DIR) {
+        sprintf(result, "%s is not a directory", fp);
+        return;
+    }
+    rmdir_path[0] = 0;
+    clean_dir(fp);
+}
+
 static void mount_cmd(void) {
     if (check_mount(false))
         return;
@@ -563,6 +626,7 @@ cmd_t cmd_table[] = {
     {"quit",    quit_cmd,       "shutdown system"},
     {"reboot",  reboot_cmd,     "Restart system"},
     {"rm",      rm_cmd,         "remove file or directory"},
+    {"rmdir",   rmdir_cmd,      "recursive directory remove"},
     {"status",  status_cmd,     "filesystem status"},
     {"tar",     tar_cmd,        "tar archiver"},
     {"unmount", unmount_cmd,    "unmount filesystem"},
