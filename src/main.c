@@ -342,38 +342,6 @@ static void mkdir_cmd(void) {
     sprintf(result, "%s created", full_path(argv[1]));
 }
 
-static void rm_cmd(void) {
-    if (check_mount(true))
-        return;
-    if (check_name())
-        return;
-    // lfs won't remove a non empty directory but returns without error!
-    struct lfs_info info;
-    char* fp = full_path(argv[1]);
-    if (fs_stat(fp, &info) < LFS_ERR_OK) {
-        sprintf(result, "%s not found", full_path(argv[1]));
-        return;
-    }
-    int isdir = 0;
-    if (info.type == LFS_TYPE_DIR) {
-        isdir = 1;
-        lfs_dir_t dir;
-        fs_dir_open(&dir, fp);
-        int n = 0;
-        while (fs_dir_read(&dir, &info))
-            if ((strcmp(info.name, ".") != 0) && (strcmp(info.name, "..") != 0))
-                n++;
-        fs_dir_close(&dir);
-        if (n) {
-            sprintf(result, "directory %s not empty", fp);
-            return;
-        }
-    }
-    if (fs_remove(fp) < LFS_ERR_OK)
-        strcpy(result, "Can't remove file or directory");
-    sprintf(result, "%s %s removed", isdir ? "directory" : "file", fp);
-}
-
 static char rmdir_path[256];
 
 static bool clean_dir(char* name) {
@@ -418,23 +386,50 @@ static bool clean_dir(char* name) {
     return true;
 }
 
-static void rmdir_cmd(void) {
+static void rm_cmd(void) {
     if (check_mount(true))
         return;
     if (check_name())
         return;
+    bool recursive = false;
+    if (strcmp(argv[1], "-r") == 0) {
+        if (argc < 3) {
+            strcpy(result, "specify a file or directory name");
+            return;
+        }
+        recursive = true;
+        argv[1] = argv[2];
+    }
+    // lfs won't remove a non empty directory but returns without error!
     struct lfs_info info;
     char* fp = full_path(argv[1]);
     if (fs_stat(fp, &info) < LFS_ERR_OK) {
         sprintf(result, "%s not found", full_path(argv[1]));
         return;
     }
-    if (info.type != LFS_TYPE_DIR) {
-        sprintf(result, "%s is not a directory", fp);
-        return;
+    int isdir = 0;
+    if (info.type == LFS_TYPE_DIR) {
+        isdir = 1;
+        lfs_dir_t dir;
+        fs_dir_open(&dir, fp);
+        int n = 0;
+        while (fs_dir_read(&dir, &info))
+            if ((strcmp(info.name, ".") != 0) && (strcmp(info.name, "..") != 0))
+                n++;
+        fs_dir_close(&dir);
+        if (n) {
+            if (recursive) {
+                rmdir_path[0] = 0;
+                clean_dir(fp);
+                return;
+            } else
+                sprintf(result, "directory %s not empty", fp);
+            return;
+        }
     }
-    rmdir_path[0] = 0;
-    clean_dir(fp);
+    if (fs_remove(fp) < LFS_ERR_OK)
+        strcpy(result, "Can't remove file or directory");
+    sprintf(result, "%s %s removed", isdir ? "directory" : "file", fp);
 }
 
 static void mount_cmd(void) {
@@ -625,8 +620,7 @@ cmd_t cmd_table[] = {
     {"mv",      mv_cmd,         "rename file or directory"},
     {"quit",    quit_cmd,       "shutdown system"},
     {"reboot",  reboot_cmd,     "Restart system"},
-    {"rm",      rm_cmd,         "remove file or directory"},
-    {"rmdir",   rmdir_cmd,      "recursive directory remove"},
+    {"rm",      rm_cmd,         "remove file or directory. -f for recursive"},
     {"status",  status_cmd,     "filesystem status"},
     {"tar",     tar_cmd,        "tar archiver"},
     {"unmount", unmount_cmd,    "unmount filesystem"},
