@@ -27,11 +27,34 @@
 #include "cc.h"
 #include "dgreadln.h"
 #include "fs.h"
-#include "io.h"
 #include "tar.h"
 #include "version.h"
 #include "vi.h"
 #include "xmodem.h"
+
+#if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
+#define SDK14 1
+#else
+#define SDK14 0
+#endif
+
+#if LIB_PICO_STDIO_USB
+#if SDK14
+#define CONS_CONNECTED stdio_usb_connected()
+#else
+#include "tusb.h"
+#define CONS_CONNECTED tud_cdc_connected()
+#endif
+#endif
+
+static void set_translate_crlf(bool on) {
+#if LIB_PICO_STDIO_UART
+    stdio_set_translate_crlf(&stdio_uart, on);
+#endif
+#if LIB_PICO_STDIO_USB
+    stdio_set_translate_crlf(&stdio_usb, on);
+#endif
+}
 
 #define COPYRIGHT "\u00a9" // for UTF8
 //#define COPYRIGHT "(c)" // for ASCII
@@ -342,38 +365,6 @@ static void mkdir_cmd(void) {
     sprintf(result, "%s created", full_path(argv[1]));
 }
 
-static void rm_cmd(void) {
-    if (check_mount(true))
-        return;
-    if (check_name())
-        return;
-    // lfs won't remove a non empty directory but returns without error!
-    struct lfs_info info;
-    char* fp = full_path(argv[1]);
-    if (fs_stat(fp, &info) < LFS_ERR_OK) {
-        sprintf(result, "%s not found", full_path(argv[1]));
-        return;
-    }
-    int isdir = 0;
-    if (info.type == LFS_TYPE_DIR) {
-        isdir = 1;
-        lfs_dir_t dir;
-        fs_dir_open(&dir, fp);
-        int n = 0;
-        while (fs_dir_read(&dir, &info))
-            if ((strcmp(info.name, ".") != 0) && (strcmp(info.name, "..") != 0))
-                n++;
-        fs_dir_close(&dir);
-        if (n) {
-            sprintf(result, "directory %s not empty", fp);
-            return;
-        }
-    }
-    if (fs_remove(fp) < LFS_ERR_OK)
-        strcpy(result, "Can't remove file or directory");
-    sprintf(result, "%s %s removed", isdir ? "directory" : "file", fp);
-}
-
 static char rmdir_path[256];
 
 static bool clean_dir(char* name) {
@@ -418,23 +409,50 @@ static bool clean_dir(char* name) {
     return true;
 }
 
-static void rmdir_cmd(void) {
+static void rm_cmd(void) {
     if (check_mount(true))
         return;
     if (check_name())
         return;
+    bool recursive = false;
+    if (strcmp(argv[1], "-r") == 0) {
+        if (argc < 3) {
+            strcpy(result, "specify a file or directory name");
+            return;
+        }
+        recursive = true;
+        argv[1] = argv[2];
+    }
+    // lfs won't remove a non empty directory but returns without error!
     struct lfs_info info;
     char* fp = full_path(argv[1]);
     if (fs_stat(fp, &info) < LFS_ERR_OK) {
         sprintf(result, "%s not found", full_path(argv[1]));
         return;
     }
-    if (info.type != LFS_TYPE_DIR) {
-        sprintf(result, "%s is not a directory", fp);
-        return;
+    int isdir = 0;
+    if (info.type == LFS_TYPE_DIR) {
+        isdir = 1;
+        lfs_dir_t dir;
+        fs_dir_open(&dir, fp);
+        int n = 0;
+        while (fs_dir_read(&dir, &info))
+            if ((strcmp(info.name, ".") != 0) && (strcmp(info.name, "..") != 0))
+                n++;
+        fs_dir_close(&dir);
+        if (n) {
+            if (recursive) {
+                rmdir_path[0] = 0;
+                clean_dir(fp);
+                return;
+            } else
+                sprintf(result, "directory %s not empty", fp);
+            return;
+        }
     }
-    rmdir_path[0] = 0;
-    clean_dir(fp);
+    if (fs_remove(fp) < LFS_ERR_OK)
+        strcpy(result, "Can't remove file or directory");
+    sprintf(result, "%s %s removed", isdir ? "directory" : "file", fp);
 }
 
 static void mount_cmd(void) {
@@ -625,8 +643,7 @@ cmd_t cmd_table[] = {
     {"mv",      mv_cmd,         "rename file or directory"},
     {"quit",    quit_cmd,       "shutdown system"},
     {"reboot",  reboot_cmd,     "Restart system"},
-    {"rm",      rm_cmd,         "remove file or directory"},
-    {"rmdir",   rmdir_cmd,      "recursive directory remove"},
+    {"rm",      rm_cmd,         "remove file or directory. -f for recursive"},
     {"status",  status_cmd,     "filesystem status"},
     {"tar",     tar_cmd,        "tar archiver"},
     {"unmount", unmount_cmd,    "unmount filesystem"},
@@ -660,12 +677,12 @@ static bool screen_size(void) {
         set_translate_crlf(false);
         printf(VT_ESC "[999;999H" VT_ESC "[6n");
         fflush(stdout);
-        int k = x_getchar_timeout_us(100000);
+        int k = getchar_timeout_us(100000);
         if (k == PICO_ERROR_TIMEOUT)
             break;
         char* cp = cmd_buffer;
         while (cp < cmd_buffer + sizeof cmd_buffer) {
-            k = x_getchar_timeout_us(100000);
+            k = getchar_timeout_us(100000);
             if (k == PICO_ERROR_TIMEOUT)
                 break;
             *cp++ = k;
@@ -725,16 +742,15 @@ static void HardFault_Handler(void) {
 // application entry point
 int main(void) {
     // initialize the pico SDK
-    if (ioinit() < 0) {
-        printf("no keyboard");
-        exit(-1);
-    }
-    ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
-    x_getchar_timeout_us(1000);
-    bool uart = false;
-#if LIB_PICO_STDIO_UART
-    uart = true;
+    stdio_init_all();
+    bool uart = true;
+#if LIB_PICO_STDIO_USB
+    while (!CONS_CONNECTED)
+        sleep_ms(1000);
+    uart = false;
 #endif
+    ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
+    getchar_timeout_us(1000);
     bool detected = screen_size();
     printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright " COPYRIGHT
                     " 1883 Thomas Edison\n"
@@ -755,9 +771,9 @@ int main(void) {
         printf("The flash file system appears corrupt or unformatted!\n"
                " would you like to format it (Y/n) ? ");
         fflush(stdout);
-        char c = x_getchar();
+        char c = getchar();
         while (c != 'y' && c != 'Y' && c != 'N' && c != 'n' && c != '\r')
-            c = x_getchar();
+            c = getchar();
         putchar(c);
         if (c != '\r')
             echo_key('\r');
