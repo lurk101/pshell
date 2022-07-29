@@ -12,29 +12,13 @@
 
 extern char* full_path(const char* name);
 
-static int dgpush = PICO_ERROR_TIMEOUT;
-
-static int dggetc() {
-    if (dgpush != PICO_ERROR_TIMEOUT) {
-        int c = dgpush;
-        dgpush = PICO_ERROR_TIMEOUT;
-        return c;
-    }
-    return getchar();
-}
-
 static int dgleft() {
-    if (dgpush != PICO_ERROR_TIMEOUT)
+    int dgpush = getchar_timeout_us(0);
+    if (dgpush != PICO_ERROR_TIMEOUT) {
+        ungetc(dgpush, stdin);
         return 1;
-    dgpush = getchar_timeout_us(0);
-    if (dgpush != PICO_ERROR_TIMEOUT)
-        return 1;
+    }
     return 0;
-}
-
-static void dgugetc(int c) {
-    dgpush = c;
-    return;
 }
 
 static int dgputs(char* s) {
@@ -393,9 +377,9 @@ static void cmdinsert(int c) {
             break;
         if (!dgleft())
             break;
-        c = dggetc();
+        c = getchar();
         if (c < '\040' || c >= '\177') {
-            dgugetc(c);
+            ungetc(c, stdin);
             break;
         }
     }
@@ -418,7 +402,7 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
     cmdli = 0;
     twotabs = 0;
     for (;;) {
-        int c = dggetc();
+        int c = getchar();
         if (c == '\t') {
             dotab();
         } else if ((twotabs = 0, ky = matchkey(c))) {
