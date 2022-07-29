@@ -23,7 +23,6 @@
 #include "pico/time.h"
 
 #include "fs.h"
-#include "io.h"
 #include "vi.h"
 
 extern char* full_path(const char* name);
@@ -801,15 +800,15 @@ static void refresh(int full_screen) {
 static int sleep(int ms) {
     if (ms)
         sleep_ms(ms);
-    return nextchar();
+    return getchar_timeout_us(0);
 }
 
 static int safe_poll(uint8_t* buffer, int ms) {
     int c;
     if (ms < 0)
-        c = x_getchar();
+        c = getchar();
     else {
-        c = x_getchar_timeout_us(ms * 1000);
+        c = getchar_timeout_us(ms * 1000);
         if (c == PICO_ERROR_TIMEOUT)
             return 0;
     }

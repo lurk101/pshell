@@ -1,10 +1,10 @@
 /* vi: set sw=4 ts=4: */
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <stdio.h>
 #include <string.h>
 
 #include "crc16.h"
-#include "io.h"
 #include "xmodem.h"
 
 #include "pico/stdio.h"

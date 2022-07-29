@@ -9,7 +9,6 @@
 
 #include "dgreadln.h"
 #include "fs.h"
-#include "io.h"
 
 extern char* full_path(const char* name);
 
@@ -21,13 +20,13 @@ static int dggetc() {
         dgpush = PICO_ERROR_TIMEOUT;
         return c;
     }
-    return x_getchar();
+    return getchar();
 }
 
 static int dgleft() {
     if (dgpush != PICO_ERROR_TIMEOUT)
         return 1;
-    dgpush = x_getchar_timeout_us(0);
+    dgpush = getchar_timeout_us(0);
     if (dgpush != PICO_ERROR_TIMEOUT)
         return 1;
     return 0;

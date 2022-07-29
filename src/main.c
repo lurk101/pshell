@@ -27,11 +27,34 @@
 #include "cc.h"
 #include "dgreadln.h"
 #include "fs.h"
-#include "io.h"
 #include "tar.h"
 #include "version.h"
 #include "vi.h"
 #include "xmodem.h"
+
+#if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
+#define SDK14 1
+#else
+#define SDK14 0
+#endif
+
+#if LIB_PICO_STDIO_USB
+#if SDK14
+#define CONS_CONNECTED stdio_usb_connected()
+#else
+#include "tusb.h"
+#define CONS_CONNECTED tud_cdc_connected()
+#endif
+#endif
+
+static void set_translate_crlf(bool on) {
+#if LIB_PICO_STDIO_UART
+    stdio_set_translate_crlf(&stdio_uart, on);
+#endif
+#if LIB_PICO_STDIO_USB
+    stdio_set_translate_crlf(&stdio_usb, on);
+#endif
+}
 
 #define COPYRIGHT "\u00a9" // for UTF8
 //#define COPYRIGHT "(c)" // for ASCII
@@ -654,12 +677,12 @@ static bool screen_size(void) {
         set_translate_crlf(false);
         printf(VT_ESC "[999;999H" VT_ESC "[6n");
         fflush(stdout);
-        int k = x_getchar_timeout_us(100000);
+        int k = getchar_timeout_us(100000);
         if (k == PICO_ERROR_TIMEOUT)
             break;
         char* cp = cmd_buffer;
         while (cp < cmd_buffer + sizeof cmd_buffer) {
-            k = x_getchar_timeout_us(100000);
+            k = getchar_timeout_us(100000);
             if (k == PICO_ERROR_TIMEOUT)
                 break;
             *cp++ = k;
@@ -719,16 +742,15 @@ static void HardFault_Handler(void) {
 // application entry point
 int main(void) {
     // initialize the pico SDK
-    if (ioinit() < 0) {
-        printf("no keyboard");
-        exit(-1);
-    }
-    ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
-    x_getchar_timeout_us(1000);
-    bool uart = false;
-#if LIB_PICO_STDIO_UART
-    uart = true;
+    stdio_init_all();
+    bool uart = true;
+#if LIB_PICO_STDIO_USB
+    while (!CONS_CONNECTED)
+        sleep_ms(1000);
+    uart = false;
 #endif
+    ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
+    getchar_timeout_us(1000);
     bool detected = screen_size();
     printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright " COPYRIGHT
                     " 1883 Thomas Edison\n"
@@ -749,9 +771,9 @@ int main(void) {
         printf("The flash file system appears corrupt or unformatted!\n"
                " would you like to format it (Y/n) ? ");
         fflush(stdout);
-        char c = x_getchar();
+        char c = getchar();
         while (c != 'y' && c != 'Y' && c != 'N' && c != 'n' && c != '\r')
-            c = x_getchar();
+            c = getchar();
         putchar(c);
         if (c != '\r')
             echo_key('\r');

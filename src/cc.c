@@ -34,7 +34,6 @@
 
 #include "cc.h"
 #include "fs.h"
-#include "io.h"
 
 #ifdef NDEBUG
 #define Inline inline
@@ -3959,7 +3958,7 @@ static int common_vfunc(int ac, int sflag, int* sp) {
 
 #if WITH_KBD_HALT
 static Inline void check_kbd_halt(void) {
-    int key = x_getchar_timeout_us(0);
+    int key = getchar_timeout_us(0);
     if ((key == 27) || (key == 3)) // check for escape
         run_die("user interrupted!!");
 }
@@ -4142,7 +4141,7 @@ static int run(void) {
                 printf("  (as float) %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
                        *((float*)sp + 2), *((float*)sp + 3));
                 if (trc_opt > 1)
-                    if (x_getchar() == 3)
+                    if (getchar() == 3)
                         run_die("user interrupted!!");
             }
         i = *pc++;
@@ -4418,10 +4417,10 @@ static int run(void) {
                 break;
             // io
             case SYSC_getchar:
-                a.i = x_getchar();
+                a.i = getchar();
                 break;
             case SYSC_getchar_timeout_us:
-                a.i = x_getchar_timeout_us(sp[0]);
+                a.i = getchar_timeout_us(sp[0]);
                 break;
             case SYSC_putchar:
                 putchar(sp[0]);

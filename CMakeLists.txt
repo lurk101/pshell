@@ -69,7 +69,6 @@ add_executable(${PSHELL}
     src/fs.c src/fs.h
     src/vi.c src/vi.h
     src/cc.c src/cc.h
-    src/io.c src/io.h
     src/tar.c src/tar.h
     src/cc_printf.S
     src/version.h)
