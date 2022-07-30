@@ -3519,17 +3519,17 @@ static void stmt(int ctx) {
                 if (id->class == Func && id->val > (int)text_base && id->val < (int)e &&
                     id->forward == 0)
                     die("duplicate global definition");
-                dd->etype = 0;
+                int ddetype = 0;
                 dd->class = Func;       // type is function
                 dd->val = (int)(e + 1); // function Pointer? offset/address
                 next();
                 nf = ir_count = ld = 0; // "ld" is parameter's index.
                 while (tk != ')') {
                     stmt(Par);
-                    dd->etype = dd->etype * 2;
+                    ddetype = ddetype * 2;
                     if (ty == FLOAT) {
                         ++nf;
-                        ++(dd->etype);
+                        ++ddetype;
                     }
                     if (tk == ',')
                         next();
@@ -3538,7 +3538,10 @@ static void stmt(int ctx) {
                     die("maximum of %d function parameters", ADJ_MASK);
                 // function etype is not like other etypes
                 next();
-                dd->etype = (dd->etype << 10) + (nf << 5) + ld; // prm info
+                ddetype = (ddetype << 10) + (nf << 5) + ld; // prm info
+                if (dd->forward && (ddetype != dd->etype))
+                    die("parameters don't match prototype");
+                dd->etype = ddetype;
                 int* se;
                 if (tk == ';') { // check for prototype
                     se = e;
