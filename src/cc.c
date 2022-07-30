@@ -125,6 +125,7 @@ struct ident_s {
     int type, htype;   // data type such as char and int
     int val, hval;
     int etype, hetype; // extended type info. different meaning for funcs.
+    int* forward;      // forward call list
 };
 
 struct ident_s *id,  // currently parsed identifier
@@ -1065,10 +1066,12 @@ static int* malloc_list;
 static lfs_file_t* fd;
 static char* fp;
 
+#if WITH_IRQ
 static struct {
     bool enabled;
     void* c_handler;
 } intrpt_vector[32];
+#endif
 
 struct file_handle {
     struct file_handle* next;
@@ -1092,7 +1095,9 @@ static void clear_globals(void) {
     memset(ir_var, 0, sizeof(ir_var));
     memset(&members, 0, sizeof(members));
     memset(&done_jmp, 0, sizeof(&done_jmp));
+#if WITH_IRQ
     memset(intrpt_vector, 0, sizeof(intrpt_vector));
+#endif
 }
 
 #define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
@@ -1201,6 +1206,7 @@ static void next() {
              */
             id->name = pp;
             id->hash = tk;
+            id->forward = 0;
             tk = id->tk = Id; // token type identifier
             return;
         }
@@ -3510,9 +3516,8 @@ static void stmt(int ctx) {
                     die("nested function");
                 if (ty > ATOM_TYPE && ty < PTR)
                     die("return type can't be struct");
-                if (id->class == Syscall && id->val)
-                    die("forward decl location failed one pass compilation");
-                if (id->class == Func && id->val > (int)text_base && id->val < (int)e)
+                if (id->class == Func && id->val > (int)text_base && id->val < (int)e &&
+                    id->forward == 0)
                     die("duplicate global definition");
                 dd->etype = 0;
                 dd->class = Func;       // type is function
@@ -3534,37 +3539,40 @@ static void stmt(int ctx) {
                 // function etype is not like other etypes
                 next();
                 dd->etype = (dd->etype << 10) + (nf << 5) + ld; // prm info
-                if (tk == ';') {
-                    dd->val = 0;
-                    goto unwind_func;
-                } // fn proto
-                if (tk != '{')
-                    die("bad function definition");
-                loc = ++ld;
-                next();
-                // Not declaration and must not be function, analyze inner block.
-                // e represents the address which will store pc
-                // (ld - loc) indicates memory size to allocate
-                ast_Single(';');
-                while (tk != '}') {
-                    int* t = n;
-                    check_label(&t);
-                    stmt(Loc);
-                    if (t != n)
-                        ast_Begin((int)t);
+                int* se;
+                if (tk == ';') { // check for prototype
+                    se = e;
+                    *++e = JMP;
+                    *++e = (int)e;
+                    dd->forward = e;
+                } else { // function with body
+                    if (tk != '{')
+                        die("bad function definition");
+                    loc = ++ld;
+                    next();
+                    // Not declaration and must not be function, analyze inner block.
+                    // e represents the address which will store pc
+                    // (ld - loc) indicates memory size to allocate
+                    ast_Single(';');
+                    while (tk != '}') {
+                        int* t = n;
+                        check_label(&t);
+                        stmt(Loc);
+                        if (t != n)
+                            ast_Begin((int)t);
+                    }
+                    if (rtf == 0 && rtt != -1)
+                        die("expecting return value");
+                    ast_Enter(ld - loc);
+                    cas = 0;
+                    se = e;
+                    gen(n);
                 }
-                if (rtf == 0 && rtt != -1)
-                    die("expecting return value");
-                ast_Enter(ld - loc);
-                cas = 0;
-                int* se = e;
-                gen(n);
                 if (src_opt) {
                     printf("%d: %.*s\n", line, p - lp, lp);
                     lp = p;
                     disassemble(se, e, 0);
                 }
-            unwind_func:
                 id = sym;
                 if (src_opt)
                     memset(ir_var, 0, sizeof(struct ident_s*) * MAX_IR);
@@ -5310,6 +5318,10 @@ int cc(int argc, char** argv) {
         stmt(Glo);
         next();
     }
+    // patch forward JMPs
+    for (struct ident_s* scan = sym; scan->tk; ++scan)
+        if (scan->class == Func && scan->forward)
+            *(scan->forward) = scan->val;
     sys_free(ast);
     ast = NULL;
     sys_free(src);
@@ -5344,9 +5356,11 @@ int cc(int argc, char** argv) {
     printf("\nCC=%d\n", run());
 
 done:
+#if WITH_IRQ
     for (int i = 0; i < 32; i++)
         if (intrpt_vector[i].enabled)
             irq_set_enabled(i, 0);
+#endif
     if (fd)
         fs_file_close(fd);
     while (file_list) {
