@@ -47,15 +47,6 @@
 #endif
 #endif
 
-static void set_translate_crlf(bool on) {
-#if LIB_PICO_STDIO_UART
-    stdio_set_translate_crlf(&stdio_uart, on);
-#endif
-#if LIB_PICO_STDIO_USB
-    stdio_set_translate_crlf(&stdio_usb, on);
-#endif
-}
-
 #define COPYRIGHT "\u00a9" // for UTF8
 //#define COPYRIGHT "(c)" // for ASCII
 
@@ -79,6 +70,18 @@ static int argc;
 static char* argv[MAX_ARGS + 1];
 static bool mounted = false, run = true;
 
+static void set_translate_crlf(bool enable) {
+    stdio_driver_t* driver;
+#if LIB_PICO_STDIO_UART
+    driver = &stdio_uart;
+#endif
+#if LIB_PICO_STDIO_USB
+    driver = &stdio_usb;
+#endif
+    stdio_set_translate_crlf(driver, enable);
+}
+
+// used by Vi
 void get_screen_xy(uint32_t* x, uint32_t* y) {
     *x = screen_x;
     *y = screen_y;
