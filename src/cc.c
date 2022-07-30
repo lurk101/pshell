@@ -34,7 +34,6 @@
 
 #include "cc.h"
 #include "fs.h"
-#include "io.h"
 
 #ifdef NDEBUG
 #define Inline inline
@@ -109,9 +108,7 @@ static int* n;                  // current position in emitted abstract syntax t
                                 // right-to-left order.
 static int ld;                  // local variable depth
 static int pplev, pplevt;       // preprocessor conditional level
-static int oline, osize;        // for optimization suggestion
-                                //
-static int* ast;                // abstract tree
+static int* ast;                // abstract syntax tree
 
 // identifier
 #define MAX_IR 64 // maximum number of local variable or function parameters
@@ -128,11 +125,11 @@ struct ident_s {
     int type, htype;   // data type such as char and int
     int val, hval;
     int etype, hetype; // extended type info. different meaning for funcs.
+    int* forward;      // forward call list
 };
 
 struct ident_s *id,  // currently parsed identifier
     *sym,            // symbol table (simple list of identifiers)
-    *oid,            // for array optimization suggestion
     *ir_var[MAX_IR]; // IR information for local vars and parameters
 
 static int ir_count;
@@ -1069,10 +1066,12 @@ static int* malloc_list;
 static lfs_file_t* fd;
 static char* fp;
 
+#if WITH_IRQ
 static struct {
     bool enabled;
     void* c_handler;
 } intrpt_vector[32];
+#endif
 
 struct file_handle {
     struct file_handle* next;
@@ -1085,18 +1084,20 @@ struct file_handle {
 
 static void clear_globals(void) {
     base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = malloc_list =
-        (int*)(data = data = src = p = lp = fp = (char*)(id = sym = oid = NULL));
+        (int*)(data = data = src = p = lp = fp = (char*)(id = sym = NULL));
     fd = NULL;
     file_list = NULL;
 
     swtc = brkc = cntc = tnew = tk = ty = loc = line = src_opt = trc_opt = ld = pplev = pplevt =
-        oline = osize = ir_count = 0;
+        ir_count = 0;
 
     memset(&tkv, 0, sizeof(tkv));
     memset(ir_var, 0, sizeof(ir_var));
     memset(&members, 0, sizeof(members));
     memset(&done_jmp, 0, sizeof(&done_jmp));
+#if WITH_IRQ
     memset(intrpt_vector, 0, sizeof(intrpt_vector));
+#endif
 }
 
 #define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
@@ -1205,6 +1206,7 @@ static void next() {
              */
             id->name = pp;
             id->hash = tk;
+            id->forward = 0;
             tk = id->tk = Id; // token type identifier
             return;
         }
@@ -1467,7 +1469,7 @@ typedef struct {
 #define Func_entry(a) (*((Func_entry_t*)a))
 
 static void ast_Func(int parm_types, int n_parms, int addr, int next, int tk) {
-    n -= 5;
+    n -= sizeof(Func_entry_t) / sizeof(int);
     Func_entry(n).parm_types = parm_types;
     Func_entry(n).n_parms = n_parms;
     Func_entry(n).addr = addr;
@@ -1485,7 +1487,7 @@ typedef struct {
 #define For_entry(a) (*((For_entry_t*)a))
 
 static void ast_For(int init, int body, int incr, int cond) {
-    n -= 5;
+    n -= sizeof(For_entry_t) / sizeof(int);
     For_entry(n).init = init;
     For_entry(n).body = body;
     For_entry(n).incr = incr;
@@ -1502,7 +1504,7 @@ typedef struct {
 #define Cond_entry(a) (*((Cond_entry_t*)a))
 
 static void ast_Cond(int else_part, int if_part, int cond_part) {
-    n -= 4;
+    n -= sizeof(Cond_entry_t) / sizeof(int);
     Cond_entry(n).else_part = else_part;
     Cond_entry(n).if_part = if_part;
     Cond_entry(n).cond_part = cond_part;
@@ -1517,7 +1519,7 @@ typedef struct {
 #define Assign_entry(a) (*((Assign_entry_t*)a))
 
 static void ast_Assign(int right_part, int type) {
-    n -= 3;
+    n -= sizeof(Assign_entry_t) / sizeof(int);
     Assign_entry(n).right_part = right_part;
     Assign_entry(n).type = type;
     Assign_entry(n).tk = Assign;
@@ -1531,7 +1533,7 @@ typedef struct {
 #define While_entry(a) (*((While_entry_t*)a))
 
 static void ast_While(int cond, int body, int tk) {
-    n -= 3;
+    n -= sizeof(While_entry_t) / sizeof(int);
     While_entry(n).cond = cond;
     While_entry(n).body = body;
     While_entry(n).tk = tk;
@@ -1545,7 +1547,7 @@ typedef struct {
 #define Switch_entry(a) (*((Switch_entry_t*)a))
 
 static void ast_Switch(int cas, int cond) {
-    n -= 3;
+    n -= sizeof(Switch_entry_t) / sizeof(int);
     Switch_entry(n).cas = cas;
     Switch_entry(n).cond = cond;
     Switch_entry(n).tk = Switch;
@@ -1559,7 +1561,7 @@ typedef struct {
 #define Case_entry(a) (*((Case_entry_t*)a))
 
 static void ast_Case(int expr, int next) {
-    n -= 3;
+    n -= sizeof(Case_entry_t) / sizeof(int);
     Case_entry(n).expr = expr;
     Case_entry(n).next = next;
     Case_entry(n).tk = Case;
@@ -1573,7 +1575,7 @@ typedef struct {
 #define CastF_entry(a) (*((CastF_entry_t*)a))
 
 static void ast_CastF(int way, int val) {
-    n -= 3;
+    n -= sizeof(CastF_entry_t) / sizeof(int);
     CastF_entry(n).tk = CastF;
     CastF_entry(n).val = val;
     CastF_entry(n).way = way;
@@ -1581,7 +1583,7 @@ static void ast_CastF(int way, int val) {
 
 // two word entries
 static void ast_Return(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Return;
     Double_entry(n).v1 = v1;
 }
@@ -1593,55 +1595,55 @@ typedef struct {
 #define Oper_entry(a) (*((Oper_entry_t*)a))
 
 static void ast_Oper(int oprnd, int op) {
-    n -= 2;
+    n -= sizeof(Oper_entry_t) / sizeof(int);
     Oper_entry(n).tk = op;
     Oper_entry(n).oprnd = oprnd;
 }
 
 static void ast_Num(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Num;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Label(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Label;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Enter(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Enter;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Goto(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Goto;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Default(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Default;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_NumF(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = NumF;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Loc(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Loc;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Load(int v1) {
-    n -= 2;
+    n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Load;
     Double_entry(n).v1 = v1;
 }
@@ -1653,7 +1655,7 @@ typedef struct {
 #define Begin_entry(a) (*((Begin_entry_t*)a))
 
 static void ast_Begin(int v1) {
-    n -= 2;
+    n -= sizeof(Begin_entry_t) / sizeof(int);
     Begin_entry(n).tk = '{';
     Begin_entry(n).addr = v1;
 }
@@ -1669,7 +1671,7 @@ typedef struct {
 #define ast_NumVal(a) (Double_entry(a).v1)
 
 static void ast_Single(int k) {
-    n--;
+    n -= sizeof(Single_entry_t) / sizeof(int);
     Single_entry(n).tk = k;
 }
 
@@ -3506,6 +3508,8 @@ static void stmt(int ctx) {
                 rtt = (ty == 0 && !memcmp(dd->name, "void", 4)) ? -1 : ty;
             }
             dd = id;
+            if (dd->forward && (dd->type != ty))
+                die("Function return type does not match prototype");
             dd->type = ty;
             if (tk == '(') { // function
                 if (b != 0)
@@ -3514,21 +3518,20 @@ static void stmt(int ctx) {
                     die("nested function");
                 if (ty > ATOM_TYPE && ty < PTR)
                     die("return type can't be struct");
-                if (id->class == Syscall && id->val)
-                    die("forward decl location failed one pass compilation");
-                if (id->class == Func && id->val > (int)text_base && id->val < (int)e)
+                if (id->class == Func && id->val > (int)text_base && id->val < (int)e &&
+                    id->forward == 0)
                     die("duplicate global definition");
-                dd->etype = 0;
+                int ddetype = 0;
                 dd->class = Func;       // type is function
                 dd->val = (int)(e + 1); // function Pointer? offset/address
                 next();
                 nf = ir_count = ld = 0; // "ld" is parameter's index.
                 while (tk != ')') {
                     stmt(Par);
-                    dd->etype = dd->etype * 2;
+                    ddetype = ddetype * 2;
                     if (ty == FLOAT) {
                         ++nf;
-                        ++(dd->etype);
+                        ++ddetype;
                     }
                     if (tk == ',')
                         next();
@@ -3537,44 +3540,48 @@ static void stmt(int ctx) {
                     die("maximum of %d function parameters", ADJ_MASK);
                 // function etype is not like other etypes
                 next();
-                dd->etype = (dd->etype << 10) + (nf << 5) + ld; // prm info
-                if (tk == ';') {
-                    dd->val = 0;
-                    goto unwind_func;
-                } // fn proto
-                if (tk != '{')
-                    die("bad function definition");
-                loc = ++ld;
-                next();
-                oline = -1;
-                osize = -1;
-                oid = 0; // optimization hint
-                // Not declaration and must not be function, analyze inner block.
-                // e represents the address which will store pc
-                // (ld - loc) indicates memory size to allocate
-                ast_Single(';');
-                while (tk != '}') {
-                    int* t = n;
-                    check_label(&t);
-                    stmt(Loc);
-                    if (t != n)
-                        ast_Begin((int)t);
+                ddetype = (ddetype << 10) + (nf << 5) + ld; // prm info
+                if (dd->forward && (ddetype != dd->etype))
+                    die("parameters don't match prototype");
+                if (dd->forward) { // patch the forward jump
+                    *(dd->forward) = dd->val;
+                    dd->forward = 0;
                 }
-                if (rtf == 0 && rtt != -1)
-                    die("expecting return value");
-                ast_Enter(ld - loc);
-                if (oid && ast_NumVal(n) >= 64)
-                    printf("--> %d: move %.*s to global scope for performance.\n", oline,
-                           (oid->hash & 0x3f), oid->name);
-                cas = 0;
-                int* se = e;
-                gen(n);
+                dd->etype = ddetype;
+                int* se;
+                if (tk == ';') { // check for prototype
+                    se = e;
+                    *++e = JMP;
+                    *++e = (int)e;
+                    dd->forward = e;
+                } else { // function with body
+                    if (tk != '{')
+                        die("bad function definition");
+                    loc = ++ld;
+                    next();
+                    // Not declaration and must not be function, analyze inner block.
+                    // e represents the address which will store pc
+                    // (ld - loc) indicates memory size to allocate
+                    ast_Single(';');
+                    while (tk != '}') {
+                        int* t = n;
+                        check_label(&t);
+                        stmt(Loc);
+                        if (t != n)
+                            ast_Begin((int)t);
+                    }
+                    if (rtf == 0 && rtt != -1)
+                        die("expecting return value");
+                    ast_Enter(ld - loc);
+                    cas = 0;
+                    se = e;
+                    gen(n);
+                }
                 if (src_opt) {
                     printf("%d: %.*s\n", line, p - lp, lp);
                     lp = p;
                     disassemble(se, e, 0);
                 }
-            unwind_func:
                 id = sym;
                 if (src_opt)
                     memset(ir_var, 0, sizeof(struct ident_s*) * MAX_IR);
@@ -3607,11 +3614,6 @@ static void stmt(int ctx) {
                     dd->type = ty;
                 }
                 sz = (sz + 3) & -4;
-                if (ctx == Loc && sz > osize) {
-                    osize = sz;
-                    oline = line;
-                    oid = dd;
-                }
                 if (ctx == Glo) {
                     dd->val = (int)data;
                     data += sz;
@@ -3959,7 +3961,7 @@ static int common_vfunc(int ac, int sflag, int* sp) {
 
 #if WITH_KBD_HALT
 static Inline void check_kbd_halt(void) {
-    int key = x_getchar_timeout_us(0);
+    int key = getchar_timeout_us(0);
     if ((key == 27) || (key == 3)) // check for escape
         run_die("user interrupted!!");
 }
@@ -4142,7 +4144,7 @@ static int run(void) {
                 printf("  (as float) %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
                        *((float*)sp + 2), *((float*)sp + 3));
                 if (trc_opt > 1)
-                    if (x_getchar() == 3)
+                    if (getchar() == 3)
                         run_die("user interrupted!!");
             }
         i = *pc++;
@@ -4418,10 +4420,10 @@ static int run(void) {
                 break;
             // io
             case SYSC_getchar:
-                a.i = x_getchar();
+                a.i = getchar();
                 break;
             case SYSC_getchar_timeout_us:
-                a.i = x_getchar_timeout_us(sp[0]);
+                a.i = getchar_timeout_us(sp[0]);
                 break;
             case SYSC_putchar:
                 putchar(sp[0]);
@@ -5325,6 +5327,10 @@ int cc(int argc, char** argv) {
         stmt(Glo);
         next();
     }
+    // check for unpatched forward JMPs
+    for (struct ident_s* scan = sym; scan->tk; ++scan)
+        if (scan->class == Func && scan->forward)
+            die("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
     sys_free(ast);
     ast = NULL;
     sys_free(src);
@@ -5359,9 +5365,11 @@ int cc(int argc, char** argv) {
     printf("\nCC=%d\n", run());
 
 done:
+#if WITH_IRQ
     for (int i = 0; i < 32; i++)
         if (intrpt_vector[i].enabled)
             irq_set_enabled(i, 0);
+#endif
     if (fd)
         fs_file_close(fd);
     while (file_list) {

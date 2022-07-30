@@ -1,3 +1,10 @@
+What's new in version 1.1.10
+
+- forward function declaration support
+- delete io.* and update all code to use standard (stdio) functions
+- minor dgreadln optimization/cleanup
+- compiler readability/maintainability improvements
+
 What's new in version 1.1.9
 
 - moved all source files to their own directory
