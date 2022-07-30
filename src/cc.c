@@ -3508,6 +3508,8 @@ static void stmt(int ctx) {
                 rtt = (ty == 0 && !memcmp(dd->name, "void", 4)) ? -1 : ty;
             }
             dd = id;
+            if (dd->forward && (dd->type != ty))
+                die("Function return type does not match prototype");
             dd->type = ty;
             if (tk == '(') { // function
                 if (b != 0)
@@ -3541,6 +3543,10 @@ static void stmt(int ctx) {
                 ddetype = (ddetype << 10) + (nf << 5) + ld; // prm info
                 if (dd->forward && (ddetype != dd->etype))
                     die("parameters don't match prototype");
+                if (dd->forward) { // patch the forward jump
+                    *(dd->forward) = dd->val;
+                    dd->forward = 0;
+                }
                 dd->etype = ddetype;
                 int* se;
                 if (tk == ';') { // check for prototype
@@ -5321,10 +5327,10 @@ int cc(int argc, char** argv) {
         stmt(Glo);
         next();
     }
-    // patch forward JMPs
+    // check for unpatched forward JMPs
     for (struct ident_s* scan = sym; scan->tk; ++scan)
         if (scan->class == Func && scan->forward)
-            *(scan->forward) = scan->val;
+            die("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
     sys_free(ast);
     ast = NULL;
     sys_free(src);
