@@ -1,3 +1,8 @@
+What's new in version 1.1.11
+
+- compiler checks for code segment overflow
+- compiler checks for data segment overflow
+
 What's new in version 1.1.10
 
 - forward function declaration support

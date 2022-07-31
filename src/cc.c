@@ -69,6 +69,7 @@ extern void get_screen_xy(int* x, int* y);
 
 static char *p, *lp;            // current position in source code
 static char* data;              // data/bss pointer
+static char* data_base;         // data/bss pointer
 static char* src;               //
 static int* base_sp;            // stack
 static int *e, *le, *text_base; // current position in emitted code
@@ -1084,7 +1085,7 @@ struct file_handle {
 
 static void clear_globals(void) {
     base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = malloc_list =
-        (int*)(data = data = src = p = lp = fp = (char*)(id = sym = NULL));
+        (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
     fd = NULL;
     file_list = NULL;
 
@@ -1325,8 +1326,11 @@ static void next() {
                 }
                 // if it is double quotes (string literal), it is considered as
                 // a string, copying characters to data
-                if (tk == '"')
+                if (tk == '"') {
+                    if (data >= data_base + (DATA_BYTES / 4))
+                        die("program data exceeds data segment");
                     *data++ = tkv.i;
+                }
             }
             ++p;
             if (tk == '"')
@@ -1865,8 +1869,13 @@ static void expr(int lev) {
         ast_Num(tkv.i);
         next();
         // continuous `"` handles C-style multiline text such as `"abc" "def"`
-        while (tk == '"')
+        while (tk == '"') {
+            if (data >= data_base + (DATA_BYTES / 4))
+                die("program data exceeds data segment");
             next();
+        }
+        if (data >= data_base + (DATA_BYTES / 4))
+            die("program data exceeds data segment");
         data = (char*)(((int)data + sizeof(int)) & (-sizeof(int)));
         ty = CHAR + PTR;
         break;
@@ -3622,6 +3631,8 @@ static void stmt(int ctx) {
                 sz = (sz + 3) & -4;
                 if (ctx == Glo) {
                     dd->val = (int)data;
+                    if (data + sz >= data_base + (DATA_BYTES / 4))
+                        die("program data exceeds data segment");
                     data += sz;
                 } else if (ctx == Loc) {
                     dd->val = (ld += sz / sizeof(int));
@@ -5226,7 +5237,7 @@ int cc(int argc, char** argv) {
     struct ident_s* idmain = id;
     id->class = Main; // keep track of main
 
-    if (!(data = data = (char*)sys_malloc(DATA_BYTES)))
+    if (!(data_base = data = (char*)sys_malloc(DATA_BYTES)))
         die("no data memory");
     if (!(tsize = (int*)sys_malloc(TS_TBL_BYTES)))
         die("no tsize memory");
