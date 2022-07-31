@@ -2723,6 +2723,12 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
     } while (1);
 }
 
+void emit(int n) {
+    if (e >= text_base + (TEXT_BYTES / 4))
+        die("code segment exceeded, program is too big");
+    *++e = n;
+}
+
 // AST parsing for IR generatiion
 // With a modular code generator, new targets can be easily supported such as
 // native Arm machine code.
@@ -2733,22 +2739,22 @@ static void gen(int* n) {
 
     switch (i) {
     case Num:
-        *++e = IMM;
-        *++e = ast_NumVal(n);
+        emit(IMM);
+        emit(ast_NumVal(n));
         break; // int value
     case NumF:
-        *++e = IMMF;
-        *++e = ast_NumVal(n);
+        emit(IMMF);
+        emit(ast_NumVal(n));
         break; // float value
     case Load:
         gen(n + 2);                                           // load the value
         if (ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR) // unreachable?
             die("struct copies not yet supported");
-        *++e = (ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2);
+        emit((ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2));
         break;
     case Loc:
-        *++e = LEA;
-        *++e = ast_NumVal(n);
+        emit(LEA);
+        emit(ast_NumVal(n));
         break; // get address of variable
     case '{':
         gen((int*)ast_NumVal(n));
@@ -2756,7 +2762,7 @@ static void gen(int* n) {
         break;   // parse AST expr or stmt
     case Assign: // assign the value to variables
         gen((int*)Assign_entry(n).right_part);
-        *++e = PSH;
+        emit(PSH);
         gen(n + 3);
         l = ast_NumVal(n) & 0xffff;
         // Add SC/SI instruction to save value in register to variable address
@@ -2764,29 +2770,29 @@ static void gen(int* n) {
         if (l > ATOM_TYPE && l < PTR)
             die("struct assign not yet supported");
         if ((ast_NumVal(n) >> 16) == FLOAT && l == INT)
-            *++e = FTOI;
+            emit(FTOI);
         else if ((ast_NumVal(n) >> 16) == INT && l == FLOAT)
-            *++e = ITOF;
-        *++e = (l >= PTR) ? SI : SC + (l >> 2);
+            emit(ITOF);
+        emit((l >= PTR) ? SI : SC + (l >> 2));
         break;
     case Inc: // increment or decrement variables
     case Dec:
         gen(n + 2);
-        *++e = PSH;
-        *++e = (ast_NumVal(n) == CHAR) ? LC : LI;
-        *++e = PSH;
-        *++e = IMM;
-        *++e = (ast_NumVal(n) >= PTR2)
-                   ? sizeof(int)
-                   : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1);
-        *++e = (i == Inc) ? ADD : SUB;
-        *++e = (ast_NumVal(n) == CHAR) ? SC : SI;
+        emit(PSH);
+        emit((ast_NumVal(n) == CHAR) ? LC : LI);
+        emit(PSH);
+        emit(IMM);
+        emit((ast_NumVal(n) >= PTR2)
+                 ? sizeof(int)
+                 : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1));
+        emit((i == Inc) ? ADD : SUB);
+        emit((ast_NumVal(n) == CHAR) ? SC : SI);
         break;
     case Cond:                              // if else condition case
         gen((int*)Cond_entry(n).cond_part); // condition
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
-        *++e = BZ;
+        emit(BZ);
         b = ++e;
         gen((int*)Cond_entry(n).if_part); // expression
         // Patch the jump address field pointed to by "b" to hold the address
@@ -2800,7 +2806,7 @@ static void gen(int* n) {
                 b = 0;
             } else {
                 l = ast_Tk(b) = (int)(e + 3);
-                *++e = JMP;
+                emit(JMP);
                 b = ++e;
             }
             if (last_jmp < l)
@@ -2825,14 +2831,14 @@ static void gen(int* n) {
      */
     case Lor:
         gen((int*)ast_NumVal(n));
-        *++e = BNZ;
+        emit(BNZ);
         b = ++e;
         gen(n + 2);
         ast_Tk(b) = (int)(e + 1);
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
-        *++e = BZ;
+        emit(BZ);
         b = ++e;
         gen(n + 2);
         ast_Tk(b) = (int)(e + 1);
@@ -2844,163 +2850,163 @@ static void gen(int* n) {
      */
     case Or:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = OR;
+        emit(OR);
         break;
     case Xor:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = XOR;
+        emit(XOR);
         break;
     case And:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = AND;
+        emit(AND);
         break;
     case Eq:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = EQ;
+        emit(EQ);
         break;
     case Ne:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = NE;
+        emit(NE);
         break;
     case Ge:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = GE;
+        emit(GE);
         break;
     case Lt:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = LT;
+        emit(LT);
         break;
     case Gt:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = GT;
+        emit(GT);
         break;
     case Le:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = LE;
+        emit(LE);
         break;
     case Shl:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = SHL;
+        emit(SHL);
         break;
     case Shr:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = SHR;
+        emit(SHR);
         break;
     case Add:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = ADD;
+        emit(ADD);
         break;
     case Sub:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = SUB;
+        emit(SUB);
         break;
     case Mul:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = MUL;
+        emit(MUL);
         break;
     case Div:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = DIV;
+        emit(DIV);
         break;
     case Mod:
         gen((int*)ast_NumVal(n));
-        *++e = PSH;
+        emit(PSH);
         gen(n + 2);
-        *++e = MOD;
+        emit(MOD);
         break;
     case AddF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = ADDF;
+        emit(ADDF);
         break;
     case SubF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = SUBF;
+        emit(SUBF);
         break;
     case MulF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = MULF;
+        emit(MULF);
         break;
     case DivF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = DIVF;
+        emit(DIVF);
         break;
     case EqF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = EQF;
+        emit(EQF);
         break;
     case NeF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = NEF;
+        emit(NEF);
         break;
     case GeF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = GEF;
+        emit(GEF);
         break;
     case LtF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = LTF;
+        emit(LTF);
         break;
     case GtF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = GTF;
+        emit(GTF);
         break;
     case LeF:
         gen((int*)ast_NumVal(n));
-        *++e = PSHF;
+        emit(PSHF);
         gen(n + 2);
-        *++e = LEF;
+        emit(LEF);
         break;
     case CastF:
         gen((int*)CastF_entry(n).val);
-        *++e = CastF_entry(n).way;
+        emit(CastF_entry(n).way);
         break;
     case Func:
     case Syscall:
@@ -3019,9 +3025,9 @@ static void gen(int* n) {
             while (j >= 0) { // push arguments
                 gen(b + 1);
                 if ((l & (1 << j)))
-                    *++e = PSHF;
+                    emit(PSHF);
                 else
-                    *++e = PSH;
+                    emit(PSH);
 
                 --j;
                 b = (int*)a[j];
@@ -3029,24 +3035,24 @@ static void gen(int* n) {
             sys_free(a);
             a = NULL;
             if (i == Syscall) {
-                *++e = IMM;
-                *++e = (sj + 1) | ((Func_entry(n).parm_types >> 10) << 10);
+                emit(IMM);
+                emit((sj + 1) | ((Func_entry(n).parm_types >> 10) << 10));
             }
         }
         if (i == Syscall)
-            *++e = SYSC;
+            emit(SYSC);
         if (i == Func)
-            *++e = JSR;
-        *++e = Func_entry(n).addr;
+            emit(JSR);
+        emit(Func_entry(n).addr);
         if (Func_entry(n).n_parms) {
-            *++e = ADJ;
-            *++e = (i == Syscall) ? Func_entry(n).parm_types : Func_entry(n).n_parms;
+            emit(ADJ);
+            emit((i == Syscall) ? Func_entry(n).parm_types : Func_entry(n).n_parms);
         }
         break;
     case While:
     case DoWhile:
         if (i == While) {
-            *++e = JMP;
+            emit(JMP);
             a = ++e;
         }
         d = (e + 1);
@@ -3064,8 +3070,8 @@ static void gen(int* n) {
         }
         cnts = c;
         gen((int*)While_entry(n).cond); // condition
-        *++e = BNZ;
-        *++e = (int)d;
+        emit(BNZ);
+        emit((int)d);
         while (brks) {
             t = (int*)brks;
             *brks = (int)(e + 1);
@@ -3075,7 +3081,7 @@ static void gen(int* n) {
         break;
     case For:
         gen((int*)For_entry(n).init); // init
-        *++e = JMP;
+        emit(JMP);
         a = ++e;
         d = (e + 1);
         b = brks;
@@ -3092,8 +3098,8 @@ static void gen(int* n) {
         gen((int*)For_entry(n).incr); // increment
         *a = (int)(e + 1);
         gen((int*)For_entry(n).cond); // condition
-        *++e = BNZ;
-        *++e = (int)d;
+        emit(BNZ);
+        emit((int)d);
         while (brks) {
             t = (int*)*brks;
             *brks = (int)(e + 1);
@@ -3104,7 +3110,7 @@ static void gen(int* n) {
     case Switch:
         gen((int*)Switch_entry(n).cond); // condition
         a = cas;
-        *++e = JMP;
+        emit(JMP);
         cas = ++e;
         b = brks;
         d = def;
@@ -3122,18 +3128,18 @@ static void gen(int* n) {
         def = d;
         break;
     case Case:
-        *++e = JMP;
+        emit(JMP);
         ++e;
         a = 0;
         *e = (int)(e + 7);
-        *++e = PSH;
+        emit(PSH);
         i = *cas;
         *cas = (int)e;
         gen((int*)ast_NumVal(n)); // condition
         if (*(e - 1) != IMM)
             die("case label not a numeric literal");
-        *++e = SUB;
-        *++e = BNZ;
+        emit(SUB);
+        emit(BNZ);
         cas = ++e;
         *e = i + e[-3];
         if (*((int*)Case_entry(n).expr) == Switch)
@@ -3143,19 +3149,19 @@ static void gen(int* n) {
             cas = a;
         break;
     case Break:
-        *++e = JMP;
-        *++e = (int)brks;
+        emit(JMP);
+        emit((int)brks);
         brks = e;
         break;
     case Continue:
-        *++e = JMP;
-        *++e = (int)cnts;
+        emit(JMP);
+        emit((int)cnts);
         cnts = e;
         break;
     case Goto:
         label = (struct ident_s*)ast_NumVal(n);
-        *++e = JMP;
-        *++e = label->val;
+        emit(JMP);
+        emit(label->val);
         if (label->class == 0)
             label->val = (int)e; // Define label address later
         break;
@@ -3166,11 +3172,11 @@ static void gen(int* n) {
     case Return:
         if (ast_NumVal(n))
             gen((int*)ast_NumVal(n));
-        *++e = LEV;
+        emit(LEV);
         break;
     case Enter:
-        *++e = ENT;
-        *++e = ast_NumVal(n);
+        emit(ENT);
+        emit(ast_NumVal(n));
         last_jmp = 0x80000000;
         gen(n + 2);
         if (*e == LEV && last_jmp != 0x8000000) {
@@ -3196,7 +3202,7 @@ static void gen(int* n) {
             }
             e = b;
         } else
-            *++e = LEV;
+            emit(LEV);
         break;
     case Label: // target of goto
         label = (struct ident_s*)ast_NumVal(n);
@@ -3551,8 +3557,8 @@ static void stmt(int ctx) {
                 int* se;
                 if (tk == ';') { // check for prototype
                     se = e;
-                    *++e = JMP;
-                    *++e = (int)e;
+                    emit(JMP);
+                    emit((int)e);
                     dd->forward = e;
                 } else { // function with body
                     if (tk != '{')
