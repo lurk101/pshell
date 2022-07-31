@@ -646,7 +646,7 @@ cmd_t cmd_table[] = {
     {"mv",      mv_cmd,         "rename file or directory"},
     {"quit",    quit_cmd,       "shutdown system"},
     {"reboot",  reboot_cmd,     "Restart system"},
-    {"rm",      rm_cmd,         "remove file or directory. -f for recursive"},
+    {"rm",      rm_cmd,         "remove file or directory. -r for recursive"},
     {"status",  status_cmd,     "filesystem status"},
     {"tar",     tar_cmd,        "tar archiver"},
     {"unmount", unmount_cmd,    "unmount filesystem"},
