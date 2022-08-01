@@ -1,5 +1,4 @@
-/* vi: set sw=4 ts=4: */
-/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /* Copyright (c) 1883 Thomas Edison - All Rights Reserved
  * You may use, distribute and modify this code under the
@@ -65,7 +64,8 @@ typedef char buf_t[128];
 
 static uint32_t screen_x = 80, screen_y = 24;
 static lfs_file_t file;
-static buf_t cmd_buffer, curdir, path, result;
+static buf_t cmd_buffer, curdir, path;
+buf_t result;
 static int argc;
 static char* argv[MAX_ARGS + 1];
 static bool mounted = false, run = true;
@@ -134,10 +134,12 @@ static void parse_cmd(void) {
     argv[argc] = NULL;
 }
 
-static void xmodem_cb(uint8_t* buf, uint32_t len) {
+static int xmodem_rx_cb(uint8_t* buf, uint32_t len) {
     if (fs_file_write(&file, buf, len) != len)
         printf("error writing file\n");
 }
+
+static int xmodem_tx_cb(uint8_t* buf, uint32_t len) { return fs_file_read(&file, buf, len); }
 
 static bool check_mount(bool need) {
     if (mounted == need)
@@ -163,7 +165,7 @@ static void put_cmd(void) {
         return;
     }
     set_translate_crlf(false);
-    xmodemReceive(xmodem_cb);
+    xmodemReceive(xmodem_rx_cb);
     set_translate_crlf(true);
     int pos = fs_file_seek(&file, 0, LFS_SEEK_END);
     fs_file_close(&file);
@@ -334,24 +336,9 @@ static void get_cmd(void) {
         strcpy(result, "Can't open file");
         return;
     }
-    uint32_t len = fs_file_seek(&file, 0, LFS_SEEK_END);
-    fs_file_rewind(&file);
-    char* buf = malloc(len);
-    if (buf == NULL) {
-        strcpy(result, "not enough memory");
-        goto err2;
-    }
-    if (fs_file_read(&file, buf, len) != len) {
-        strcpy(result, "error reading file");
-        goto err1;
-    }
     set_translate_crlf(false);
-    xmodemTransmit(buf, len);
+    xmodemTransmit(xmodem_tx_cb);
     set_translate_crlf(true);
-    printf("\nfile transfered, size: %d\n", len);
-err1:
-    free(buf);
-err2:
     fs_file_close(&file);
 }
 

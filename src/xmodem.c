@@ -9,16 +9,29 @@
 
 #include "pico/stdio.h"
 
+extern char result[128];
+
+#define SOH 0x01
+#define STX 0x02
+#define EOT 0x04
+#define ACK 0x06
+#define NAK 0x15
+#define CAN 0x18
+#define CTRLZ 0x1a
+
+#define DLY_1S 1000
+#define MAXRETRANS 25
+
 static xmodem_cb_t callback = NULL;
 
-int getbyte(uint32_t timeout) {
+static int getbyte(uint32_t timeout) {
     int c = getchar_timeout_us(timeout * 1000);
     if (c == PICO_ERROR_TIMEOUT)
         return -1;
     return c;
 }
 
-void putCAN(void) {
+static void putCAN(void) {
     for (int n = 0; n < 3; n++)
         putchar(CAN);
 }
@@ -39,7 +52,7 @@ static bool check(bool crc, const uint8_t* buf, int sz) {
     return 0;
 }
 
-void flushreceive(void) {
+static void flushreceive(void) {
     while (getbyte(((DLY_1S)*3) >> 1) >= 0)
         ;
 }
@@ -127,14 +140,15 @@ int xmodemReceive(xmodem_cb_t cb) {
     }
 }
 
-int xmodemTransmit(uint8_t* src, int srcsz) {
+int xmodemTransmit(xmodem_cb_t cb) {
     uint8_t xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
     int bufsz, crc = -1;
     uint8_t packetno = 1;
     int i, c, len = 0;
     int retry;
+    int done = 0;
 
-    for (;;) {
+    while (!done) {
         for (retry = 0; retry < 16; ++retry) {
             if ((c = getbyte((DLY_1S) << 1)) >= 0) {
                 switch (c) {
@@ -148,6 +162,7 @@ int xmodemTransmit(uint8_t* src, int srcsz) {
                     if ((c = getbyte(DLY_1S)) == CAN) {
                         putchar(ACK);
                         flushreceive();
+                        strcpy(result, "canceled by remote");
                         return -1; /* canceled by remote */
                     }
                     break;
@@ -158,26 +173,18 @@ int xmodemTransmit(uint8_t* src, int srcsz) {
         }
         putCAN();
         flushreceive();
+        strcpy(result, "no sync");
         return -2; /* no sync */
-
-        for (;;) {
+        while (!done) {
         start_trans:
             xbuff[0] = SOH;
             bufsz = 128;
             xbuff[1] = packetno;
             xbuff[2] = ~packetno;
-            c = srcsz - len;
-            if (c > bufsz)
-                c = bufsz;
-            if (c >= 0) {
-                memset(&xbuff[3], 0, bufsz);
-                if (c == 0) {
-                    xbuff[3] = CTRLZ;
-                } else {
-                    memcpy(&xbuff[3], &src[len], c);
-                    if (c < bufsz)
-                        xbuff[3 + c] = CTRLZ;
-                }
+            c = cb(&xbuff[3], bufsz);
+            if (c > 0) {
+                if (c < bufsz)
+                    xbuff[3 + c] = CTRLZ;
                 if (crc) {
                     uint16_t ccrc = crc16_ccitt(&xbuff[3], bufsz);
                     xbuff[bufsz + 3] = (ccrc >> 8) & 0xFF;
@@ -203,6 +210,7 @@ int xmodemTransmit(uint8_t* src, int srcsz) {
                             if ((c = getbyte(DLY_1S)) == CAN) {
                                 putchar(ACK);
                                 flushreceive();
+                                strcpy(result, "cancelled by remote");
                                 return -1; /* canceled by remote */
                             }
                             break;
@@ -214,6 +222,7 @@ int xmodemTransmit(uint8_t* src, int srcsz) {
                 }
                 putCAN();
                 flushreceive();
+                strcpy(result, "transmit error");
                 return -4; /* xmit error */
             } else {
                 for (retry = 0; retry < 10; ++retry) {
@@ -222,7 +231,12 @@ int xmodemTransmit(uint8_t* src, int srcsz) {
                         break;
                 }
                 flushreceive();
-                return (c == ACK) ? len : -5;
+                if (c == ACK) {
+                    sprintf(result, "%d bytes transferred", len);
+                    return len;
+                }
+                strcpy(result, "ACK timeout");
+                return -5;
             }
         }
     }
