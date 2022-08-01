@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
-option(USB_CONSOLE "build for USB console" ON)
-option(WITH_IRQ "build with interrupt support" ON) 
+option(USB_CONSOLE "build for USB console, otherwise UART" ON)
+option(WITH_IRQ "build with interrupt support" OFF) 
 option(WITH_KBD_HALT "build with run-time CTL-C checking" ON)
 
 set(CMAKE_C_STANDARD 11)

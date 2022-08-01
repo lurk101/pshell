@@ -353,7 +353,6 @@ err1:
     free(buf);
 err2:
     fs_file_close(&file);
-    strcpy(result, "transfered");
 }
 
 static void mkdir_cmd(void) {
