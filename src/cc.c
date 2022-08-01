@@ -51,6 +51,8 @@
 #define MEMBER_DICT_BYTES (4 * K)
 #define STACK_BYTES (16 * K)
 
+#define CTLC 3
+#define ESC 27
 #define VT_BOLD "\033[1m"
 #define VT_NORMAL "\033[m"
 
@@ -4125,7 +4127,9 @@ static int run(void) {
 #if WITH_IRQ
     run_level++;
 #endif
+#if WITH_KBD_HALT
     uint32_t last_t = time_us_32();
+#endif
     int i, sysc, strl, irqn;
     unsigned us, ms, mask;
     struct file_handle *h, *last_h;
@@ -4137,7 +4141,7 @@ static int run(void) {
         if (!run_level) {
 #endif
             uint32_t t = time_us_32();
-            if (t - last_t > 0x100000) {
+            if ((t ^ last_t) & 0x100000) {
                 last_t = t;
                 check_kbd_halt();
             }
@@ -4160,9 +4164,11 @@ static int run(void) {
                        *((int*)sp + 2), *((int*)sp + 3));
                 printf("  (as float) %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
                        *((float*)sp + 2), *((float*)sp + 3));
-                if (trc_opt > 1)
-                    if (getchar() == 3)
+                if (trc_opt > 1) {
+                    int c = getchar();
+                    if (c == CTLC || c == ESC)
                         run_die("user interrupted!!");
+                }
             }
         i = *pc++;
         switch (i) {
@@ -4438,11 +4444,17 @@ static int run(void) {
             // io
             case SYSC_getchar:
                 a.i = getchar();
-                if (a.i == 3)
+#if WITH_KBD_HALT
+                if (a.i == CTLC || a.i == ESC)
                     run_die("user interrupted!!");
+#endif
                 break;
             case SYSC_getchar_timeout_us:
                 a.i = getchar_timeout_us(sp[0]);
+#if WITH_KBD_HALT
+                if (a.i == CTLC || a.i == ESC)
+                    run_die("user interrupted!!");
+#endif
                 break;
             case SYSC_putchar:
                 putchar(sp[0]);
@@ -4918,14 +4930,6 @@ static int run(void) {
             case SYSC_i2c_get_hw:
                 a.i = (int)i2c_get_hw((void*)sp[0]);
                 break;
-#if 0
-    case SYSC_i2c_write_blocking_until:
-        a.i = i2c_write_blocking_until((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
-        break;
-    case SYSC_i2c_read_blocking_until:
-        a.i = i2c_read_blocking_until((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
-        break;
-#endif
             case SYSC_i2c_write_timeout_us:
                 a.i = i2c_write_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
                 break;
