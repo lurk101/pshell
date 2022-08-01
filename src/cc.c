@@ -3082,7 +3082,7 @@ static void gen(int* n) {
         emit(BNZ);
         emit((int)d);
         while (brks) {
-            t = (int*)brks;
+            t = (int*)*brks;
             *brks = (int)(e + 1);
             brks = t;
         }
@@ -4438,6 +4438,8 @@ static int run(void) {
             // io
             case SYSC_getchar:
                 a.i = getchar();
+                if (a.i == 3)
+                    run_die("user interrupted!!");
                 break;
             case SYSC_getchar_timeout_us:
                 a.i = getchar_timeout_us(sp[0]);

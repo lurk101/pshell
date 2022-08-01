@@ -1,3 +1,7 @@
+What's new in version 1.1.12
+
+- fix compiler fail when break statement is used in while loop.
+
 What's new in version 1.1.11
 
 - compiler checks for code segment overflow
