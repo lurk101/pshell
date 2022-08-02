@@ -98,7 +98,6 @@ static int ty;                  // current expression type
                                 // bit 2:9 - type
                                 // bit 10:11 - ptr level
 static int rtf, rtt;            // return flag and return type for current function
-static int last_jmp;            //
 static int loc;                 // local variable offset
 static int line;                // current line number
 static int src_opt;             // print source and assembly flag
@@ -2812,25 +2811,15 @@ static void gen(int* n) {
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
-            if (*e == LEV) {
-                l = ast_Tk(b) = (int)(e + 1);
-                b = 0;
-            } else {
-                l = ast_Tk(b) = (int)(e + 3);
-                emit(JMP);
-                b = ++e;
-            }
-            if (last_jmp < l)
-                last_jmp = l;
+            *b = (int)(e + 3);
+            emit(JMP);
+            emit(0);
+            b = e;
             gen((int*)Cond_entry(n).else_part);
         } // else statment
         // Patch the jump address field pointed to by "d" to hold the address
         // past the false branch.
-        if (b != 0) {
-            ast_Tk(b) = (int)(e + 1);
-            if (last_jmp < ast_Tk(b))
-                last_jmp = ast_Tk(b);
-        }
+        *b = (int)(e + 1);
         break;
     // operators
     /* If current token is logical OR operator:
@@ -3188,31 +3177,8 @@ static void gen(int* n) {
     case Enter:
         emit(ENT);
         emit(ast_NumVal(n));
-        last_jmp = 0x80000000;
         gen(n + 2);
-        if (*e == LEV && last_jmp != 0x8000000) {
-            b = e;
-            while (*(b - 1) == LEV)
-                --b;
-            while (last_jmp > (int)b) {
-                do {
-                    t = le + 1;
-                    while (t < e) {
-                        if (*t == JMP || *t == BZ || *t == BNZ)
-                            if (t[1] == last_jmp)
-                                t[1] = (int)b;
-                        t += (*t <= ADJ || *t == SYSC) ? 2 : 1;
-                    }
-                    last_jmp -= 4;
-                } while (last_jmp != (int)b);
-                while (*(b - 1) == (int)b) {
-                    *(b - 1) = LEV;
-                    *(b - 2) = LEV;
-                    b -= 2;
-                }
-            }
-            e = b;
-        } else
+        if (*e != LEV)
             emit(LEV);
         break;
     case Label: // target of goto
@@ -3220,8 +3186,6 @@ static void gen(int* n) {
         if (label->class != 0)
             die("duplicate label definition");
         d = e + 1;
-        if (last_jmp < (int)d)
-            last_jmp = (int)d;
         b = (int*)label->val;
         while (b != 0) {
             t = (int*)ast_Tk(b);
@@ -3321,7 +3285,9 @@ static void disassemble(int* le, int* e, int i_count) {
                         break;
                     }
                 printf("\n");
-            } else if ((*le & 0xf0000000) && (*le > 0 || -*le > 0x1000000)) {
+            } else if (*(le - 1) == IMMF)
+                printf(" %f\n", *((float*)le));
+            else if ((*le & 0xf0000000) && (*le > 0 || -*le > 0x1000000)) {
                 for (scan = sym; scan->tk; ++scan)
                     if (scan->val == *le) {
                         printf(" &%.*s", scan->hash & 0x3f, scan->name);
