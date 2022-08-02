@@ -1,3 +1,11 @@
+What's new in version 1.1.13
+
+- fix tar handling of linux tar peculiarities
+- revert update that broke test cae 00033
+- add 200+ test cases
+- remove xget file size limit
+- cosistent use of CTL-C or ESC for user break
+
 What's new in version 1.1.12
 
 - fix compiler fail when break statement is used in while loop.
