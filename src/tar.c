@@ -199,6 +199,8 @@ void tar(int ac, char* av[]) {
             }
             if (hdr->name[0] == 0)
                 break;
+            if (hdr->name[strlen(hdr->name) - 1] == '/')
+                continue;
             int l = strtol(hdr->size, NULL, 8);
             if (op == LIST_OP) {
                 printf("%s\n", hdr->name);
