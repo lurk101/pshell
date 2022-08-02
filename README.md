@@ -7,6 +7,7 @@ A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 [list of implemented functions]: FUNCTIONS.md
 [What's new]: WHATSNEW.md
 [examples]: c-examples
+[thread]: https://forums.raspberrypi.com/viewtopic.php?t=336843
 
 Credit where credit is due...
 
@@ -24,6 +25,8 @@ About the compiler, briefly…
 - Aggregate types: array, struct and union.
 - Flow control: for, while, if then else, break, continue and goto.
 - Memory, math and SDK functions. ([list of implemented functions])
+
+Raspberry Pi Forums [thread].
 
 Building from source.
 
