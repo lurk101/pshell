@@ -40,7 +40,3 @@ to transmit a file to the host. xmodem transfers single files.
 A tar command allows you create Linux compatible tarballs
 with multiple files, which can then be transferred as a single
 file.
-
-Build options
-
-
