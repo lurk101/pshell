@@ -52,7 +52,6 @@
 #define STACK_BYTES (16 * K)
 
 #define CTLC 3
-#define ESC 27
 #define VT_BOLD "\033[1m"
 #define VT_NORMAL "\033[m"
 
@@ -4132,7 +4131,7 @@ static int run(void) {
                        *((float*)sp + 2), *((float*)sp + 3));
                 if (trc_opt > 1) {
                     int c = getchar();
-                    if (c == CTLC || c == ESC)
+                    if (c == CTLC)
                         run_die("user interrupted!!");
                 }
             }
@@ -4411,14 +4410,14 @@ static int run(void) {
             case SYSC_getchar:
                 a.i = getchar();
 #if WITH_KBD_HALT
-                if (a.i == CTLC || a.i == ESC)
+                if (a.i == CTLC)
                     run_die("user interrupted!!");
 #endif
                 break;
             case SYSC_getchar_timeout_us:
                 a.i = getchar_timeout_us(sp[0]);
 #if WITH_KBD_HALT
-                if (a.i == CTLC || a.i == ESC)
+                if (a.i == CTLC)
                     run_die("user interrupted!!");
 #endif
                 break;
