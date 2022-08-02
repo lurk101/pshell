@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 option(USB_CONSOLE "build for USB console, otherwise UART" ON)
-option(WITH_IRQ "build with interrupt support" OFF) 
+option(WITH_IRQ "build with interrupt support" OFF)
 option(WITH_KBD_HALT "build with run-time CTL-C checking" ON)
 
 set(CMAKE_C_STANDARD 11)
@@ -39,12 +39,25 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
+execute_process(
+  COMMAND git describe
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_V )
+
+string( REGEX MATCHALL "^v([0-9]*)\.([0-9]*)\.([0-9]*)" GIT_V_MATCHES ${GIT_V})
+set(PSHELL_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+
+# Remove unused variables
+unset( GIT_V )
+unset( GIT_V_MATCHES )
+
 add_compile_options("-DPICO_MALLOC_PANIC=0")
 add_compile_options("-DLFS_NO_ERROR")
 add_compile_options("-DLFS_NO_DEBUG")
 add_compile_options("-DLFS_NO_WARN")
 add_compile_options("-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH}")
 add_compile_options("-DGIT_BRANCH=${GIT_BRANCH}")
+add_compile_options("-DPSHELL_VERSION=${PSHELL_VERSION}")
 
 if (WITH_IRQ)
 add_compile_options("-DWITH_IRQ=1")
@@ -69,8 +82,7 @@ add_executable(${PSHELL}
     src/vi.c src/vi.h
     src/cc.c src/cc.h
     src/tar.c src/tar.h
-    src/cc_printf.S
-    src/version.h)
+    src/cc_printf.S)
 
 if (USB_CONSOLE)
   pico_enable_stdio_uart(${PSHELL} 0)

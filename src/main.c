@@ -27,7 +27,6 @@
 #include "dgreadln.h"
 #include "fs.h"
 #include "tar.h"
-#include "version.h"
 #include "vi.h"
 #include "xmodem.h"
 
@@ -257,7 +256,6 @@ static void cp_cmd(void) {
     char* buf = NULL;
     if (check_from_to_parms(&from, &to, 1))
         return;
-    result[0] = 0;
     lfs_file_t in, out;
     bool in_ok = false, out_ok = false;
     do {
@@ -522,7 +520,6 @@ static void ls_cmd(void) {
             if (info.type == LFS_TYPE_REG)
                 printf(" %7d %s\n", info.size, info.name);
     fs_dir_close(&dir);
-    result[0] = 0;
 }
 
 static void cd_cmd(void) {
@@ -561,21 +558,18 @@ static void cc_cmd(void) {
     if (check_mount(true))
         return;
     cc(argc, argv);
-    result[0] = 0;
 }
 
 static void tar_cmd(void) {
     if (check_mount(true))
         return;
     tar(argc, argv);
-    result[0] = 0;
 }
 
 static void vi_cmd(void) {
     if (check_mount(true))
         return;
     vi(argc - 1, argv + 1);
-    result[0] = 0;
 }
 
 static void clear_cmd(void) {
@@ -612,10 +606,10 @@ static void quit_cmd(void) {
 static void version_cmd(void) {
     const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
     const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
-    printf("\nPico Shell v" PS_VERSION " [%s %s], LittleFS v%d.%d, Vi " VI_VER ", SDK %d.%d.%d\n",
-           git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR,
-           PICO_SDK_VERSION_MINOR, PICO_SDK_VERSION_REVISION);
-    result[0] = 0;
+    const char* pshell_version = STRINGIZE_VALUE_OF(PSHELL_VERSION);
+    printf("\nPico Shell v%s [%s %s], LittleFS v%d.%d, Vi " VI_VER ", SDK %d.%d.%d\n",
+           pshell_version, git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff,
+           PICO_SDK_VERSION_MAJOR, PICO_SDK_VERSION_MINOR, PICO_SDK_VERSION_REVISION);
 }
 
 // clang-format off
