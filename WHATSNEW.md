@@ -1,3 +1,9 @@
+What's new in version 1.1.14
+
+- fix USB buffer overflow pasting in Vi
+- Remove ESC as BREAK key
+- Add getting started section
+
 What's new in version 1.1.13
 
 - fix tar handling of linux tar peculiarities

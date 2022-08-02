@@ -8,6 +8,7 @@ A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 [What's new]: WHATSNEW.md
 [examples]: c-examples
 [thread]: https://forums.raspberrypi.com/viewtopic.php?t=336843
+[Getting Started]: GETTING-STARTED.md
 
 Credit where credit is due...
 
@@ -28,6 +29,8 @@ About the compiler, briefly…
 
 Raspberry Pi Forums [thread].
 
+[Getting Started]
+
 Building from source.
 
 Edit the root folder CMakeLists.tx file to pick a console device, then:
@@ -46,14 +49,14 @@ Starting with version 1.0.4 all development will occur on the dev branch. To bui
 ```
 git checkout dev
 ```
-To build for USB:
+To build for UART (USB is the default):
 ```
-cmake .. -DUSB_CONSOLE=1
+cmake .. -DUSB_CONSOLE=OFF
 ```
 
 C source code [examples].
 
-Example log.
+Example console log.
 
 ```sh
 Pico Shell - Copyright 1883 (c) Thomas Edison
