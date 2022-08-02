@@ -796,13 +796,6 @@ static void refresh(int full_screen) {
     refresh_old_offset = offset;
 }
 
-// sleep for 'h' 1/100 seconds, return 1/0 if stdin is (ready for read)/(not ready)
-static int sleep(int ms) {
-    if (ms)
-        sleep_ms(ms);
-    return getchar_timeout_us(0);
-}
-
 static int safe_poll(uint8_t* buffer, int ms) {
     int c;
     if (ms < 0)
@@ -1184,7 +1177,7 @@ static void redraw(int full_screen) {
 static void flash(int ms) {
     standout_start();
     redraw(true);
-    sleep(ms);
+    sleep_ms(ms);
     standout_end();
     redraw(true);
 }
@@ -1842,7 +1835,7 @@ static void showmatching(char* p) {
         save_dot = dot; // remember where we are
         dot = q;        // go to new loc
         refresh(false); // let the user see it
-        sleep(1000);    // give user some time
+        sleep_ms(1000); // give user some time
         dot = save_dot; // go back to old loc
         refresh(false);
     }
@@ -3755,7 +3748,7 @@ static void edit_file(char* fn) {
         // poll to see if there is input already waiting. if we are
         // not able to display output fast enough to keep up, skip
         // the display update until we catch up with input.
-        if (!readbuffer[0] && sleep(0) == PICO_ERROR_TIMEOUT) {
+        if (!readbuffer[0]) {
             // no input pending - so update output
             refresh(false);
             show_status_line();
