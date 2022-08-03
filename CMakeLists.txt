@@ -49,6 +49,7 @@ add_compile_options("-DWITH_KBD_HALT=0")
 endif()
 
 add_subdirectory(littlefs)
+add_subdirectory(disassembler)
 
 add_executable(${PSHELL}
     src/main.c
@@ -70,7 +71,7 @@ else()
 endif()
 
 target_link_libraries(${PSHELL} PUBLIC
-    littlefs
+    littlefs disassembler
     pico_stdlib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
