@@ -23,6 +23,7 @@ if (PICO_SDK_VERSION_STRING VERSION_LESS "1.3.1")
     message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.3.1 (or later) required.")
 endif()
 
+find_package(Git REQUIRED)
 execute_process(
   COMMAND git describe
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
