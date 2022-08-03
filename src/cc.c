@@ -3096,9 +3096,14 @@ static void gen(int* n) {
         cnts = c;
         gen((int*)For_entry(n).incr); // increment
         *a = (int)(e + 1);
-        gen((int*)For_entry(n).cond); // condition
-        emit(BNZ);
-        emit((int)d);
+        if (For_entry(n).cond) {
+            gen((int*)For_entry(n).cond); // condition
+            emit(BNZ);
+            emit((int)d);
+        } else {
+            emit(JMP);
+            emit((int)d);
+        }
         while (brks) {
             t = (int*)*brks;
             *brks = (int)(e + 1);
@@ -3835,10 +3840,13 @@ static void stmt(int ctx) {
             die("semicolon expected");
         next();
         ast_Single(';');
-        expr(Assign);
-        a = n; // Point to entry of for cond
-        if (tk != ';')
-            die("semicolon expected");
+        if (tk != ';') {
+            expr(Assign);
+            a = n; // Point to entry of for cond
+            if (tk != ';')
+                die("semicolon expected");
+        } else
+            a = 0;
         next();
         ast_Single(';');
         if (tk != ')')
