@@ -70,7 +70,7 @@ extern void get_screen_xy(int* x, int* y);
 
 struct patch_s {
     struct patch_s* next;
-    int* addr;
+    uint16_t* addr;
 };
 
 static char *p, *lp;            // current position in source code
@@ -78,7 +78,7 @@ static char* data;              // data/bss pointer
 static char* data_base;         // data/bss pointer
 static char* src;               //
 static int* base_sp;            // stack
-static int *e, *le, *text_base; // current position in emitted code
+static uint16_t *e, *le, *text_base; // current position in emitted code
 static int* cas;                // case statement patch-up pointer
 static struct patch_s* def;     // default statement patch-up pointer
 static struct patch_s* brks;    // break statement patch-up pointer
@@ -131,7 +131,7 @@ struct ident_s {
     int type, htype;   // data type such as char and int
     int val, hval;
     int etype, hetype; // extended type info. different meaning for funcs.
-    int* forward;      // forward call patch address
+    uint16_t* forward; // forward call patch address
 };
 
 struct ident_s *id,  // currently parsed identifier
@@ -1089,7 +1089,8 @@ struct file_handle {
 } * file_list;
 
 static void clear_globals(void) {
-    base_sp = e = le = text_base = cas = tsize = n = malloc_list =
+    e = le = text_base = NULL;
+    base_sp = cas = tsize = n = malloc_list =
         (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
     def = brks = cnts = NULL;
     fd = NULL;
@@ -1145,7 +1146,7 @@ static __attribute__((__noreturn__)) void run_die(const char* fmt, ...) {
 static void* sys_malloc(int l) {
     int* p = malloc(l + 8);
     if (!p)
-        return NULL;
+        die("out of memory");
     memset(p + 2, 0, l);
     p[0] = (int)malloc_list;
     malloc_list = p;
@@ -2752,7 +2753,7 @@ void emit(int n) {
 // native Arm machine code.
 static void gen(int* n) {
     int i = ast_Tk(n), j, k, l;
-    int *a, *b, *c, *d, *t;
+    uint16_t *a, *b, *c, *d, *t;
     struct ident_s* label;
     struct patch_s* patch;
 
@@ -2812,7 +2813,8 @@ static void gen(int* n) {
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
         emit(BZ);
-        b = ++e;
+        emit(0);
+        b = e;
         gen((int*)Cond_entry(n).if_part); // expression
         // Patch the jump address field pointed to by "b" to hold the address
         // of false branch. "+ 3" counts the "JMP" instruction added below.
@@ -3019,30 +3021,29 @@ static void gen(int* n) {
         break;
     case Func:
     case Syscall:
-        b = (int*)Func_entry(n).next;
+        b = (uint16_t*)Func_entry(n).next;
         k = b ? Func_entry(n).n_parms : 0;
         if (k) {
             l = Func_entry(n).parm_types >> 10;
-            if (!(a = (int*)sys_malloc(sizeof(int) * (k + 1))))
-                die("no cache memory");
+            int* t;
+            t = sys_malloc(sizeof(int) * (k + 1));
             j = 0;
             while (ast_Tk(b)) {
-                a[j++] = (int)b;
-                b = (int*)ast_Tk(b);
+                t[j++] = (int)b;
+                b = (uint16_t*)ast_Tk(b);
             }
             int sj = j;
             while (j >= 0) { // push arguments
-                gen(b + 1);
+                gen((int*)b + 1);
                 if ((l & (1 << j)))
                     emit(PSHF);
                 else
                     emit(PSH);
 
                 --j;
-                b = (int*)a[j];
+                b = (uint16_t*)t[j];
             }
-            sys_free(a);
-            a = NULL;
+            sys_free(t);
             if (i == Syscall) {
                 emit(IMM);
                 emit((sj + 1) | ((Func_entry(n).parm_types >> 10) << 10));
@@ -3065,15 +3066,15 @@ static void gen(int* n) {
             a = ++e;
         }
         d = (e + 1);
-        b = (int*)brks;
+        b = (uint16_t*)brks;
         brks = 0;
-        c = (int*)cnts;
+        c = (uint16_t*)cnts;
         cnts = 0;
         gen((int*)While_entry(n).body); // loop body
         if (i == While)
             *a = (int)(e + 1);
         while (cnts) {
-            t = (int*)cnts->next;
+            t = (uint16_t*)cnts->next;
             *cnts->addr = (int)(e + 1);
             sys_free(cnts);
             cnts = (struct patch_s*)t;
@@ -3083,7 +3084,7 @@ static void gen(int* n) {
         emit(BNZ);
         emit((int)d);
         while (brks) {
-            t = (int*)brks->next;
+            t = (uint16_t*)brks->next;
             *brks->addr = (int)(e + 1);
             sys_free(brks);
             brks = (struct patch_s*)t;
@@ -3095,13 +3096,13 @@ static void gen(int* n) {
         emit(JMP);
         a = ++e;
         d = (e + 1);
-        b = (int*)brks;
+        b = (uint16_t*)brks;
         brks = 0;
-        c = (int*)cnts;
+        c = (uint16_t*)cnts;
         cnts = 0;
         gen((int*)For_entry(n).body); // loop body
         while (cnts) {
-            t = (int*)cnts->next;
+            t = (uint16_t*)cnts->next;
             *cnts->addr = (int)(e + 1);
             sys_free(cnts);
             cnts = (struct patch_s*)t;
@@ -3118,7 +3119,7 @@ static void gen(int* n) {
             emit((int)d);
         }
         while (brks) {
-            t = (int*)brks->next;
+            t = (uint16_t*)brks->next;
             *brks->addr = (int)(e + 1);
             sys_free(brks);
             brks = (struct patch_s*)t;
@@ -3127,26 +3128,26 @@ static void gen(int* n) {
         break;
     case Switch:
         gen((int*)Switch_entry(n).cond); // condition
-        a = cas;
+        a = (uint16_t*)cas;
         emit(JMP);
         emit(0);
-        cas = e;
-        b = (int*)brks;
-        d = (int*)def;
+        cas = (int*)e;
+        b = (uint16_t*)brks;
+        d = (uint16_t*)def;
         def = 0;
         brks = 0;
         gen((int*)Switch_entry(n).cas); // case statment
         // deal with no default inside switch case
         if (def) {
-            t = (int*)def->next;
+            t = (uint16_t*)def->next;
             *cas = (int)def->addr;
             sys_free(def);
             def = (struct patch_s*)t;
         } else
             *cas = (int)(e + 1);
-        cas = a;
+        cas = (int*)a;
         while (brks) {
-            t = (int*)brks->next;
+            t = (uint16_t*)brks->next;
             *brks->addr = (int)(e + 1);
             sys_free(brks);
             brks = (struct patch_s*)t;
@@ -3167,13 +3168,14 @@ static void gen(int* n) {
             die("case label not a numeric literal");
         emit(SUB);
         emit(BNZ);
-        cas = ++e;
+        emit(0);
+        cas = (int*)e;
         *e = i + e[-3];
         if (*((int*)Case_entry(n).expr) == Switch)
-            a = cas;
+            a = (uint16_t*)cas;
         gen((int*)Case_entry(n).expr); // expression
         if (a != 0)
-            cas = a;
+            cas = (int*)a;
         break;
     case Break:
         emit(JMP);
@@ -3222,9 +3224,9 @@ static void gen(int* n) {
         if (label->class != 0)
             die("duplicate label definition");
         d = e + 1;
-        b = (int*)label->val;
+        b = (uint16_t*)label->val;
         while (b != 0) {
-            t = (int*)ast_Tk(b);
+            t = (uint16_t*)ast_Tk(b);
             ast_Tk(b) = (int)d;
             b = t;
         }
@@ -3297,7 +3299,7 @@ static void loc_array_decl(int ct, int extent[3], int* dims, int* et, int* size)
     }
 }
 
-static void disassemble(int* le, int* e, int i_count) {
+static void disassemble(uint16_t* le, uint16_t* e, int i_count) {
     while (le < e) {
         le -= i_count;
         int off = le - text_base; // Func IR instruction memory offset
@@ -3462,8 +3464,6 @@ static void stmt(int ctx) {
                             die("bad struct member definition");
                         sz = (ty >= PTR) ? sizeof(int) : tsize[ty >> 2];
                         struct member_s* m = (struct member_s*)sys_malloc(sizeof(struct member_s));
-                        if (!m)
-                            die("no member memory");
                         m->id = id;
                         m->etype = 0;
                         next();
@@ -3567,7 +3567,7 @@ static void stmt(int ctx) {
                     dd->forward = 0;
                 }
                 dd->etype = ddetype;
-                int* se;
+                uint16_t* se;
                 if (tk == ';') { // check for prototype
                     se = e;
                     emit(JMP);
@@ -3983,1145 +3983,6 @@ static int common_vfunc(int ac, int sflag, int* sp) {
     return r;
 }
 
-#if WITH_KBD_HALT
-static Inline void check_kbd_halt(void) {
-    int key = getchar_timeout_us(0);
-    if ((key == 27) || (key == 3)) // check for escape
-        run_die("user interrupted!!");
-}
-#endif
-
-static int *bp, *pc, *sp;
-
-#if WITH_IRQ
-#define disable() uint32_t save = save_and_disable_interrupts()
-#define enable() restore_interrupts(save)
-#else
-#define disable()
-#define enable()
-#endif
-
-static Inline float pop_float(void) {
-    disable();
-    float r = *((float*)sp++);
-    enable();
-    return r;
-}
-
-static Inline int* pop_ptr(void) {
-    disable();
-    void* p = (int*)(*sp++);
-    enable();
-    return p;
-}
-
-static Inline int pop_int(void) {
-    disable();
-    int i = *sp++;
-    enable();
-    return i;
-}
-
-static Inline void push_ptr(void* p) {
-    disable();
-    *--sp = (int)p;
-    enable();
-}
-
-static Inline void push_int(int i) {
-    disable();
-    *--sp = i;
-    enable();
-}
-
-static Inline void push_float(float f) {
-    disable();
-    *((float*)--sp) = f;
-    enable();
-}
-
-static Inline void push_n(int n) {
-    disable();
-    sp -= n;
-    enable();
-}
-
-static Inline void pop_n(int n) {
-    disable();
-    sp += n;
-    enable();
-}
-
-static int run(void);
-
-#if WITH_IRQ
-static volatile int run_level;
-#endif
-
-static union {
-    int i;
-    float f;
-} a; // accumulator
-
-#if WITH_IRQ
-void irqn_handler(int n) {
-    {
-        disable();
-        push_int(a.i);
-        push_ptr(pc);
-        push_int(EXIT); // return to EXIT
-        push_ptr(sp);
-        bp = sp;
-        pc = intrpt_vector[n].c_handler;
-        enable();
-    }
-    run();
-    {
-        disable();
-        pc = pop_ptr(); // throw away the fake EXIT instruction
-        pc = pop_ptr();
-        a.i = pop_int();
-        enable();
-    }
-}
-
-void irq0_handler(void) { irqn_handler(0); }
-void irq1_handler(void) { irqn_handler(1); }
-void irq2_handler(void) { irqn_handler(2); }
-void irq3_handler(void) { irqn_handler(3); }
-void irq4_handler(void) { irqn_handler(4); }
-void irq5_handler(void) { irqn_handler(5); }
-void irq6_handler(void) { irqn_handler(6); }
-void irq7_handler(void) { irqn_handler(7); }
-void irq8_handler(void) { irqn_handler(8); }
-void irq9_handler(void) { irqn_handler(9); }
-void irq10_handler(void) { irqn_handler(10); }
-void irq11_handler(void) { irqn_handler(11); }
-void irq12_handler(void) { irqn_handler(12); }
-void irq13_handler(void) { irqn_handler(13); }
-void irq14_handler(void) { irqn_handler(14); }
-void irq15_handler(void) { irqn_handler(15); }
-void irq16_handler(void) { irqn_handler(16); }
-void irq17_handler(void) { irqn_handler(17); }
-void irq18_handler(void) { irqn_handler(18); }
-void irq19_handler(void) { irqn_handler(19); }
-void irq20_handler(void) { irqn_handler(20); }
-void irq21_handler(void) { irqn_handler(21); }
-void irq22_handler(void) { irqn_handler(22); }
-void irq23_handler(void) { irqn_handler(23); }
-void irq24_handler(void) { irqn_handler(24); }
-void irq25_handler(void) { irqn_handler(25); }
-void irq26_handler(void) { irqn_handler(26); }
-void irq27_handler(void) { irqn_handler(27); }
-void irq28_handler(void) { irqn_handler(28); }
-void irq29_handler(void) { irqn_handler(29); }
-void irq30_handler(void) { irqn_handler(30); }
-void irq31_handler(void) { irqn_handler(31); }
-
-static irq_handler_t handler[32] = {
-    irq0_handler,  irq1_handler,  irq2_handler,  irq3_handler,  irq4_handler,  irq5_handler,
-    irq6_handler,  irq7_handler,  irq8_handler,  irq9_handler,  irq10_handler, irq11_handler,
-    irq12_handler, irq13_handler, irq14_handler, irq15_handler, irq16_handler, irq17_handler,
-    irq18_handler, irq19_handler, irq20_handler, irq21_handler, irq22_handler, irq23_handler,
-    irq24_handler, irq25_handler, irq26_handler, irq27_handler, irq28_handler, irq29_handler,
-    irq30_handler, irq31_handler};
-#endif
-
-static int run(void) {
-
-#if WITH_IRQ
-    run_level++;
-#endif
-#if WITH_KBD_HALT
-    uint32_t last_t = time_us_32();
-#endif
-    int i, sysc, strl, irqn;
-    unsigned us, ms, mask;
-    struct file_handle *h, *last_h;
-    static pwm_config c;
-
-    while (1) {
-#if WITH_KBD_HALT
-#if WITH_IRQ
-        if (!run_level) {
-#endif
-            uint32_t t = time_us_32();
-            if ((t ^ last_t) & 0x100000) {
-                last_t = t;
-                check_kbd_halt();
-            }
-#if WITH_IRQ
-        }
-#endif
-#endif
-        if (trc_opt)
-#if WITH_IRQ
-            if (run_level == 0)
-#endif
-            {
-                disassemble(pc, pc + 2, 1);
-                printf("\n");
-                printf("acc          %08x (as int) %d\n", a.i, a.i);
-                printf("accf         %f\n", a.f);
-                printf("stk [%6d] %08x %08x %08x %08x\n", (int)(sp - base_sp), *((int*)sp),
-                       *((int*)sp + 1), *((int*)sp + 2), *((int*)sp + 3));
-                printf("    (as int) %08d %08d %08d %08d\n", *((int*)sp), *((int*)sp + 1),
-                       *((int*)sp + 2), *((int*)sp + 3));
-                printf("  (as float) %08f %08f %08f %08f\n\n", *((float*)sp), *((float*)sp + 1),
-                       *((float*)sp + 2), *((float*)sp + 3));
-                if (trc_opt > 1) {
-                    int c = getchar();
-                    if (c == CTLC)
-                        run_die("user interrupted!!");
-                }
-            }
-        i = *pc++;
-        switch (i) {
-        case LEA:
-            a.i = (int)(bp + *pc++); // load local address
-            break;
-        case IMM:
-        case IMMF:
-            a.i = *pc++; // load global address or immediate
-            break;
-        case JMP:
-            pc = (int*)*pc; // jump
-            break;
-        case JSR: // jump to subroutine
-            push_ptr(pc + 1);
-            pc = (int*)*pc;
-            break;
-        case BZ:
-            pc = (a.i == 0) ? (int*)*pc : pc + 1; // branch if zero
-            break;
-        case BNZ:
-            pc = (a.i != 0) ? (int*)*pc : pc + 1; // branch if zero
-            break;
-        // enter subroutine
-        case ENT:
-            push_ptr(bp);
-            bp = sp;
-            push_n(*pc++);
-            break;
-        case ADJ:
-            pop_n(*pc++ & ADJ_MASK); // stack adjust
-            break;
-        // leave subroutine
-        case LEV:
-            sp = bp;
-            bp = pop_ptr();
-            pc = pop_ptr();
-            break;
-        case LI:
-        case LF:
-            a.i = *(int*)a.i; // load int or float
-            break;
-        case LC:
-            a.i = *(char*)a.i; // load char
-            break;
-        case SI:
-        case SF:
-            *((int*)pop_ptr()) = a.i; // store int or float
-            break;
-        case SC:
-            *((char*)pop_ptr()) = a.i; // store char
-            break;
-
-        case PSH:
-        case PSHF:
-            push_int(a.i); // push
-            break;
-
-        case OR:
-            a.i = pop_int() | a.i;
-            break;
-        case XOR:
-            a.i = pop_int() ^ a.i;
-            break;
-        case AND:
-            a.i = pop_int() & a.i;
-            break;
-        case EQ:
-        case EQF:
-            a.i = pop_int() == a.i;
-            break;
-        case NE:
-        case NEF:
-            a.i = pop_int() != a.i;
-            break;
-        case LT:
-            a.i = pop_int() < a.i;
-            break;
-        case LTF:
-            a.i = pop_float() < a.f;
-            break;
-        case GT:
-            a.i = pop_int() > a.i;
-            break;
-        case GTF:
-            a.i = pop_float() > a.f;
-            break;
-        case LE:
-            a.i = pop_int() <= a.i;
-            break;
-        case LEF:
-            a.i = pop_float() <= a.f;
-            break;
-        case GE:
-            a.i = pop_int() >= a.i;
-            break;
-        case GEF:
-            a.i = pop_float() == a.f;
-            break;
-        case SHL:
-            a.i = pop_int() << a.i;
-            break;
-        case SHR:
-            a.i = pop_int() >> a.i;
-            break;
-        case ADD:
-            a.i = pop_int() + a.i;
-            break;
-        case ADDF:
-            a.f = pop_float() + a.f;
-            break;
-        case SUB:
-            a.i = pop_int() - a.i;
-            break;
-        case SUBF:
-            a.f = pop_float() - a.f;
-            break;
-        case MUL:
-            a.i = pop_int() * a.i;
-            break;
-        case MULF:
-            a.f = pop_float() * a.f;
-            break;
-        case DIV:
-            a.i = pop_int() / a.i;
-            break;
-        case DIVF:
-            a.f = pop_float() / a.f;
-            break;
-        case MOD:
-            a.i = pop_int() % a.i;
-            break;
-        case ITOF:
-            a.f = (float)a.i;
-            break;
-        case FTOI:
-            a.i = (int)a.f;
-            break;
-        case SYSC:
-            sysc = *pc++;
-            switch (sysc) {
-            case SYSC_printf:
-                a.i = common_vfunc(a.i, 0, sp);
-                break;
-            case SYSC_sprintf:
-                a.i = common_vfunc(a.i, 1, sp);
-                break;
-            // memory management
-            case SYSC_malloc:
-                a.i = (int)sys_malloc(sp[0]);
-                break;
-            case SYSC_free:
-                sys_free((void*)(sp[0]));
-                break;
-            // string
-            case SYSC_strlen:
-                a.i = strlen((void*)sp[0]);
-                break;
-            case SYSC_strcpy:
-                a.i = (int)strcpy((void*)sp[1], (void*)sp[0]);
-                break;
-            case SYSC_strncpy:
-                a.i = (int)strncpy((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_strcmp:
-                a.i = strcmp((void*)sp[1], (void*)sp[0]);
-                break;
-            case SYSC_strncmp:
-                a.i = strncmp((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_strcat:
-                a.i = (int)strcat((void*)sp[1], (void*)sp[0]);
-                break;
-            case SYSC_strncat:
-                a.i = (int)strncat((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_strchr:
-                a.i = (int)strchr((void*)sp[1], sp[0]);
-                break;
-            case SYSC_strrchr:
-                a.i = (int)strrchr((void*)sp[1], sp[0]);
-                break;
-            case SYSC_strdup:
-                strl = strlen((void*)sp[0]);
-                void* strp;
-                if (!(strp = sys_malloc(strl + 1)))
-                    run_die("no strdup memory");
-                strcpy(strp, (void*)sp[0]);
-                a.i = (int)strp;
-                break;
-            case SYSC_memcmp:
-                a.i = memcmp((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_memcpy:
-                a.i = (int)memcpy((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_memset:
-                a.i = (int)memset((void*)sp[2], sp[1], sp[0]);
-                break;
-            // math
-            case SYSC_atoi:
-                a.i = atoi((char*)sp[0]);
-                break;
-            case SYSC_sqrtf:
-                a.f = sqrtf(*((float*)sp));
-                break;
-            case SYSC_sinf:
-                a.f = sinf(*((float*)sp));
-                break;
-            case SYSC_cosf:
-                a.f = cosf(*((float*)sp));
-                break;
-            case SYSC_tanf:
-                a.f = tanf(*((float*)sp));
-                break;
-            case SYSC_asinf:
-                a.f = asinf(*((float*)sp));
-                break;
-            case SYSC_acosf:
-                a.f = acosf(*((float*)sp));
-                break;
-            case SYSC_atanf:
-                a.f = atanf(*((float*)sp));
-                break;
-            case SYSC_atan2f:
-                a.f = atan2f(*((float*)sp + 1), *((float*)sp));
-                break;
-            case SYSC_sinhf:
-                a.f = sinhf(*((float*)sp));
-                break;
-            case SYSC_coshf:
-                a.f = coshf(*((float*)sp));
-                break;
-            case SYSC_tanhf:
-                a.f = tanhf(*((float*)sp));
-                break;
-            case SYSC_asinhf:
-                a.f = asinhf(*((float*)sp));
-                break;
-            case SYSC_acoshf:
-                a.f = acoshf(*((float*)sp));
-                break;
-            case SYSC_atanhf:
-                a.f = atanhf(*((float*)sp));
-                break;
-            case SYSC_logf:
-                a.f = logf(*((float*)sp));
-                break;
-            case SYSC_log10f:
-                a.f = log10f(*((float*)sp));
-                break;
-            case SYSC_powf:
-                a.f = powf(*((float*)sp + 1), *((float*)sp));
-                break;
-            case SYSC_fmodf:
-                a.f = fmodf(*((float*)sp + 1), *((float*)sp));
-                break;
-            case SYSC_rand:
-                a.i = rand();
-                break;
-            case SYSC_srand:
-                srand(sp[0]);
-                break;
-            case SYSC_exit:
-                a.i = sp[0];
-                goto exit_called;
-            case SYSC_popcount:
-                a.i = __builtin_popcount(sp[0]);
-                break;
-            case SYSC_wfi:
-                __wfi();
-                break;
-            // io
-            case SYSC_getchar:
-                a.i = getchar();
-#if WITH_KBD_HALT
-                if (a.i == CTLC)
-                    run_die("user interrupted!!");
-#endif
-                break;
-            case SYSC_getchar_timeout_us:
-                a.i = getchar_timeout_us(sp[0]);
-#if WITH_KBD_HALT
-                if (a.i == CTLC)
-                    run_die("user interrupted!!");
-#endif
-                break;
-            case SYSC_putchar:
-                putchar(sp[0]);
-                break;
-            case SYSC_open:
-                h = sys_malloc(sizeof(struct file_handle));
-                h->is_dir = false;
-                if (!h)
-                    run_die("no file handle memory");
-                if (fs_file_open(&h->u.file, full_path((char*)sp[1]), sp[0]) < LFS_ERR_OK) {
-                    sys_free(h);
-                    a.i = 0;
-                    break;
-                }
-                a.i = (int)h;
-                h->next = file_list;
-                file_list = h;
-                break;
-            case SYSC_opendir:
-                h = sys_malloc(sizeof(struct file_handle));
-                h->is_dir = true;
-                if (!h)
-                    run_die("no directory handle memory");
-                if (fs_dir_open(&h->u.dir, full_path((char*)sp[0])) < LFS_ERR_OK) {
-                    sys_free(h);
-                    a.i = 0;
-                    break;
-                }
-                a.i = (int)h;
-                h->next = file_list;
-                file_list = h;
-                break;
-            case SYSC_close:
-                last_h = (void*)&file_list;
-                h = file_list;
-                while (h) {
-                    if (h == (struct file_handle*)sp[0]) {
-                        last_h->next = h->next;
-                        if (h->is_dir)
-                            fs_dir_close(&h->u.dir);
-                        else
-                            fs_file_close(&h->u.file);
-                        sys_free(h);
-                        break;
-                    }
-                    last_h = h;
-                    h = h->next;
-                }
-                if (!h)
-                    run_die("closing unopened file!");
-                break;
-            case SYSC_read:
-                h = (struct file_handle*)sp[2];
-                if (h->is_dir)
-                    run_die("use readdir to read from directories");
-                a.i = fs_file_read(&h->u.file, (void*)sp[1], sp[0]);
-                break;
-            case SYSC_readdir:
-                h = (struct file_handle*)sp[1];
-                if (!h->is_dir)
-                    run_die("use read to read from files");
-                a.i = fs_dir_read(&h->u.dir, (void*)sp[0]);
-                break;
-            case SYSC_write:
-                h = (struct file_handle*)sp[2];
-                a.i = fs_file_write(&h->u.file, (void*)sp[1], sp[0]);
-                break;
-            case SYSC_lseek:
-                h = (struct file_handle*)sp[2];
-                a.i = fs_file_seek(&h->u.file, sp[1], sp[0]);
-                break;
-            case SYSC_rename:
-                fp = full_path((void*)sp[1]);
-                char* fpa = sys_malloc(strlen(fp) + 1);
-                if (!fpa)
-                    run_die("no rename memory");
-                strcpy(fpa, fp);
-                char* fpb = full_path((void*)sp[0]);
-                a.i = fs_rename(fpa, fpb);
-                sys_free(fpa);
-                break;
-            case SYSC_remove:
-                a.i = fs_remove(full_path((void*)sp[0]));
-                break;
-            case SYSC_screen_width:
-                get_screen_xy(&a.i, &us);
-                break;
-            case SYSC_screen_height:
-                get_screen_xy(&us, &a.i);
-                break;
-            // time
-            case SYSC_time_us_32: // SDK
-                a.i = time_us_32();
-                break;
-            case SYSC_sleep_us:
-                us = sp[0];
-                while (us > 10000) {
-                    sleep_ms(10000);
-#if WITH_KDB_HALT
-                    check_kbd_halt();
-#endif
-                    us -= 10000;
-                }
-                sleep_us(us);
-                break;
-            case SYSC_sleep_ms:
-                ms = sp[0];
-                while (ms > 10) {
-                    sleep_ms(10);
-#if WITH_KDB_HALT
-                    check_kbd_halt();
-#endif
-                    ms -= 10;
-                }
-                sleep_ms(ms);
-                break;
-            // SDK gpio
-            case SYSC_gpio_set_function:
-                gpio_set_function(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_get_function:
-                a.i = gpio_get_function(sp[0]);
-                break;
-            case SYSC_gpio_set_pulls:
-                gpio_set_pulls(sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_gpio_pull_up:
-                gpio_pull_up(sp[0]);
-                break;
-            case SYSC_gpio_is_pulled_up:
-                a.i = gpio_is_pulled_up(sp[0]);
-                break;
-            case SYSC_gpio_pull_down:
-                gpio_pull_down(sp[0]);
-                break;
-            case SYSC_gpio_is_pulled_down:
-                a.i = gpio_is_pulled_down(sp[0]);
-                break;
-            case SYSC_gpio_disable_pulls:
-                gpio_disable_pulls(sp[0]);
-                break;
-            case SYSC_gpio_set_irqover:
-                gpio_set_irqover(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_set_outover:
-                gpio_set_outover(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_set_inover:
-                gpio_set_inover(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_set_oeover:
-                gpio_set_oeover(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_set_input_enabled:
-                gpio_set_input_enabled(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_set_input_hysteresis_enabled:
-                gpio_set_input_hysteresis_enabled(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_is_input_hysteresis_enabled:
-                a.i = gpio_is_input_hysteresis_enabled(sp[0]);
-                break;
-            case SYSC_gpio_set_slew_rate:
-                gpio_set_slew_rate(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_get_slew_rate:
-                a.i = gpio_get_slew_rate(sp[0]);
-                break;
-            case SYSC_gpio_set_drive_strength:
-                gpio_set_drive_strength(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_get_drive_strength:
-                a.i = gpio_get_drive_strength(sp[0]);
-                break;
-#if WITH_IRQ
-            case SYSC_gpio_set_irq_enabled:
-                gpio_set_irq_enabled(sp[2], sp[1], sp[0]);
-                break;
-#if SDK14
-            case SYSC_gpio_set_irq_callback:
-                gpio_set_irq_callback((gpio_irq_callback_t)sp[0]);
-                break;
-#endif
-            case SYSC_gpio_set_irq_enabled_with_callback:
-                gpio_set_irq_enabled_with_callback(sp[3], sp[2], sp[1], (gpio_irq_callback_t)sp[0]);
-                break;
-            case SYSC_gpio_set_dormant_irq_enabled:
-                gpio_set_dormant_irq_enabled(sp[2], sp[1], sp[0]);
-                break;
-#if SDK14
-            case SYSC_gpio_get_irq_event_mask:
-                a.i = gpio_get_irq_event_mask(sp[0]);
-                break;
-#endif
-            case SYSC_gpio_acknowledge_irq:
-                gpio_acknowledge_irq(sp[1], sp[0]);
-                break;
-#if SDK14
-            case SYSC_gpio_add_raw_irq_handler_with_order_priority_masked:
-                gpio_add_raw_irq_handler_with_order_priority_masked(sp[2], (irq_handler_t)sp[1],
-                                                                    sp[0]);
-                break;
-            case SYSC_gpio_add_raw_irq_handler_with_order_priority:
-                gpio_add_raw_irq_handler_with_order_priority(sp[2], (irq_handler_t)sp[1], sp[0]);
-                break;
-            case SYSC_gpio_add_raw_irq_handler_masked:
-                gpio_add_raw_irq_handler_masked(sp[1], (irq_handler_t)sp[0]);
-                break;
-            case SYSC_gpio_add_raw_irq_handler:
-                gpio_add_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
-                break;
-            case SYSC_gpio_remove_raw_irq_handler_masked:
-                gpio_remove_raw_irq_handler_masked(sp[1], (irq_handler_t)sp[0]);
-                break;
-            case SYSC_gpio_remove_raw_irq_handler:
-                gpio_remove_raw_irq_handler(sp[1], (irq_handler_t)sp[0]);
-                break;
-#endif
-#endif // WITH_IRQ
-            case SYSC_gpio_init:
-                gpio_init(sp[0]);
-                break;
-            case SYSC_gpio_deinit:
-                gpio_deinit(sp[0]);
-                break;
-            case SYSC_gpio_init_mask:
-                gpio_init_mask(sp[0]);
-                break;
-            case SYSC_gpio_get:
-                a.i = gpio_get(sp[0]);
-                break;
-            case SYSC_gpio_get_all:
-                a.i = gpio_get_all();
-                break;
-            case SYSC_gpio_set_mask:
-                gpio_set_mask(sp[0]);
-                break;
-            case SYSC_gpio_clr_mask:
-                gpio_clr_mask(sp[0]);
-                break;
-            case SYSC_gpio_xor_mask:
-                gpio_xor_mask(sp[0]);
-                break;
-            case SYSC_gpio_put_masked:
-                gpio_put_masked(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_put_all:
-                gpio_put_all(sp[0]);
-                break;
-            case SYSC_gpio_put:
-                gpio_put(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_get_out_level:
-                a.i = gpio_get_out_level(sp[0]);
-                break;
-            case SYSC_gpio_set_dir_out_masked:
-                gpio_set_dir_out_masked(sp[0]);
-                break;
-            case SYSC_gpio_set_dir_in_masked:
-                gpio_set_dir_in_masked(sp[0]);
-                break;
-            case SYSC_gpio_set_dir_masked:
-                gpio_set_dir_masked(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_set_dir_all_bits:
-                gpio_set_dir_all_bits(sp[0]);
-                break;
-            case SYSC_gpio_set_dir:
-                gpio_set_dir(sp[1], sp[0]);
-                break;
-            case SYSC_gpio_is_dir_out:
-                a.i = gpio_is_dir_out(sp[0]);
-                break;
-            case SYSC_gpio_get_dir:
-                a.i = gpio_get_dir(sp[0]);
-                break;
-            // PWM
-            case SYSC_pwm_gpio_to_slice_num:
-                a.i = pwm_gpio_to_slice_num(sp[0]);
-                break;
-            case SYSC_pwm_gpio_to_channel:
-                a.i = pwm_gpio_to_channel(sp[0]);
-                break;
-            case SYSC_pwm_config_set_phase_correct:
-                pwm_config_set_phase_correct((void*)sp[1], sp[0]);
-                break;
-            case SYSC_pwm_config_set_clkdiv:
-                pwm_config_set_clkdiv((void*)sp[1], *((float*)sp));
-                break;
-            case SYSC_pwm_config_set_clkdiv_int_frac:
-                pwm_config_set_clkdiv_int_frac((void*)sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_pwm_config_set_clkdiv_int:
-                pwm_config_set_clkdiv_int((void*)sp[1], sp[0]);
-                break;
-            case SYSC_pwm_config_set_clkdiv_mode:
-                pwm_config_set_clkdiv_mode((void*)sp[1], sp[0]);
-                break;
-            case SYSC_pwm_config_set_output_polarity:
-                pwm_config_set_output_polarity((void*)sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_pwm_config_set_wrap:
-                pwm_config_set_wrap((void*)sp[1], sp[0]);
-                break;
-            case SYSC_pwm_init:
-                pwm_init(sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_pwm_get_default_config:
-                c = pwm_get_default_config();
-                a.i = (int)&c;
-                break;
-            case SYSC_pwm_set_wrap:
-                pwm_set_wrap(sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_chan_level:
-                pwm_set_chan_level(sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_both_levels:
-                pwm_set_both_levels(sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_gpio_level:
-                pwm_set_gpio_level(sp[1], sp[0]);
-                break;
-            case SYSC_pwm_get_counter:
-                a.i = pwm_get_counter(sp[0]);
-                break;
-            case SYSC_pwm_set_counter:
-                pwm_set_counter(sp[1], sp[0]);
-                break;
-            case SYSC_pwm_advance_count:
-                pwm_advance_count(sp[0]);
-                break;
-            case SYSC_pwm_retard_count:
-                pwm_retard_count(sp[0]);
-                break;
-            case SYSC_pwm_set_clkdiv_int_frac:
-                pwm_set_clkdiv_int_frac(sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_clkdiv:
-                pwm_set_clkdiv(sp[1], *((float*)sp));
-                break;
-            case SYSC_pwm_set_output_polarity:
-                pwm_set_output_polarity(sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_clkdiv_mode:
-                pwm_set_clkdiv_mode(sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_phase_correct:
-                pwm_set_phase_correct(sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_enabled:
-                pwm_set_enabled(sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_mask_enabled:
-                pwm_set_mask_enabled(sp[0]);
-                break;
-#if WITH_IRQ
-            case SYSC_pwm_set_irq_enabled:
-                pwm_set_irq_enabled(sp[1], sp[0]);
-                break;
-            case SYSC_pwm_set_irq_mask_enabled:
-                pwm_set_irq_mask_enabled(sp[1], sp[0]);
-                break;
-            case SYSC_pwm_clear_irq:
-                pwm_clear_irq(sp[0]);
-                break;
-            case SYSC_pwm_get_irq_status_mask:
-                a.i = pwm_get_irq_status_mask();
-                break;
-            case SYSC_pwm_force_irq:
-                pwm_force_irq(sp[0]);
-                break;
-#endif
-            case SYSC_pwm_get_dreq:
-                a.i = pwm_get_dreq(sp[0]);
-                break;
-                // ADC
-            case SYSC_adc_init:
-                adc_init();
-                break;
-            case SYSC_adc_gpio_init:
-                adc_gpio_init(sp[0]);
-                break;
-            case SYSC_adc_select_input:
-                adc_select_input(sp[0]);
-                break;
-            case SYSC_adc_get_selected_input:
-                a.i = adc_get_selected_input();
-                break;
-            case SYSC_adc_set_round_robin:
-                adc_set_round_robin(sp[0]);
-                break;
-            case SYSC_adc_set_temp_sensor_enabled:
-                adc_set_temp_sensor_enabled(sp[0]);
-                break;
-            case SYSC_adc_read:
-                a.i = adc_read();
-                break;
-            case SYSC_adc_run:
-                adc_run(sp[0]);
-                break;
-            case SYSC_adc_set_clkdiv:
-                adc_set_clkdiv(*(float*)sp);
-                break;
-            case SYSC_adc_fifo_setup:
-                adc_fifo_setup(sp[4], sp[3], sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_adc_fifo_is_empty:
-                a.i = adc_fifo_is_empty();
-                break;
-            case SYSC_adc_fifo_get_level:
-                a.i = adc_fifo_get_level();
-                break;
-            case SYSC_adc_fifo_get:
-                a.i = adc_fifo_get();
-                break;
-            case SYSC_adc_fifo_get_blocking:
-                a.i = adc_fifo_get_blocking();
-                break;
-            case SYSC_adc_fifo_drain:
-                adc_fifo_drain();
-                break;
-            case SYSC_adc_irq_set_enabled:
-                adc_irq_set_enabled(sp[0]);
-                break;
-                // CLOCKS
-            case SYSC_clocks_init:
-                clocks_init();
-                break;
-            case SYSC_clock_configure:
-                a.i = clock_configure(sp[4], sp[3], sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_clock_stop:
-                clock_stop(sp[0]);
-                break;
-            case SYSC_clock_get_hz:
-                a.i = clock_get_hz(sp[0]);
-                break;
-            case SYSC_frequency_count_khz:
-                a.i = frequency_count_khz(sp[0]);
-                break;
-            case SYSC_clock_set_reported_hz:
-                clock_set_reported_hz(sp[1], sp[0]);
-                break;
-            case SYSC_frequency_count_mhz:
-                a.f = frequency_count_mhz(sp[0]);
-                break;
-            case SYSC_clocks_enable_resus:
-                clocks_enable_resus((resus_callback_t)sp[0]);
-                break;
-            case SYSC_clock_gpio_init:
-                clock_gpio_init(sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_clock_configure_gpin:
-                a.i = clock_configure_gpin(sp[3], sp[2], sp[1], sp[0]);
-                break;
-                // I2C
-            case SYSC_i2c_init:
-                a.i = i2c_init((void*)sp[1], sp[0]);
-                break;
-            case SYSC_i2c_deinit:
-                i2c_deinit((void*)sp[0]);
-                break;
-            case SYSC_i2c_set_baudrate:
-                a.i = i2c_set_baudrate((void*)sp[1], sp[0]);
-                break;
-            case SYSC_i2c_set_slave_mode:
-                i2c_set_slave_mode((void*)sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_i2c_hw_index:
-                a.i = i2c_hw_index((void*)sp[0]);
-                break;
-            case SYSC_i2c_get_hw:
-                a.i = (int)i2c_get_hw((void*)sp[0]);
-                break;
-            case SYSC_i2c_write_timeout_us:
-                a.i = i2c_write_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_i2c_write_timeout_per_char_us:
-                a.i = i2c_write_timeout_per_char_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1],
-                                                    sp[0]);
-                break;
-            case SYSC_i2c_read_timeout_us:
-                a.i = i2c_read_timeout_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_i2c_read_timeout_per_char_us:
-                a.i = i2c_read_timeout_per_char_us((void*)sp[5], sp[4], (void*)sp[3], sp[2], sp[1],
-                                                   sp[0]);
-                break;
-            case SYSC_i2c_write_blocking:
-                a.i = i2c_write_blocking((void*)sp[4], sp[3], (void*)sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_i2c_read_blocking:
-                a.i = i2c_read_blocking((void*)sp[4], sp[3], (void*)sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_i2c_get_write_available:
-                a.i = i2c_get_write_available((void*)sp[0]);
-                break;
-            case SYSC_i2c_get_read_available:
-                a.i = i2c_get_read_available((void*)sp[0]);
-                break;
-            case SYSC_i2c_write_raw_blocking:
-                i2c_write_raw_blocking((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_i2c_read_raw_blocking:
-                i2c_read_raw_blocking((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_i2c_get_dreq:
-                a.i = i2c_get_dreq((void*)sp[1], sp[0]);
-                break;
-                // SPI
-            case SYSC_spi_init:
-                a.i = spi_init((void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_deinit:
-                spi_deinit((void*)sp[0]);
-                break;
-            case SYSC_spi_set_baudrate:
-                a.i = spi_set_baudrate((void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_get_baudrate:
-                a.i = spi_get_baudrate((void*)sp[0]);
-                break;
-            case SYSC_spi_get_index:
-                a.i = spi_get_index((void*)sp[0]);
-                break;
-            case SYSC_spi_get_hw:
-                a.i = (int)spi_get_hw((void*)sp[0]);
-                break;
-            case SYSC_spi_get_const_hw:
-                a.i = (int)spi_get_const_hw((void*)sp[0]);
-                break;
-            case SYSC_spi_set_format:
-                spi_set_format((void*)sp[4], sp[3], sp[2], sp[1], sp[0]);
-                break;
-            case SYSC_spi_set_slave:
-                spi_set_slave((void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_is_writable:
-                a.i = spi_is_writable((void*)sp[0]);
-                break;
-            case SYSC_spi_is_readable:
-                a.i = spi_is_readable((void*)sp[0]);
-                break;
-            case SYSC_spi_is_busy:
-                a.i = spi_is_busy((void*)sp[0]);
-                break;
-            case SYSC_spi_write_read_blocking:
-                a.i = spi_write_read_blocking((void*)sp[3], (void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_write_blocking:
-                a.i = spi_write_blocking((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_read_blocking:
-                a.i = spi_read_blocking((void*)sp[3], sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_write16_read16_blocking:
-                a.i = spi_write16_read16_blocking((void*)sp[3], (void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_write16_blocking:
-                a.i = spi_write16_blocking((void*)sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_read16_blocking:
-                a.i = spi_read16_blocking((void*)sp[3], sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_spi_get_dreq:
-                a.i = spi_get_dreq((void*)sp[1], sp[0]);
-                break;
-                // IRQ
-#if WITH_IRQ
-            case SYSC_irq_set_priority:
-                irq_set_priority(sp[1], sp[0]);
-                break;
-            case SYSC_irq_get_priority:
-                a.i = irq_get_priority(sp[0]);
-                break;
-            case SYSC_irq_set_enabled:
-                irqn = sp[1];
-                intrpt_vector[irqn].enabled = sp[0];
-                irq_set_enabled(sp[1], sp[0]);
-                break;
-            case SYSC_irq_is_enabled:
-                a.i = irq_is_enabled(sp[0]);
-                break;
-            case SYSC_irq_set_mask_enabled:
-                mask = sp[1];
-                for (int i = 0; i < 32; i++) {
-                    if (mask & 1)
-                        intrpt_vector[i].enabled = sp[0];
-                    mask >>= 1;
-                }
-                irq_set_mask_enabled(sp[1], sp[0]);
-                break;
-            case SYSC_irq_set_exclusive_handler:
-                irqn = sp[1];
-                intrpt_vector[irqn].c_handler = (void*)sp[0];
-                irq_set_exclusive_handler(sp[1], handler[irqn]);
-                break;
-            case SYSC_irq_get_exclusive_handler:
-                a.i = (int)irq_get_exclusive_handler(sp[0]);
-                break;
-            case SYSC_irq_add_shared_handler:
-                irqn = sp[2];
-                intrpt_vector[irqn].c_handler = (void*)sp[1];
-                irq_add_shared_handler(sp[2], (void*)sp[1], sp[0]);
-                break;
-            case SYSC_irq_remove_handler:
-                irqn = sp[0];
-                if (intrpt_vector[irqn].c_handler != (void*)sp[0])
-                    run_die("can't remove uninstalled handler");
-                irq_remove_handler(sp[1], (void*)sp[0]);
-                break;
-#if SDK14
-            case SYSC_irq_has_shared_handler:
-                a.i = irq_has_shared_handler(sp[0]);
-                break;
-#endif
-            case SYSC_irq_get_vtable_handler:
-                a.i = (int)irq_get_vtable_handler(sp[0]);
-                break;
-            case SYSC_irq_clear:
-                irq_clear(sp[0]);
-                break;
-            case SYSC_irq_set_pending:
-                irq_set_pending(sp[0]);
-                break;
-            case SYSC_irq_init_priorities:
-                irq_init_priorities();
-                break;
-#if SDK14
-            case SYSC_user_irq_claim:
-                user_irq_claim(sp[0]);
-                break;
-            case SYSC_user_irq_unclaim:
-                user_irq_unclaim(sp[0]);
-                break;
-            case SYSC_user_irq_claim_unused:
-                a.i = user_irq_claim_unused(sp[0]);
-                break;
-            case SYSC_user_irq_is_claimed:
-                a.i = user_irq_is_claimed(sp[0]);
-                break;
-#endif
-#endif // WITH_IRQ
-            default:
-                run_die("unknown system call");
-                break;
-            }
-            break;
-        case EXIT:
-#if WITH_IRQ
-            run_level--;
-#endif
-            return a.i;
-        default:
-            run_die("unknown instruction = 0x%08x!\n", i);
-        }
-    }
-exit_called:
-    return a.i;
-}
-
 static int show_strings(char** names, int n) {
     int x, y, lc = 0;
     get_screen_xy(&x, &y);
@@ -5225,8 +4086,7 @@ int cc(int argc, char** argv) {
     if (setjmp(done_jmp))
         goto done;
 
-    if (!(sym = (struct ident_s*)sys_malloc(SYM_TBL_BYTES)))
-        die("no symbol memory");
+    sym = sys_malloc(SYM_TBL_BYTES);
 
     // Register keywords in symbol stack. Must match the sequence of enum
     p = "enum char int float struct union sizeof return goto break continue "
@@ -5248,12 +4108,9 @@ int cc(int argc, char** argv) {
     struct ident_s* idmain = id;
     id->class = Main; // keep track of main
 
-    if (!(data_base = data = (char*)sys_malloc(DATA_BYTES)))
-        die("no data memory");
-    if (!(tsize = (int*)sys_malloc(TS_TBL_BYTES)))
-        die("no tsize memory");
-    if (!(ast = (int*)sys_malloc(AST_TBL_BYTES)))
-        die("could not allocate abstract syntax tree area");
+    data_base = data = sys_malloc(DATA_BYTES);
+    tsize = sys_malloc(TS_TBL_BYTES);
+    ast = sys_malloc(AST_TBL_BYTES);
     n = ast + (AST_TBL_BYTES / 4) - 1;
 
     // add primitive types
@@ -5321,8 +4178,6 @@ int cc(int argc, char** argv) {
     if (strrchr(fn, '.') == NULL)
         strcat(fn, ".c");
     fd = sys_malloc(sizeof(lfs_file_t));
-    if (fd == NULL)
-        die("no file handle memory");
     if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
         sys_free(fd);
         fd = NULL;
@@ -5333,13 +4188,10 @@ int cc(int argc, char** argv) {
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
 
-    if (!(text_base = le = e = (int*)sys_malloc(TEXT_BYTES)))
-        die("no text memory");
-    if (!(members = (struct member_s**)sys_malloc(MEMBER_DICT_BYTES)))
-        die("no members table memory");
+    text_base = le = e = sys_malloc(TEXT_BYTES);
+    members = sys_malloc(MEMBER_DICT_BYTES);
 
-    if (!(src = lp = p = (char*)sys_malloc(siz + 1)))
-        die("no source memory");
+    src = lp = p = sys_malloc(siz + 1);
     if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
         die("unable to read from source file");
     p[siz] = 0;
@@ -5367,7 +4219,7 @@ int cc(int argc, char** argv) {
     sym = NULL;
     sys_free(tsize);
     tsize = NULL;
-    if (!(pc = (int*)idmain->val))
+    if (!idmain->val)
         die("main() not defined\n");
 
     if (src_opt)
@@ -5375,29 +4227,7 @@ int cc(int argc, char** argv) {
 
     printf("\n");
 
-    // setup stack
-    if (!(base_sp = bp = sp = (int*)sys_malloc(STACK_BYTES)))
-        die("could not allocate stack area");
-    bp = sp = (int*)((int)sp + STACK_BYTES - 4);
-    push_int(EXIT); // call exit if main returns
-    push_int(argc);
-    push_ptr(argv);
-    push_ptr(sp + 2);
-
-    // run...
-    a.i = 0;
-#if WITH_IRQ
-    run_level = -1;
-#endif
-
-    printf("\nCC=%d\n", run());
-
 done:
-#if WITH_IRQ
-    for (int i = 0; i < 32; i++)
-        if (intrpt_vector[i].enabled)
-            irq_set_enabled(i, 0);
-#endif
     if (fd)
         fs_file_close(fd);
     while (file_list) {
