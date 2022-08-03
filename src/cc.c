@@ -388,524 +388,6 @@ static const char* instr_str[] = {
 enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000 };
 
 // (library) external functions
-enum {
-    // stdio.h
-    // varargs functions
-    SYSC_printf = 0,
-    SYSC_sprintf,
-    // IO
-    SYSC_getchar,
-    SYSC_getchar_timeout_us,
-    SYSC_putchar,
-    SYSC_open,
-    SYSC_opendir,
-    SYSC_close,
-    SYSC_read,
-    SYSC_readdir,
-    SYSC_write,
-    SYSC_lseek,
-    SYSC_rename,
-    SYSC_remove,
-    SYSC_screen_width,
-    SYSC_screen_height,
-    // stdlib.h
-    SYSC_malloc,
-    SYSC_free,
-    SYSC_atoi,
-    SYSC_rand,
-    SYSC_srand,
-    SYSC_exit,
-    SYSC_popcount,
-    // string.h
-    SYSC_strlen,
-    SYSC_strcpy,
-    SYSC_strncpy,
-    SYSC_strcmp,
-    SYSC_strncmp,
-    SYSC_strcat,
-    SYSC_strncat,
-    SYSC_strchr,
-    SYSC_strrchr,
-    SYSC_strdup,
-    SYSC_memcmp,
-    SYSC_memcpy,
-    SYSC_memset,
-    // math.h
-    SYSC_sqrtf,
-    SYSC_sinf,
-    SYSC_cosf,
-    SYSC_tanf,
-    SYSC_asinf,
-    SYSC_acosf,
-    SYSC_atanf,
-    SYSC_atan2f,
-    SYSC_sinhf,
-    SYSC_coshf,
-    SYSC_tanhf,
-    SYSC_asinhf,
-    SYSC_acoshf,
-    SYSC_atanhf,
-    SYSC_logf,
-    SYSC_log10f,
-    SYSC_powf,
-    SYSC_fmodf,
-    // hardware/sync.h
-    SYSC_wfi,
-    // hardware/timer.h
-    SYSC_time_us_32,
-    // pico/time.h
-    SYSC_sleep_us,
-    SYSC_sleep_ms,
-    // hardware/gpio.h
-    SYSC_gpio_set_function,
-    SYSC_gpio_get_function,
-    SYSC_gpio_set_pulls,
-    SYSC_gpio_pull_up,
-    SYSC_gpio_is_pulled_up,
-    SYSC_gpio_pull_down,
-    SYSC_gpio_is_pulled_down,
-    SYSC_gpio_disable_pulls,
-    SYSC_gpio_set_irqover,
-    SYSC_gpio_set_outover,
-    SYSC_gpio_set_inover,
-    SYSC_gpio_set_oeover,
-    SYSC_gpio_set_input_enabled,
-    SYSC_gpio_set_input_hysteresis_enabled,
-    SYSC_gpio_is_input_hysteresis_enabled,
-    SYSC_gpio_set_slew_rate,
-    SYSC_gpio_get_slew_rate,
-    SYSC_gpio_set_drive_strength,
-    SYSC_gpio_get_drive_strength,
-#if WITH_IRQ
-    SYSC_gpio_set_irq_enabled,
-#if SDK14
-    SYSC_gpio_set_irq_callback,
-#endif
-    SYSC_gpio_set_irq_enabled_with_callback,
-    SYSC_gpio_set_dormant_irq_enabled,
-#if SDK14
-    SYSC_gpio_get_irq_event_mask,
-#endif
-    SYSC_gpio_acknowledge_irq,
-#if SDK14
-    SYSC_gpio_add_raw_irq_handler_with_order_priority_masked,
-    SYSC_gpio_add_raw_irq_handler_with_order_priority,
-    SYSC_gpio_add_raw_irq_handler_masked,
-    SYSC_gpio_add_raw_irq_handler,
-    SYSC_gpio_remove_raw_irq_handler_masked,
-    SYSC_gpio_remove_raw_irq_handler,
-#endif
-#endif // WITH_IRQ
-    SYSC_gpio_init,
-    SYSC_gpio_deinit,
-    SYSC_gpio_init_mask,
-    SYSC_gpio_get,
-    SYSC_gpio_get_all,
-    SYSC_gpio_set_mask,
-    SYSC_gpio_clr_mask,
-    SYSC_gpio_xor_mask,
-    SYSC_gpio_put_masked,
-    SYSC_gpio_put_all,
-    SYSC_gpio_put,
-    SYSC_gpio_get_out_level,
-    SYSC_gpio_set_dir_out_masked,
-    SYSC_gpio_set_dir_in_masked,
-    SYSC_gpio_set_dir_masked,
-    SYSC_gpio_set_dir_all_bits,
-    SYSC_gpio_set_dir,
-    SYSC_gpio_is_dir_out,
-    SYSC_gpio_get_dir,
-    // hardware/pwm.h
-    SYSC_pwm_gpio_to_slice_num,
-    SYSC_pwm_gpio_to_channel,
-    SYSC_pwm_config_set_phase_correct,
-    SYSC_pwm_config_set_clkdiv,
-    SYSC_pwm_config_set_clkdiv_int_frac,
-    SYSC_pwm_config_set_clkdiv_int,
-    SYSC_pwm_config_set_clkdiv_mode,
-    SYSC_pwm_config_set_output_polarity,
-    SYSC_pwm_config_set_wrap,
-    SYSC_pwm_init,
-    SYSC_pwm_get_default_config,
-    SYSC_pwm_set_wrap,
-    SYSC_pwm_set_chan_level,
-    SYSC_pwm_set_both_levels,
-    SYSC_pwm_set_gpio_level,
-    SYSC_pwm_get_counter,
-    SYSC_pwm_set_counter,
-    SYSC_pwm_advance_count,
-    SYSC_pwm_retard_count,
-    SYSC_pwm_set_clkdiv_int_frac,
-    SYSC_pwm_set_clkdiv,
-    SYSC_pwm_set_output_polarity,
-    SYSC_pwm_set_clkdiv_mode,
-    SYSC_pwm_set_phase_correct,
-    SYSC_pwm_set_enabled,
-    SYSC_pwm_set_mask_enabled,
-#if WITH_IRQ
-    SYSC_pwm_set_irq_enabled,
-    SYSC_pwm_set_irq_mask_enabled,
-    SYSC_pwm_clear_irq,
-    SYSC_pwm_get_irq_status_mask,
-    SYSC_pwm_force_irq,
-#endif
-    SYSC_pwm_get_dreq,
-    // hardware/adc.h
-    SYSC_adc_init,
-    SYSC_adc_gpio_init,
-    SYSC_adc_select_input,
-    SYSC_adc_get_selected_input,
-    SYSC_adc_set_round_robin,
-    SYSC_adc_set_temp_sensor_enabled,
-    SYSC_adc_read,
-    SYSC_adc_run,
-    SYSC_adc_set_clkdiv,
-    SYSC_adc_fifo_setup,
-    SYSC_adc_fifo_is_empty,
-    SYSC_adc_fifo_get_level,
-    SYSC_adc_fifo_get,
-    SYSC_adc_fifo_get_blocking,
-    SYSC_adc_fifo_drain,
-    SYSC_adc_irq_set_enabled,
-    // hardware/clocks.h
-    SYSC_clocks_init,
-    SYSC_clock_configure,
-    SYSC_clock_stop,
-    SYSC_clock_get_hz,
-    SYSC_frequency_count_khz,
-    SYSC_clock_set_reported_hz,
-    SYSC_frequency_count_mhz,
-    SYSC_clocks_enable_resus,
-    SYSC_clock_gpio_init,
-    SYSC_clock_configure_gpin,
-    // hardware/i2c.h
-    SYSC_i2c_init,
-    SYSC_i2c_deinit,
-    SYSC_i2c_set_baudrate,
-    SYSC_i2c_set_slave_mode,
-    SYSC_i2c_hw_index,
-    SYSC_i2c_get_hw,
-    SYSC_i2c_write_timeout_us,
-    SYSC_i2c_write_timeout_per_char_us,
-    SYSC_i2c_read_timeout_us,
-    SYSC_i2c_read_timeout_per_char_us,
-    SYSC_i2c_write_blocking,
-    SYSC_i2c_read_blocking,
-    SYSC_i2c_get_write_available,
-    SYSC_i2c_get_read_available,
-    SYSC_i2c_write_raw_blocking,
-    SYSC_i2c_read_raw_blocking,
-    SYSC_i2c_get_dreq,
-    // hardware/spi.h
-    SYSC_spi_init,
-    SYSC_spi_deinit,
-    SYSC_spi_set_baudrate,
-    SYSC_spi_get_baudrate,
-    SYSC_spi_get_index,
-    SYSC_spi_get_hw,
-    SYSC_spi_get_const_hw,
-    SYSC_spi_set_format,
-    SYSC_spi_set_slave,
-    SYSC_spi_is_writable,
-    SYSC_spi_is_readable,
-    SYSC_spi_is_busy,
-    SYSC_spi_write_read_blocking,
-    SYSC_spi_write_blocking,
-    SYSC_spi_read_blocking,
-    SYSC_spi_write16_read16_blocking,
-    SYSC_spi_write16_blocking,
-    SYSC_spi_read16_blocking,
-    SYSC_spi_get_dreq,
-#if WITH_IRQ
-    // hardware/irq.h
-    SYSC_irq_set_priority,
-    SYSC_irq_get_priority,
-    SYSC_irq_set_enabled,
-    SYSC_irq_is_enabled,
-    SYSC_irq_set_mask_enabled,
-    SYSC_irq_set_exclusive_handler,
-    SYSC_irq_get_exclusive_handler,
-    SYSC_irq_add_shared_handler,
-    SYSC_irq_remove_handler,
-#if SDK14
-    SYSC_irq_has_shared_handler,
-#endif
-    SYSC_irq_get_vtable_handler,
-    SYSC_irq_clear,
-    SYSC_irq_set_pending,
-    SYSC_irq_init_priorities,
-#if SDK14
-    SYSC_user_irq_claim,
-    SYSC_user_irq_unclaim,
-    SYSC_user_irq_claim_unused,
-    SYSC_user_irq_is_claimed,
-#endif
-#endif // WITH_IRQ
-    SYSC_last
-};
-
-static const struct {
-    char* name;
-    int etype;
-} externs[] = {
-    // stdio.h
-    // varargs
-    {"printf", 1},
-    {"sprintf", 1},
-    // io
-    {"getchar", 0},
-    {"getchar_timeout_us", 1},
-    {"putchar", 1},
-    {"open", 2},
-    {"opendir", 1},
-    {"close", 1},
-    {"read", 3},
-    {"readdir", 2},
-    {"write", 3},
-    {"lseek", 3},
-    {"rename", 2},
-    {"remove", 1},
-    {"screen_width", 0},
-    {"screen_height", 0},
-
-    // stdlib.h
-    {"malloc", 1},
-    {"free", 1},
-    {"atoi", 1},
-    {"rand", 0},
-    {"srand", 1},
-    {"exit", 1},
-    {"popcount", 1},
-
-    // string.h
-    {"strlen", 1},
-    {"strcpy", 2},
-    {"strncpy", 3},
-    {"strcmp", 2},
-    {"strncmp", 3},
-    {"strcat", 2},
-    {"strncat", 3},
-    {"strchr", 2},
-    {"strrchr", 2},
-    {"strdup", 1},
-    {"memcmp", 3},
-    {"memcpy", 3},
-    {"memset", 3},
-
-    // math.h
-    {"sqrtf", 1 | (1 << 5) | (1 << 10)},
-    {"sinf", 1 | (1 << 5) | (1 << 10)},
-    {"cosf", 1 | (1 << 5) | (1 << 10)},
-    {"tanf", 1 | (1 << 5) | (1 << 10)},
-    {"asinf", 1 | (1 << 5) | (1 << 10)},
-    {"acosf", 1 | (1 << 5) | (1 << 10)},
-    {"atanf", 1 | (1 << 5) | (1 << 10)},
-    {"atan2f", 2 | (2 << 5) | (0b11 << 10)},
-    {"sinhf", 1 | (1 << 5) | (1 << 10)},
-    {"coshf", 1 | (1 << 5) | (1 << 10)},
-    {"tanhf", 1 | (1 << 5) | (1 << 10)},
-    {"asinhf", 1 | (1 << 5) | (1 << 10)},
-    {"acoshf", 1 | (1 << 5) | (1 << 10)},
-    {"atanhf", 1 | (1 << 5) | (1 << 10)},
-    {"logf", 1 | (1 << 5) | (1 << 10)},
-    {"log10f", 1 | (1 << 5) | (1 << 10)},
-    {"powf", 2 | (2 << 5) | (0b11 << 10)},
-    {"fmodf", 2 | (2 << 5) | (0b11 << 10)},
-    // sync
-    {"wfi", 0},
-    // time
-    {"time_us_32", 0},
-    {"sleep_us", 1},
-    {"sleep_ms", 1},
-    // gpio
-    {"gpio_set_function", 2},
-    {"gpio_get_function", 1},
-    {"gpio_set_pulls", 3},
-    {"gpio_pull_up", 1},
-    {"gpio_is_pulled_up", 1},
-    {"gpio_pull_down", 1},
-    {"gpio_is_pulled_down", 1},
-    {"gpio_disable_pulls", 1},
-    {"gpio_set_irqover", 2},
-    {"gpio_set_outover", 2},
-    {"gpio_set_inover", 2},
-    {"gpio_set_oeover", 2},
-    {"gpio_set_input_enabled", 2},
-    {"gpio_set_input_hysteresis_enabled", 2},
-    {"gpio_is_input_hysteresis_enabled", 1},
-    {"gpio_set_slew_rate", 2},
-    {"gpio_get_slew_rate", 1},
-    {"gpio_set_drive_strength", 2},
-    {"gpio_get_drive_strength", 1},
-#if WITH_IRQ
-    {"gpio_set_irq_enabled", 3},
-#if SDK14
-    {"gpio_set_irq_callback", 1},
-#endif
-    {"gpio_set_irq_enabled_with_callback", 4},
-    {"gpio_set_dormant_irq_enabled", 3},
-#if SDK14
-    {"gpio_get_irq_event_mask", 1},
-#endif
-    {"gpio_acknowledge_irq", 2},
-#if SDK14
-    {"gpio_add_raw_irq_handler_with_order_priority_masked", 3},
-    {"gpio_add_raw_irq_handler_with_order_priority", 3},
-    {"gpio_add_raw_irq_handler_masked", 2},
-    {"gpio_add_raw_irq_handler", 2},
-    {"gpio_remove_raw_irq_handler_masked", 2},
-    {"gpio_remove_raw_irq_handler", 2},
-#endif
-#endif // WITH_IRQ
-    {"gpio_init", 1},
-    {"gpio_deinit", 1},
-    {"gpio_init_mask", 1},
-    {"gpio_get", 1},
-    {"gpio_get_all", 0},
-    {"gpio_set_mask", 1},
-    {"gpio_clr_mask", 1},
-    {"gpio_xor_mask", 1},
-    {"gpio_put_masked", 2},
-    {"gpio_put_all", 1},
-    {"gpio_put", 2},
-    {"gpio_get_out_level", 1},
-    {"gpio_set_dir_out_masked", 1},
-    {"gpio_set_dir_in_masked", 1},
-    {"gpio_set_dir_masked", 2},
-    {"gpio_set_dir_all_bits", 1},
-    {"gpio_set_dir", 2},
-    {"gpio_is_dir_out", 1},
-    {"gpio_get_dir", 1},
-    // PWM
-    {"pwm_gpio_to_slice_num", 1},
-    {"pwm_gpio_to_channel", 1},
-    {"pwm_config_set_phase_correct", 2},
-    {"pwm_config_set_clkdiv", 2 | (1 << 5) | (0b01 << 10)},
-    {"pwm_config_set_clkdiv_int_frac", 3},
-    {"pwm_config_set_clkdiv_int", 2},
-    {"pwm_config_set_clkdiv_mode", 2},
-    {"pwm_config_set_output_polarity", 3},
-    {"pwm_config_set_wrap", 2},
-    {"pwm_init", 3},
-    {"pwm_get_default_config", 0},
-    {"pwm_set_wrap", 2},
-    {"pwm_set_chan_level", 3},
-    {"pwm_set_both_levels", 3},
-    {"pwm_set_gpio_level", 2},
-    {"pwm_get_counter", 1},
-    {"pwm_set_counter", 2},
-    {"pwm_advance_count", 1},
-    {"pwm_retard_count", 1},
-    {"pwm_set_clkdiv_int_frac", 3},
-    {"pwm_set_clkdiv", 2},
-    {"pwm_set_output_polarity", 3},
-    {"pwm_set_clkdiv_mode", 2},
-    {"pwm_set_phase_correct", 2},
-    {"pwm_set_enabled", 2},
-    {"pwm_set_mask_enabled", 1},
-#if WITH_IRQ
-    {"pwm_set_irq_enabled", 2},
-    {"pwm_set_irq_mask_enabled", 2},
-    {"pwm_clear_irq", 1},
-    {"pwm_get_irq_status_mask", 0},
-    {"pwm_force_irq", 1},
-#endif
-    {"pwm_get_dreq", 1},
-    // ADC
-    {"adc_init", 0},
-    {"adc_gpio_init", 1},
-    {"adc_select_input", 1},
-    {"adc_get_selected_input", 0},
-    {"adc_set_round_robin", 1},
-    {"adc_set_temp_sensor_enabled", 1},
-    {"adc_read", 0},
-    {"adc_run", 1},
-    {"adc_set_clkdiv", 1},
-    {"adc_fifo_setup", 5},
-    {"adc_fifo_is_empty", 0},
-    {"adc_fifo_get_level", 0},
-    {"adc_fifo_get", 0},
-    {"adc_fifo_get_blocking", 0},
-    {"adc_fifo_drain", 0},
-    {"adc_irq_set_enabled", 1},
-    // CLOCKS
-    {"clocks_init", 0},
-    {"clock_configure", 5},
-    {"clock_stop", 1},
-    {"clock_get_hz", 1},
-    {"frequency_count_khz", 1},
-    {"clock_set_reported_hz", 2},
-    {"frequency_count_mhz", 1},
-    {"clocks_enable_resus", 1},
-    {"clock_gpio_init", 3},
-    {"clock_configure_gpin", 4},
-    // I2C
-    {"i2c_init", 2},
-    {"i2c_deinit", 1},
-    {"i2c_set_baudrate", 2},
-    {"i2c_set_slave_mode", 3},
-    {"i2c_hw_index", 1},
-    {"i2c_get_hw", 1},
-#if 0
-    {"i2c_write_blocking_until", 6},
-    {"i2c_read_blocking_until", 6},
-#endif
-    {"i2c_write_timeout_us", 6},
-    {"i2c_write_timeout_per_char_us", 6},
-    {"i2c_read_timeout_us", 6},
-    {"i2c_read_timeout_per_char_us", 6},
-    {"i2c_write_blocking", 5},
-    {"i2c_read_blocking", 5},
-    {"i2c_get_write_available", 1},
-    {"i2c_get_read_available", 1},
-    {"i2c_write_raw_blocking", 3},
-    {"i2c_read_raw_blocking", 3},
-    {"i2c_get_dreq", 2},
-    // SPI
-    {"spi_init", 2},
-    {"spi_deinit", 1},
-    {"spi_set_baudrate", 2},
-    {"spi_get_baudrate", 1},
-    {"spi_get_index", 1},
-    {"spi_get_hw", 1},
-    {"spi_get_const_hw", 1},
-    {"spi_set_format", 5},
-    {"spi_set_slave", 2},
-    {"spi_is_writable", 1},
-    {"spi_is_readable", 1},
-    {"spi_is_busy", 1},
-    {"spi_write_read_blocking", 4},
-    {"spi_write_blocking", 3},
-    {"spi_read_blocking", 4},
-    {"spi_write16_read16_blocking", 4},
-    {"spi_write16_blocking", 3},
-    {"spi_read16_blocking", 4},
-    {"spi_get_dreq", 2},
-    // IRQ
-    {"irq_set_priority", 2},
-    {"irq_get_priority", 1},
-    {"irq_set_enabled", 2},
-    {"irq_is_enabled", 1},
-    {"irq_set_mask_enabled", 2},
-    {"irq_set_exclusive_handler", 2},
-    {"irq_get_exclusive_handler", 1},
-    {"irq_add_shared_handler", 3},
-    {"irq_remove_handler", 2},
-#if SDK14
-    {"irq_has_shared_handler", 1},
-#endif
-    {"irq_get_vtable_handler", 1},
-    {"irq_clear", 1},
-    {"irq_set_pending", 1},
-    {"irq_init_priorities", 0},
-#if SDK14
-    {"user_irq_claim", 1},
-    {"user_irq_unclaim", 1},
-    {"user_irq_claim_unused", 1},
-    {"user_irq_is_claimed", 1},
-#endif
-
-    {0, 0}};
 
 struct define_grp {
     char* name;
@@ -1004,7 +486,18 @@ static struct define_grp spi_defines[] = {
     {"spi_default", (int)PICO_DEFAULT_SPI_INSTANCE},
     {0}};
 
-#if WITH_IRQ
+static struct define_grp math_defines[] = {{0}};
+
+static struct define_grp adc_defines[] = {{0}};
+
+static struct define_grp stdlib_defines[] = {{0}};
+
+static struct define_grp string_defines[] = {{0}};
+
+static struct define_grp time_defines[] = {{0}};
+
+static struct define_grp sync_defines[] = {{0}};
+
 static struct define_grp irq_defines[] = {
     // IRQ
     {"TIMER_IRQ_0", TIMER_IRQ_0},
@@ -1043,70 +536,25 @@ static struct define_grp irq_defines[] = {
     {"PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY",
      PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY},
     {0}};
-#endif // WITH_IRQ
 
-static struct {
-    char* name;
-    int extern_start;
-    struct define_grp* grp;
-} includes[] = {{"stdio", SYSC_printf, stdio_defines},
-                {"stdlib", SYSC_malloc, 0},
-                {"string", SYSC_strlen, 0},
-                {"math", SYSC_sqrtf, 0},
-                {"sync", SYSC_wfi, 0},
-                {"timer", SYSC_time_us_32, 0},
-                {"time", SYSC_sleep_us, 0},
-                {"gpio", SYSC_gpio_set_function, gpio_defines},
-                {"pwm", SYSC_pwm_gpio_to_slice_num, pwm_defines},
-                {"adc", SYSC_adc_init, 0},
-                {"clocks", SYSC_clocks_init, clk_defines},
-                {"i2c", SYSC_i2c_init, i2c_defines},
-                {"spi", SYSC_spi_init, spi_defines},
-#if WITH_IRQ
-                {"irq", SYSC_irq_set_priority, irq_defines},
-#endif
-                {0, SYSC_last}};
+// stubs for now
+void sys_close(void){};
+void sys_lseek(void){};
+void sys_open(void){};
+void sys_opendir(void){};
+void sys_popcount(void){};
+void sys_printf(void){};
+void sys_read(void){};
+void sys_readdir(void){};
+void sys_remove(void){};
+void sys_rename(void){};
+void sys_screen_height(void){};
+void sys_screen_width(void){};
+void sys_wfi(void){};
+void sys_write(void){};
 
 static jmp_buf done_jmp;
 static int* malloc_list;
-static lfs_file_t* fd;
-static char* fp;
-
-#if WITH_IRQ
-static struct {
-    bool enabled;
-    void* c_handler;
-} intrpt_vector[32];
-#endif
-
-struct file_handle {
-    struct file_handle* next;
-    bool is_dir;
-    union {
-        lfs_file_t file;
-        lfs_dir_t dir;
-    } u;
-} * file_list;
-
-static void clear_globals(void) {
-    e = le = text_base = NULL;
-    base_sp = cas = tsize = n = malloc_list =
-        (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
-    def = brks = cnts = NULL;
-    fd = NULL;
-    file_list = NULL;
-
-    swtc = brkc = cntc = tnew = tk = ty = loc = line = src_opt = trc_opt = ld = pplev = pplevt =
-        ir_count = 0;
-
-    memset(&tkv, 0, sizeof(tkv));
-    memset(ir_var, 0, sizeof(ir_var));
-    memset(&members, 0, sizeof(members));
-    memset(&done_jmp, 0, sizeof(&done_jmp));
-#if WITH_IRQ
-    memset(intrpt_vector, 0, sizeof(intrpt_vector));
-#endif
-}
 
 #define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
@@ -1171,12 +619,305 @@ static void sys_free(void* p) {
     die("corrupted memory");
 }
 
+static const struct {
+    char* name;
+    int etype;
+    struct define_grp* grp;
+    void* extrn;
+    int ret_float : 1;
+    int is_printf : 1;
+    int is_sprintf : 1;
+} externs[] = {
+    {"acosf", 1 | (1 << 5) | (1 << 10), math_defines, acosf, 1, 0, 0},
+    {"acoshf", 1 | (1 << 5) | (1 << 10), math_defines, acoshf, 1, 0, 0},
+    {"adc_fifo_drain", 0, adc_defines, adc_fifo_drain, 0, 0, 0},
+    {"adc_fifo_get", 0, adc_defines, adc_fifo_get, 0, 0, 0},
+    {"adc_fifo_get_blocking", 0, adc_defines, adc_fifo_get_blocking, 0, 0, 0},
+    {"adc_fifo_get_level", 0, adc_defines, adc_fifo_get_level, 0, 0, 0},
+    {"adc_fifo_is_empty", 0, adc_defines, adc_fifo_is_empty, 0, 0, 0},
+    {"adc_fifo_setup", 5, adc_defines, adc_fifo_setup, 0, 0, 0},
+    {"adc_get_selected_input", 0, adc_defines, adc_get_selected_input, 0, 0, 0},
+    {"adc_gpio_init", 1, adc_defines, adc_gpio_init, 0, 0, 0},
+    {"adc_init", 0, adc_defines, adc_init, 0, 0, 0},
+    {"adc_irq_set_enabled", 1, adc_defines, adc_irq_set_enabled, 0, 0, 0},
+    {"adc_read", 0, adc_defines, adc_read, 0, 0, 0},
+    {"adc_run", 1, adc_defines, adc_run, 0, 0, 0},
+    {"adc_select_input", 1, adc_defines, adc_select_input, 0, 0, 0},
+    {"adc_set_clkdiv", 1, adc_defines, adc_set_clkdiv, 0, 0, 0},
+    {"adc_set_round_robin", 1, adc_defines, adc_set_round_robin, 0, 0, 0},
+    {"adc_set_temp_sensor_enabled", 1, adc_defines, adc_set_temp_sensor_enabled, 0, 0, 0},
+    {"asinf", 1 | (1 << 5) | (1 << 10), math_defines, asinf, 1, 0, 0},
+    {"asinhf", 1 | (1 << 5) | (1 << 10), math_defines, asinhf, 1, 0, 0},
+    {"atan2f", 2 | (2 << 5) | (0b11 << 10), math_defines, atan2f, 1, 0, 0},
+    {"atanf", 1 | (1 << 5) | (1 << 10), math_defines, atanf, 1, 0, 0},
+    {"atanhf", 1 | (1 << 5) | (1 << 10), math_defines, atanhf, 1, 0, 0},
+    {"atoi", 1, stdlib_defines, atoi, 0, 0, 0},
+    {"clock_configure", 5, clk_defines, clock_configure, 0, 0, 0},
+    {"clock_configure_gpin", 4, clk_defines, clock_configure_gpin, 0, 0, 0},
+    {"clock_get_hz", 1, clk_defines, clock_get_hz, 0, 0, 0},
+    {"clock_gpio_init", 3, clk_defines, clock_gpio_init, 0, 0, 0},
+    {"clocks_enable_resus", 1, clk_defines, clocks_enable_resus, 0, 0, 0},
+    {"clock_set_reported_hz", 2, clk_defines, clock_set_reported_hz, 0, 0, 0},
+    {"clocks_init", 0, clk_defines, clocks_init, 0, 0, 0},
+    {"clock_stop", 1, clk_defines, clock_stop, 0, 0, 0},
+    {"close", 1, stdio_defines, sys_close, 0, 0, 0},
+    {"cosf", 1 | (1 << 5) | (1 << 10), math_defines, cosf, 1, 0, 0},
+    {"coshf", 1 | (1 << 5) | (1 << 10), math_defines, coshf, 1, 0, 0},
+    {"exit", 1, stdlib_defines, exit, 0, 0, 0},
+    {"fmodf", 2 | (2 << 5) | (0b11 << 10), math_defines, fmodf, 1, 0, 0},
+    {"free", 1, stdlib_defines, free, 0, 0, 0},
+    {"frequency_count_khz", 1, clk_defines, frequency_count_khz, 0, 0, 0},
+    {"frequency_count_mhz", 1, clk_defines, frequency_count_mhz, 0, 0, 0},
+    {"getchar", 0, stdio_defines, getchar, 0, 0, 0},
+    {"getchar_timeout_us", 1, stdio_defines, getchar_timeout_us, 0, 0, 0},
+    {"gpio_acknowledge_irq", 2, gpio_defines, gpio_acknowledge_irq, 0, 0, 0},
+    {"gpio_add_raw_irq_handler", 2, gpio_defines, gpio_add_raw_irq_handler, 0, 0, 0},
+    {"gpio_add_raw_irq_handler_masked", 2, gpio_defines, gpio_add_raw_irq_handler_masked, 0, 0, 0},
+    {"gpio_add_raw_irq_handler_with_order_priority", 3, gpio_defines,
+     gpio_add_raw_irq_handler_with_order_priority, 0, 0, 0},
+    {"gpio_add_raw_irq_handler_with_order_priority_masked", 3, gpio_defines,
+     gpio_add_raw_irq_handler_with_order_priority_masked, 0, 0, 0},
+    {"gpio_clr_mask", 1, gpio_defines, gpio_clr_mask, 0, 0, 0},
+    {"gpio_deinit", 1, gpio_defines, gpio_deinit, 0, 0, 0},
+    {"gpio_disable_pulls", 1, gpio_defines, gpio_disable_pulls, 0, 0, 0},
+    {"gpio_get", 1, gpio_defines, gpio_get, 0, 0, 0},
+    {"gpio_get_all", 0, gpio_defines, gpio_get_all, 0, 0, 0},
+    {"gpio_get_dir", 1, gpio_defines, gpio_get_dir, 0, 0, 0},
+    {"gpio_get_drive_strength", 1, gpio_defines, gpio_get_drive_strength, 0, 0, 0},
+    {"gpio_get_function", 1, gpio_defines, gpio_get_function, 0, 0, 0},
+    {"gpio_get_irq_event_mask", 1, gpio_defines, gpio_get_irq_event_mask, 0, 0, 0},
+    {"gpio_get_out_level", 1, gpio_defines, gpio_get_out_level, 0, 0, 0},
+    {"gpio_get_slew_rate", 1, gpio_defines, gpio_get_slew_rate, 0, 0, 0},
+    {"gpio_init", 1, gpio_defines, gpio_init, 0, 0, 0},
+    {"gpio_init_mask", 1, gpio_defines, gpio_init_mask, 0, 0, 0},
+    {"gpio_is_dir_out", 1, gpio_defines, gpio_is_dir_out, 0, 0, 0},
+    {"gpio_is_input_hysteresis_enabled", 1, gpio_defines, gpio_is_input_hysteresis_enabled, 0, 0,
+     0},
+    {"gpio_is_pulled_down", 1, gpio_defines, gpio_is_pulled_down, 0, 0, 0},
+    {"gpio_is_pulled_up", 1, gpio_defines, gpio_is_pulled_up, 0, 0, 0},
+    {"gpio_pull_down", 1, gpio_defines, gpio_pull_down, 0, 0, 0},
+    {"gpio_pull_up", 1, gpio_defines, gpio_pull_up, 0, 0, 0},
+    {"gpio_put", 2, gpio_defines, gpio_put, 0, 0, 0},
+    {"gpio_put_all", 1, gpio_defines, gpio_put_all, 0, 0, 0},
+    {"gpio_put_masked", 2, gpio_defines, gpio_put_masked, 0, 0, 0},
+    {"gpio_remove_raw_irq_handler", 2, gpio_defines, gpio_remove_raw_irq_handler, 0, 0, 0},
+    {"gpio_remove_raw_irq_handler_masked", 2, gpio_defines, gpio_remove_raw_irq_handler_masked, 0,
+     0, 0},
+    {"gpio_set_dir", 2, gpio_defines, gpio_set_dir, 0, 0, 0},
+    {"gpio_set_dir_all_bits", 1, gpio_defines, gpio_set_dir_all_bits, 0, 0, 0},
+    {"gpio_set_dir_in_masked", 1, gpio_defines, gpio_set_dir_in_masked, 0, 0, 0},
+    {"gpio_set_dir_masked", 2, gpio_defines, gpio_set_dir_masked, 0, 0, 0},
+    {"gpio_set_dir_out_masked", 1, gpio_defines, gpio_set_dir_out_masked, 0, 0, 0},
+    {"gpio_set_dormant_irq_enabled", 3, gpio_defines, gpio_set_dormant_irq_enabled, 0, 0, 0},
+    {"gpio_set_drive_strength", 2, gpio_defines, gpio_set_drive_strength, 0, 0, 0},
+    {"gpio_set_function", 2, gpio_defines, gpio_set_function, 0, 0, 0},
+    {"gpio_set_inover", 2, gpio_defines, gpio_set_inover, 0, 0, 0},
+    {"gpio_set_input_enabled", 2, gpio_defines, gpio_set_input_enabled, 0, 0, 0},
+    {"gpio_set_input_hysteresis_enabled", 2, gpio_defines, gpio_set_input_hysteresis_enabled, 0, 0,
+     0},
+    {"gpio_set_irq_callback", 1, gpio_defines, gpio_set_irq_callback, 0, 0, 0},
+    {"gpio_set_irq_enabled", 3, gpio_defines, gpio_set_irq_enabled, 0, 0, 0},
+    {"gpio_set_irq_enabled_with_callback", 4, gpio_defines, gpio_set_irq_enabled_with_callback, 0,
+     0, 0},
+    {"gpio_set_irqover", 2, gpio_defines, gpio_set_irqover, 0, 0, 0},
+    {"gpio_set_mask", 1, gpio_defines, gpio_set_mask, 0, 0, 0},
+    {"gpio_set_oeover", 2, gpio_defines, gpio_set_oeover, 0, 0, 0},
+    {"gpio_set_outover", 2, gpio_defines, gpio_set_outover, 0, 0, 0},
+    {"gpio_set_pulls", 3, gpio_defines, gpio_set_pulls, 0, 0, 0},
+    {"gpio_set_slew_rate", 2, gpio_defines, gpio_set_slew_rate, 0, 0, 0},
+    {"gpio_xor_mask", 1, gpio_defines, gpio_xor_mask, 0, 0, 0},
+    {"i2c_deinit", 1, i2c_defines, i2c_deinit, 0, 0, 0},
+    {"i2c_get_dreq", 2, i2c_defines, i2c_get_dreq, 0, 0, 0},
+    {"i2c_get_hw", 1, i2c_defines, i2c_get_hw, 0, 0, 0},
+    {"i2c_get_read_available", 1, i2c_defines, i2c_get_read_available, 0, 0, 0},
+    {"i2c_get_write_available", 1, i2c_defines, i2c_get_write_available, 0, 0, 0},
+    {"i2c_hw_index", 1, i2c_defines, i2c_hw_index, 0, 0, 0},
+    {"i2c_init", 2, i2c_defines, i2c_init, 0, 0, 0},
+    {"i2c_read_blocking", 5, i2c_defines, i2c_read_blocking, 0, 0, 0},
+    {"i2c_read_raw_blocking", 3, i2c_defines, i2c_read_raw_blocking, 0, 0, 0},
+    {"i2c_read_timeout_per_char_us", 6, i2c_defines, i2c_read_timeout_per_char_us, 0, 0, 0},
+    {"i2c_read_timeout_us", 6, i2c_defines, i2c_read_timeout_us, 0, 0, 0},
+    {"i2c_set_baudrate", 2, i2c_defines, i2c_set_baudrate, 0, 0, 0},
+    {"i2c_set_slave_mode", 3, i2c_defines, i2c_set_slave_mode, 0, 0, 0},
+    {"i2c_write_blocking", 5, i2c_defines, i2c_write_blocking, 0, 0, 0},
+    {"i2c_write_raw_blocking", 3, i2c_defines, i2c_write_raw_blocking, 0, 0, 0},
+    {"i2c_write_timeout_per_char_us", 6, i2c_defines, i2c_write_timeout_per_char_us, 0, 0, 0},
+    {"i2c_write_timeout_us", 6, i2c_defines, i2c_write_timeout_us, 0, 0, 0},
+    {"irq_add_shared_handler", 3, irq_defines, irq_add_shared_handler, 0, 0, 0},
+    {"irq_clear", 1, irq_defines, irq_clear, 0, 0, 0},
+    {"irq_get_exclusive_handler", 1, irq_defines, irq_get_exclusive_handler, 0, 0, 0},
+    {"irq_get_priority", 1, irq_defines, irq_get_priority, 0, 0, 0},
+    {"irq_get_vtable_handler", 1, irq_defines, irq_get_vtable_handler, 0, 0, 0},
+    {"irq_has_shared_handler", 1, irq_defines, irq_has_shared_handler, 0, 0, 0},
+    {"irq_init_priorities", 0, irq_defines, irq_init_priorities, 0, 0, 0},
+    {"irq_is_enabled", 1, irq_defines, irq_is_enabled, 0, 0, 0},
+    {"irq_remove_handler", 2, irq_defines, irq_remove_handler, 0, 0, 0},
+    {"irq_set_enabled", 2, irq_defines, irq_set_enabled, 0, 0, 0},
+    {"irq_set_exclusive_handler", 2, irq_defines, irq_set_exclusive_handler, 0, 0, 0},
+    {"irq_set_mask_enabled", 2, irq_defines, irq_set_mask_enabled, 0, 0, 0},
+    {"irq_set_pending", 1, irq_defines, irq_set_pending, 0, 0, 0},
+    {"irq_set_priority", 2, irq_defines, irq_set_priority, 0, 0, 0},
+    {"log10f", 1 | (1 << 5) | (1 << 10), math_defines, log10f, 1, 0, 0},
+    {"logf", 1 | (1 << 5) | (1 << 10), math_defines, logf, 1, 0, 0},
+    {"lseek", 3, stdio_defines, sys_lseek, 0, 0, 0},
+    {"malloc", 1, stdlib_defines, sys_malloc, 0, 0, 0},
+    {"memcmp", 3, string_defines, memcmp, 0, 0, 0},
+    {"memcpy", 3, string_defines, memcpy, 0, 0, 0},
+    {"memset", 3, string_defines, memset, 0, 0, 0},
+    {"open", 2, stdio_defines, sys_open, 0, 0, 0},
+    {"opendir", 1, stdio_defines, sys_opendir, 0, 0, 0},
+    {"popcount", 1, stdlib_defines, sys_popcount, 0, 0, 0},
+    {"powf", 2 | (2 << 5) | (0b11 << 10), math_defines, powf, 1, 0, 0},
+    {"printf", 1, stdio_defines, sys_printf, 0, 1, 0},
+    {"putchar", 1, stdio_defines, putchar, 0, 0, 0},
+    {"pwm_advance_count", 1, pwm_defines, pwm_advance_count, 0, 0, 0},
+    {"pwm_clear_irq", 1, pwm_defines, pwm_clear_irq, 0, 0, 0},
+    {"pwm_config_set_clkdiv", 2 | (1 << 5) | (0b01 << 10), pwm_defines, pwm_config_set_clkdiv, 0, 0,
+     0},
+    {"pwm_config_set_clkdiv_int", 2, pwm_defines, pwm_config_set_clkdiv_int, 0, 0, 0},
+    {"pwm_config_set_clkdiv_int_frac", 3, pwm_defines, pwm_config_set_clkdiv_int_frac, 0, 0, 0},
+    {"pwm_config_set_clkdiv_mode", 2, pwm_defines, pwm_config_set_clkdiv_mode, 0, 0, 0},
+    {"pwm_config_set_output_polarity", 3, pwm_defines, pwm_config_set_output_polarity, 0, 0, 0},
+    {"pwm_config_set_phase_correct", 2, pwm_defines, pwm_config_set_phase_correct, 0, 0, 0},
+    {"pwm_config_set_wrap", 2, pwm_defines, pwm_config_set_wrap, 0, 0, 0},
+    {"pwm_force_irq", 1, pwm_defines, pwm_force_irq, 0, 0, 0},
+    {"pwm_get_counter", 1, pwm_defines, pwm_get_counter, 0, 0, 0},
+    {"pwm_get_default_config", 0, pwm_defines, pwm_get_default_config, 0, 0, 0},
+    {"pwm_get_dreq", 1, pwm_defines, pwm_get_dreq, 0, 0, 0},
+    {"pwm_get_irq_status_mask", 0, pwm_defines, pwm_get_irq_status_mask, 0, 0, 0},
+    {"pwm_gpio_to_channel", 1, pwm_defines, pwm_gpio_to_channel, 0, 0, 0},
+    {"pwm_gpio_to_slice_num", 1, pwm_defines, pwm_gpio_to_slice_num, 0, 0, 0},
+    {"pwm_init", 3, pwm_defines, pwm_init, 0, 0, 0},
+    {"pwm_retard_count", 1, pwm_defines, pwm_retard_count, 0, 0, 0},
+    {"pwm_set_both_levels", 3, pwm_defines, pwm_set_both_levels, 0, 0, 0},
+    {"pwm_set_chan_level", 3, pwm_defines, pwm_set_chan_level, 0, 0, 0},
+    {"pwm_set_clkdiv", 2, pwm_defines, pwm_set_clkdiv, 0, 0, 0},
+    {"pwm_set_clkdiv_int_frac", 3, pwm_defines, pwm_set_clkdiv_int_frac, 0, 0, 0},
+    {"pwm_set_clkdiv_mode", 2, pwm_defines, pwm_set_clkdiv_mode, 0, 0, 0},
+    {"pwm_set_counter", 2, pwm_defines, pwm_set_counter, 0, 0, 0},
+    {"pwm_set_enabled", 2, pwm_defines, pwm_set_enabled, 0, 0, 0},
+    {"pwm_set_gpio_level", 2, pwm_defines, pwm_set_gpio_level, 0, 0, 0},
+    {"pwm_set_irq_enabled", 2, pwm_defines, pwm_set_irq_enabled, 0, 0, 0},
+    {"pwm_set_irq_mask_enabled", 2, pwm_defines, pwm_set_irq_mask_enabled, 0, 0, 0},
+    {"pwm_set_mask_enabled", 1, pwm_defines, pwm_set_mask_enabled, 0, 0, 0},
+    {"pwm_set_output_polarity", 3, pwm_defines, pwm_set_output_polarity, 0, 0, 0},
+    {"pwm_set_phase_correct", 2, pwm_defines, pwm_set_phase_correct, 0, 0, 0},
+    {"pwm_set_wrap", 2, pwm_defines, pwm_set_wrap, 0, 0, 0},
+    {"rand", 0, stdlib_defines, rand, 0, 0, 0},
+    {"read", 3, stdio_defines, sys_read, 0, 0, 0},
+    {"readdir", 2, stdio_defines, sys_readdir, 0, 0, 0},
+    {"remove", 1, stdio_defines, sys_remove, 0, 0, 0},
+    {"rename", 2, stdio_defines, sys_rename, 0, 0, 0},
+    {"screen_height", 0, stdio_defines, sys_screen_height, 0, 0, 0},
+    {"screen_width", 0, stdio_defines, sys_screen_width, 0, 0, 0},
+    {"sinf", 1 | (1 << 5) | (1 << 10), math_defines, sinf, 1, 0, 0},
+    {"sinhf", 1 | (1 << 5) | (1 << 10), math_defines, sinhf, 1, 0, 0},
+    {"sleep_ms", 1, time_defines, sleep_ms, 0, 0, 0},
+    {"sleep_us", 1, time_defines, sleep_us, 0, 0, 0},
+    {"spi_deinit", 1, spi_defines, spi_deinit, 0, 0, 0},
+    {"spi_get_baudrate", 1, spi_defines, spi_get_baudrate, 0, 0, 0},
+    {"spi_get_const_hw", 1, spi_defines, spi_get_const_hw, 0, 0, 0},
+    {"spi_get_dreq", 2, spi_defines, spi_get_dreq, 0, 0, 0},
+    {"spi_get_hw", 1, spi_defines, spi_get_hw, 0, 0, 0},
+    {"spi_get_index", 1, spi_defines, spi_get_index, 0, 0, 0},
+    {"spi_init", 2, spi_defines, spi_init, 0, 0, 0},
+    {"spi_is_busy", 1, spi_defines, spi_is_busy, 0, 0, 0},
+    {"spi_is_readable", 1, spi_defines, spi_is_readable, 0, 0, 0},
+    {"spi_is_writable", 1, spi_defines, spi_is_writable, 0, 0, 0},
+    {"spi_read16_blocking", 4, spi_defines, spi_read16_blocking, 0, 0, 0},
+    {"spi_read_blocking", 4, spi_defines, spi_read_blocking, 0, 0, 0},
+    {"spi_set_baudrate", 2, spi_defines, spi_set_baudrate, 0, 0, 0},
+    {"spi_set_format", 5, spi_defines, spi_set_format, 0, 0, 0},
+    {"spi_set_slave", 2, spi_defines, spi_set_slave, 0, 0, 0},
+    {"spi_write16_blocking", 3, spi_defines, spi_write16_blocking, 0, 0, 0},
+    {"spi_write16_read16_blocking", 4, spi_defines, spi_write16_read16_blocking, 0, 0, 0},
+    {"spi_write_blocking", 3, spi_defines, spi_write_blocking, 0, 0, 0},
+    {"spi_write_read_blocking", 4, spi_defines, spi_write_read_blocking, 0, 0, 0},
+    {"sprintf", 1, stdio_defines, sprintf, 0, 0, 1},
+    {"sqrtf", 1 | (1 << 5) | (1 << 10), math_defines, sqrtf, 1, 0, 0},
+    {"srand", 1, stdlib_defines, srand, 0, 0, 0},
+    {"strcat", 2, string_defines, strcat, 0, 0, 0},
+    {"strchr", 2, string_defines, strchr, 0, 0, 0},
+    {"strcmp", 2, string_defines, strcmp, 0, 0, 0},
+    {"strcpy", 2, string_defines, strcpy, 0, 0, 0},
+    {"strdup", 1, string_defines, strdup, 0, 0, 0},
+    {"strlen", 1, string_defines, strlen, 0, 0, 0},
+    {"strncat", 3, string_defines, strncat, 0, 0, 0},
+    {"strncmp", 3, string_defines, strncmp, 0, 0, 0},
+    {"strncpy", 3, string_defines, strncpy, 0, 0, 0},
+    {"strrchr", 2, string_defines, strrchr, 0, 0, 0},
+    {"tanf", 1 | (1 << 5) | (1 << 10), math_defines, tanf, 1, 0, 0},
+    {"tanhf", 1 | (1 << 5) | (1 << 10), math_defines, tanhf, 1, 0, 0},
+    {"time_us_32", 0, time_defines, time_us_32, 0, 0, 0},
+    {"user_irq_claim", 1, irq_defines, user_irq_claim, 0, 0, 0},
+    {"user_irq_claim_unused", 1, irq_defines, user_irq_claim_unused, 0, 0, 0},
+    {"user_irq_is_claimed", 1, irq_defines, user_irq_is_claimed, 0, 0, 0},
+    {"user_irq_unclaim", 1, irq_defines, user_irq_unclaim, 0, 0, 0},
+    {"wfi", 0, sync_defines, sys_wfi, 0, 0, 0},
+    {"write", 3, stdio_defines, sys_write, 0, 0, 0}};
+
+static struct {
+    char* name;
+    struct define_grp* grp;
+} includes[] = {{"stdio", stdio_defines},
+                {"stdlib", 0},
+                {"string", 0},
+                {"math", 0},
+                {"sync", 0},
+                {"timer", 0},
+                {"time", 0},
+                {"gpio", gpio_defines},
+                {"pwm", pwm_defines},
+                {"adc", 0},
+                {"clocks", clk_defines},
+                {"i2c", i2c_defines},
+                {"spi", spi_defines},
+                {"irq", irq_defines},
+                {0}};
+
+static lfs_file_t* fd;
+static char* fp;
+
+struct file_handle {
+    struct file_handle* next;
+    bool is_dir;
+    union {
+        lfs_file_t file;
+        lfs_dir_t dir;
+    } u;
+} * file_list;
+
+static void clear_globals(void) {
+    e = le = text_base = NULL;
+    base_sp = cas = tsize = n = malloc_list =
+        (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
+    def = brks = cnts = NULL;
+    fd = NULL;
+    file_list = NULL;
+
+    swtc = brkc = cntc = tnew = tk = ty = loc = line = src_opt = trc_opt = ld = pplev = pplevt =
+        ir_count = 0;
+
+    memset(&tkv, 0, sizeof(tkv));
+    memset(ir_var, 0, sizeof(ir_var));
+    memset(&members, 0, sizeof(members));
+    memset(&done_jmp, 0, sizeof(&done_jmp));
+}
+
+#define numof(a) (sizeof(a) / sizeof(a[0]))
+
 static int extern_getidx(char* name) // get cache index of external function
 {
-    int i, ext_addr = 0x1234;
-    for (i = 0; externs[i].name; ++i)
-        if (!strcmp(externs[i].name, name))
-            return i;
+    int first = 0, last = numof(externs) - 1, middle;
+    while (first <= last) {
+        middle = (first + last) / 2;
+        if (strcmp(externs[middle].name, name) < 0)
+            first = middle + 1;
+        else if (strcmp(externs[middle].name, name) > 0)
+            last = middle - 1;
+        else
+            return middle;
+    }
     return -1;
 }
 
@@ -1792,10 +1533,7 @@ static void expr(int lev) {
                 if (ix < 0)
                     die("Unknown external function %s", d->name);
                 d->val = ix;
-                d->type =
-                    (((ix >= SYSC_sqrtf) && (ix < SYSC_wfi)) || (ix == SYSC_frequency_count_mhz))
-                        ? FLOAT
-                        : INT;
+                d->type = externs[ix].ret_float ? FLOAT : INT;
                 d->etype = externs[ix].etype;
                 d->name[namelen] = ch;
             }
@@ -1828,7 +1566,7 @@ static void expr(int lev) {
             if (t > ADJ_MASK)
                 die("maximum of %d function parameters", ADJ_MASK);
             tt = (tt << 10) + (nf << 5) + t; // func etype not like other etype
-            if (d->etype != tt && d->val != SYSC_printf && d->val != SYSC_sprintf)
+            if (d->etype != tt && !externs[d->val].is_printf && externs[d->val].is_sprintf)
                 die("argument type mismatch");
             next();
             // function or system call id
@@ -3983,57 +3721,10 @@ static int common_vfunc(int ac, int sflag, int* sp) {
     return r;
 }
 
-static int show_strings(char** names, int n) {
-    int x, y, lc = 0;
-    get_screen_xy(&x, &y);
-    if (x > 80)
-        x -= 2;
-    char* lbuf = sys_malloc(x + 1);
-    printf("\n");
-    strcpy(lbuf, "  ");
-    strcat(lbuf, names[0]);
-    int cc = strlen(lbuf);
-    char* lp = lbuf + cc;
-    for (int i = 1; i < n; i++) {
-        int sl = strlen(names[i]) + 2;
-        if (cc + sl < x) {
-            strcat(lp, ", ");
-            strcat(lp, names[i]);
-            cc += sl;
-        } else {
-            printf("%s\n", lbuf);
-            strcpy(lbuf, "  ");
-            strcat(lbuf, names[i]);
-            cc = strlen(lbuf);
-            lp = lbuf + cc;
-        }
-    }
-    printf("%s\n", lbuf);
-}
-
-static int lex_comp(const void* p1, const void* p2) { return strcmp(*(char**)p1, *(char**)p2); }
-
 static void show_defines(struct define_grp* d) {
-    printf("\nsymbols:\n");
-    int l;
-    for (l = 0;; l++)
-        if (d[l].name == 0)
-            break;
-    char** names = sys_malloc(l * sizeof(char*));
-    for (int j = 0; j < l; j++)
-        names[j] = d[j].name;
-    qsort(names, l, sizeof(names[0]), lex_comp);
-    show_strings(names, l);
 }
 
 static void show_externals(int i) {
-    printf("\nfunctions:\n");
-    int l = includes[i + 1].extern_start - includes[i].extern_start;
-    char** names = sys_malloc(l * sizeof(char*));
-    for (int j = 0; j < l; j++)
-        names[j] = externs[j + includes[i].extern_start].name;
-    qsort(names, l, sizeof(names[0]), lex_comp);
-    show_strings(names, l);
 }
 
 static void help(char* lib) {
@@ -4169,9 +3860,7 @@ int cc(int argc, char** argv) {
     add_defines(clk_defines);
     add_defines(i2c_defines);
     add_defines(spi_defines);
-#if WITH_IRQ
     add_defines(irq_defines);
-#endif
 
     char* fn = sys_malloc(strlen(full_path(*argv)) + 3);
     strcpy(fn, full_path(*argv));
