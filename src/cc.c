@@ -4117,7 +4117,7 @@ static int run(void) {
         if (!run_level) {
 #endif
             uint32_t t = time_us_32();
-            if ((t ^ last_t) & 0x100000) {
+            if ((t - last_t) > 0x100000) {
                 last_t = t;
                 check_kbd_halt();
             }
