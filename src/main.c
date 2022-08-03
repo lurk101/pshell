@@ -4,10 +4,6 @@
  * You may use, distribute and modify this code under the
  * terms of the BSD 3 clause license, which unfortunately
  * won't be written for another century.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- *
- * A little flash file system manager for the Raspberry Pico
  */
 
 #include <ctype.h>

@@ -1888,7 +1888,10 @@ static void expr(int lev) {
             die("open parenthesis expected in sizeof");
         next();
         d = 0;
-        if (tk == Id) {
+        if (tk == Num || tk == NumF) {
+            ty = (Int - Char) << 2;
+            next();
+        } else if (tk == Id) {
             d = id;
             ty = d->type;
             next();
