@@ -63,7 +63,7 @@ typedef char buf_t[128];
 
 static uint32_t screen_x = 80, screen_y = 24;
 static lfs_file_t file;
-static buf_t cmd_buffer, curdir, path;
+static buf_t cmd_buffer, path, curdir = "/";
 buf_t result;
 static int argc;
 static char* argv[MAX_ARGS + 1];
@@ -97,15 +97,23 @@ char* full_path(const char* name) {
         return NULL;
     if (name[0] == '/') {
         strcpy(path, name);
-    } else if (curdir[0] == 0) {
-        strcpy(path, "/");
-        strcat(path, name);
-    } else {
-        strcpy(path, curdir);
-        if (name[0]) {
-            strcat(path, "/");
+        return path;
+    }
+    if (memcmp(name, "./", 2) == 0)
+        name += 2;
+    strcpy(path, curdir);
+    if (memcmp(name, "../", 3) != 0) {
+        if (name[0])
             strcat(path, name);
-        }
+    } else {
+        name += 3; // root doen't have a parent
+        char* cp = strrchr(path, '/');
+        if (cp != NULL)
+            *cp = 0;
+        cp = strrchr(path, '/');
+        if (cp != NULL)
+            *(cp + 1) = 0;
+        strcat(path, name);
     }
     return path;
 }
@@ -526,22 +534,25 @@ static void cd_cmd(void) {
     if (check_mount(true))
         return;
     if (argc < 2) {
-        curdir[0] = 0;
-        return;
+        strcpy(path, "/");
+        goto cd_done;
     }
+    if (strcmp(argv[1], ".") == 0)
+        goto cd_done;
     if (strcmp(argv[1], "..") == 0) {
-        if (curdir[0] == 0) {
+        if (strcmp(curdir, "/") == 0) {
             strcpy(result, "not a directory");
             return;
         }
-        int i;
-        for (i = strlen(curdir) - 1; i >= 0; i--)
-            if (curdir[i] == '/')
-                break;
-        if (i < 0)
-            i = 0;
-        curdir[i] = 0;
-        return;
+        strcpy(path, curdir);
+        char* cp = strrchr(path, '/');
+        if (cp == NULL)
+            cp = curdir;
+        *cp = 0;
+        cp = strrchr(path, '/');
+        if (cp != NULL)
+            *(cp + 1) = 0;
+        goto cd_done;
     }
     full_path(argv[1]);
     lfs_dir_t dir;
@@ -550,7 +561,10 @@ static void cd_cmd(void) {
         return;
     }
     fs_dir_close(&dir);
+cd_done:
     strcpy(curdir, path);
+    if (curdir[strlen(curdir) - 1] != '/')
+        strcat(curdir, "/");
     sprintf(result, "changed to %s", curdir);
 }
 
