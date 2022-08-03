@@ -23,40 +23,16 @@ if (PICO_SDK_VERSION_STRING VERSION_LESS "1.3.1")
     message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.3.1 (or later) required.")
 endif()
 
-# Get the current working branch
-execute_process(
-  COMMAND git rev-parse --abbrev-ref HEAD
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_BRANCH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-# Get the latest abbreviated commit hash of the working branch
-execute_process(
-  COMMAND git log -1 --format=%h
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_COMMIT_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
 execute_process(
   COMMAND git describe
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_V )
-
-string( REGEX MATCHALL "^v([0-9]*)\.([0-9]*)\.([0-9]*)" GIT_V_MATCHES ${GIT_V})
-set(PSHELL_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
-
-# Remove unused variables
-unset( GIT_V )
-unset( GIT_V_MATCHES )
+  OUTPUT_VARIABLE PSHELL_VERSION
+)
 
 add_compile_options("-DPICO_MALLOC_PANIC=0")
 add_compile_options("-DLFS_NO_ERROR")
 add_compile_options("-DLFS_NO_DEBUG")
 add_compile_options("-DLFS_NO_WARN")
-add_compile_options("-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH}")
-add_compile_options("-DGIT_BRANCH=${GIT_BRANCH}")
 add_compile_options("-DPSHELL_VERSION=${PSHELL_VERSION}")
 
 if (WITH_IRQ)

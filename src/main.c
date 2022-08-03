@@ -604,12 +604,10 @@ static void quit_cmd(void) {
 }
 
 static void version_cmd(void) {
-    const char* git_branch = STRINGIZE_VALUE_OF(GIT_BRANCH);
-    const char* git_hash = STRINGIZE_VALUE_OF(GIT_COMMIT_HASH);
     const char* pshell_version = STRINGIZE_VALUE_OF(PSHELL_VERSION);
-    printf("\nPico Shell v%s [%s %s], LittleFS v%d.%d, Vi " VI_VER ", SDK %d.%d.%d\n",
-           pshell_version, git_branch, git_hash, LFS_VERSION >> 16, LFS_VERSION & 0xffff,
-           PICO_SDK_VERSION_MAJOR, PICO_SDK_VERSION_MINOR, PICO_SDK_VERSION_REVISION);
+    printf("\nPico Shell %s, LittleFS v%d.%d, Vi " VI_VER ", SDK v%d.%d.%d\n", pshell_version,
+           LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR, PICO_SDK_VERSION_MINOR,
+           PICO_SDK_VERSION_REVISION);
 }
 
 // clang-format off
