@@ -68,6 +68,11 @@ extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 extern void get_screen_xy(int* x, int* y);
 
+struct patch_s {
+    struct patch_s* next;
+    int* addr;
+};
+
 static char *p, *lp;            // current position in source code
 static char* data;              // data/bss pointer
 static char* data_base;         // data/bss pointer
@@ -75,9 +80,9 @@ static char* src;               //
 static int* base_sp;            // stack
 static int *e, *le, *text_base; // current position in emitted code
 static int* cas;                // case statement patch-up pointer
-static int* def;                // default statement patch-up pointer
-static int* brks;               // break statement patch-up pointer
-static int* cnts;               // continue statement patch-up pointer
+static struct patch_s* def;     // default statement patch-up pointer
+static struct patch_s* brks;    // break statement patch-up pointer
+static struct patch_s* cnts;    // continue statement patch-up pointer
 static int swtc;                // !0 -> in a switch-stmt context
 static int brkc;                // !0 -> in a break-stmt context
 static int cntc;                // !0 -> in a continue-stmt context
@@ -126,7 +131,7 @@ struct ident_s {
     int type, htype;   // data type such as char and int
     int val, hval;
     int etype, hetype; // extended type info. different meaning for funcs.
-    int* forward;      // forward call list
+    int* forward;      // forward call patch address
 };
 
 struct ident_s *id,  // currently parsed identifier
@@ -1084,8 +1089,9 @@ struct file_handle {
 } * file_list;
 
 static void clear_globals(void) {
-    base_sp = e = le = text_base = cas = def = brks = cnts = tsize = n = malloc_list =
+    base_sp = e = le = text_base = cas = tsize = n = malloc_list =
         (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
+    def = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
 
@@ -2748,6 +2754,7 @@ static void gen(int* n) {
     int i = ast_Tk(n), j, k, l;
     int *a, *b, *c, *d, *t;
     struct ident_s* label;
+    struct patch_s* patch;
 
     switch (i) {
     case Num:
@@ -3058,45 +3065,48 @@ static void gen(int* n) {
             a = ++e;
         }
         d = (e + 1);
-        b = brks;
+        b = (int*)brks;
         brks = 0;
-        c = cnts;
+        c = (int*)cnts;
         cnts = 0;
         gen((int*)While_entry(n).body); // loop body
         if (i == While)
             *a = (int)(e + 1);
         while (cnts) {
-            t = (int*)*cnts;
-            *cnts = (int)(e + 1);
-            cnts = t;
+            t = (int*)cnts->next;
+            *cnts->addr = (int)(e + 1);
+            sys_free(cnts);
+            cnts = (struct patch_s*)t;
         }
-        cnts = c;
+        cnts = (struct patch_s*)c;
         gen((int*)While_entry(n).cond); // condition
         emit(BNZ);
         emit((int)d);
         while (brks) {
-            t = (int*)*brks;
-            *brks = (int)(e + 1);
-            brks = t;
+            t = (int*)brks->next;
+            *brks->addr = (int)(e + 1);
+            sys_free(brks);
+            brks = (struct patch_s*)t;
         }
-        brks = b;
+        brks = (struct patch_s*)b;
         break;
     case For:
         gen((int*)For_entry(n).init); // init
         emit(JMP);
         a = ++e;
         d = (e + 1);
-        b = brks;
+        b = (int*)brks;
         brks = 0;
-        c = cnts;
+        c = (int*)cnts;
         cnts = 0;
         gen((int*)For_entry(n).body); // loop body
         while (cnts) {
-            t = (int*)*cnts;
-            *cnts = (int)(e + 1);
-            cnts = t;
+            t = (int*)cnts->next;
+            *cnts->addr = (int)(e + 1);
+            sys_free(cnts);
+            cnts = (struct patch_s*)t;
         }
-        cnts = c;
+        cnts = (struct patch_s*)c;
         gen((int*)For_entry(n).incr); // increment
         *a = (int)(e + 1);
         if (For_entry(n).cond) {
@@ -3108,31 +3118,41 @@ static void gen(int* n) {
             emit((int)d);
         }
         while (brks) {
-            t = (int*)*brks;
-            *brks = (int)(e + 1);
-            brks = t;
+            t = (int*)brks->next;
+            *brks->addr = (int)(e + 1);
+            sys_free(brks);
+            brks = (struct patch_s*)t;
         }
-        brks = b;
+        brks = (struct patch_s*)b;
         break;
     case Switch:
         gen((int*)Switch_entry(n).cond); // condition
         a = cas;
         emit(JMP);
-        cas = ++e;
-        b = brks;
-        d = def;
-        brks = def = 0;
+        emit(0);
+        cas = e;
+        b = (int*)brks;
+        d = (int*)def;
+        def = 0;
+        brks = 0;
         gen((int*)Switch_entry(n).cas); // case statment
         // deal with no default inside switch case
-        *cas = def ? (int)def : (int)(e + 1);
+        if (def) {
+            t = (int*)def->next;
+            *cas = (int)def->addr;
+            sys_free(def);
+            def = (struct patch_s*)t;
+        } else
+            *cas = (int)(e + 1);
         cas = a;
         while (brks) {
-            t = (int*)*brks;
-            *brks = (int)(e + 1);
-            brks = t;
+            t = (int*)brks->next;
+            *brks->addr = (int)(e + 1);
+            sys_free(brks);
+            brks = (struct patch_s*)t;
         }
-        brks = b;
-        def = d;
+        brks = (struct patch_s*)b;
+        def = (struct patch_s*)d;
         break;
     case Case:
         emit(JMP);
@@ -3157,13 +3177,19 @@ static void gen(int* n) {
         break;
     case Break:
         emit(JMP);
-        emit((int)brks);
-        brks = e;
+        emit(0);
+        patch = sys_malloc(sizeof(struct patch_s));
+        patch->addr = e;
+        patch->next = brks;
+        brks = patch;
         break;
     case Continue:
         emit(JMP);
-        emit((int)cnts);
-        cnts = e;
+        emit(0);
+        patch = sys_malloc(sizeof(struct patch_s));
+        patch->next = cnts;
+        patch->addr = e;
+        cnts = patch;
         break;
     case Goto:
         label = (struct ident_s*)ast_NumVal(n);
@@ -3173,7 +3199,10 @@ static void gen(int* n) {
             label->val = (int)e; // Define label address later
         break;
     case Default:
-        def = e + 1;
+        patch = sys_malloc(sizeof(struct patch_s));
+        patch->next = def;
+        patch->addr = e + 1;
+        def = patch;
         gen((int*)ast_NumVal(n));
         break;
     case Return:
@@ -5086,7 +5115,7 @@ static int run(void) {
 #endif
             return a.i;
         default:
-            run_die("unknown instruction = %d %s!\n", i);
+            run_die("unknown instruction = 0x%08x!\n", i);
         }
     }
 exit_called:
