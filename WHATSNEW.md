@@ -1,3 +1,8 @@
+What's new in version 1.1.15
+
+- fix handling of . and .. notation for directory names
+- allow for(;;) synctax. Passes test 00034.c
+
 What's new in version 1.1.14
 
 - fix USB buffer overflow pasting in Vi
