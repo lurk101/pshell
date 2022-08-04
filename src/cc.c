@@ -705,13 +705,13 @@ static int wrap_rename(char* old, char* new) {
 
 static int wrap_screen_height(void) {
     int x, y;
-    get_screen_xy(&y, &x);
+    get_screen_xy(&x, &y);
     return y;
 }
 
 static int wrap_screen_width(void) {
     int x, y;
-    get_screen_xy(&y, &x);
+    get_screen_xy(&x, &y);
     return x;
 }
 
@@ -970,15 +970,14 @@ static struct {
     char* name;
     struct define_grp* grp;
 } includes[] = {{"stdio", stdio_defines},
-                {"stdlib", 0},
-                {"string", 0},
-                {"math", 0},
-                {"sync", 0},
-                {"timer", 0},
-                {"time", 0},
+                {"stdlib", stdlib_defines},
+                {"string", string_defines},
+                {"math", math_defines},
+                {"sync", sync_defines},
+                {"time", time_defines},
                 {"gpio", gpio_defines},
                 {"pwm", pwm_defines},
-                {"adc", 0},
+                {"adc", adc_defines},
                 {"clocks", clk_defines},
                 {"i2c", i2c_defines},
                 {"spi", spi_defines},
@@ -3822,10 +3821,55 @@ static int common_vfunc(int ac, int sflag, int* sp) {
     return r;
 }
 
-static void show_defines(struct define_grp* d) {
+static void show_defines(struct define_grp* grp) {
+	if (grp->name == 0)
+		return;
+	printf("\nPredefined symbols:\n\n");
+	int x,y;
+	get_screen_xy(&x, &y);
+	int pos = 0;
+	for (;grp->name; grp++) {
+		if (pos == 0) {
+			pos = strlen(grp->name);
+			printf("%s", grp->name);
+		}
+		else {
+			if (pos + strlen(grp->name) + 2 > x) {
+				pos = strlen(grp->name);
+				printf("\n%s", grp->name);
+			} else {
+				pos += strlen(grp->name) + 2;
+				printf(", %s", grp->name);
+			}
+		}
+	}
+	if (pos)
+		printf("\n");
 }
 
 static void show_externals(int i) {
+	printf("\nFunctions:\n\n");
+	int x,y;
+	get_screen_xy(&x, &y);
+	int pos = 0;
+	for (int j = 0; j < numof(externs); j++)
+		if (externs[j].grp == includes[i].grp) {
+			if (pos == 0) {
+				pos = strlen(externs[j].name);
+				printf("%s", externs[j].name);
+			}
+			else {
+				if (pos + strlen(externs[j].name) + 2 > x) {
+					pos = strlen(externs[j].name);
+					printf("\n%s", externs[j].name);
+				} else {
+					pos += strlen(externs[j].name) + 2;
+					printf(", %s", externs[j].name);
+				}
+			}
+		}
+	if (pos)
+		printf("\n");
 }
 
 static void help(char* lib) {
@@ -3840,8 +3884,7 @@ static void help(char* lib) {
                "    filename\n"
                "            C source file name.\n"
                "Libraries:\n"
-               "    %s",
-               includes[0].name);
+               "    %s", includes[0]);
         for (int i = 1; includes[i].name; i++) {
             printf(", %s", includes[i].name);
             if ((i % 8) == 0 && includes[i + 1].name)
