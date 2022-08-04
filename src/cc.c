@@ -69,10 +69,15 @@ extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 extern void get_screen_xy(int* x, int* y);
 
+enum {
+    pc_relative = 0,
+};
+
 struct patch_s {
     struct patch_s* next;
     uint16_t* addr;
     int val;
+    int patch_type;
 };
 
 static char *p, *lp;            // current position in source code
@@ -2182,7 +2187,9 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
     } while (1);
 }
 
-static void old_emit(int n) {}
+static void old_emit(int n) {
+    // e = 0;
+}
 
 static void emit(uint16_t n) {
     if (e >= text_base + (TEXT_BYTES / sizeof(*e)))
@@ -2201,7 +2208,7 @@ static void emit_Word(uint32_t n) {
 }
 
 static void emit_ENT(int n) {
-    emit(0xb580);             // push {r7, lr}
+    emit(0xb5f0);             // push    {r4, r5, r6, r7, lr}
     emit(0x466f);             // mov  r7, sp
     if (n) {                  //
         if (n < 128)          //
@@ -2212,6 +2219,7 @@ static void emit_ENT(int n) {
             struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
             l->addr = e - 1;
             l->val = loc - ld;
+            l->patch_type = pc_relative;
             l->next = lit;
             lit = l;
         }
@@ -2220,17 +2228,42 @@ static void emit_ENT(int n) {
 
 static void emit_LEV(void) {
     emit(0x46bd);          // mov sp, r7
-    emit(0xbd80);          // pop {r7, pc}
+    emit(0xbdf0);          // pop {r4, r5, r6, r7, pc}
     if (((int)e & 2) == 0) //
-        emit(0x46c0);      // nop         ; (mov r8, r8)
+        emit(0x46c0);      // nop ; (mov r8, r8)
+}
+
+static void patch_literals(void) {
     while (lit) {
         emit_Word(lit->val);
-        *lit->addr |= (e - lit->addr - 2) / 2;
+        switch (lit->patch_type) {
+        case pc_relative:
+            *lit->addr |= ((int)e - ((int)lit->addr & ~3)) / 4 - 1;
+            break;
+        default:
+            fatal("unexpected compiler error");
+        }
         struct patch_s* tlit = lit->next;
         sys_free(lit);
         lit = tlit;
     }
 }
+
+static void emit_IMM(int n) {
+    if (n < 256)          //
+        emit(0x2600 | n); // movs r6, #n
+    else {                //
+        emit(0x4e00);     // ldr r6, [pc, n]
+        struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
+        l->addr = e;
+        l->val = n;
+        l->patch_type = pc_relative;
+        l->next = lit;
+        lit = l;
+    }
+}
+
+static void emit_IMMF(int n) { emit_IMM(n); }
 
 // AST parsing for IR generatiion
 // With a modular code generator, new targets can be easily supported such as
@@ -2243,12 +2276,10 @@ static void gen(int* n) {
 
     switch (i) {
     case Num:
-        old_emit(IMM);
-        old_emit(ast_NumVal(n));
+        emit_IMM(ast_NumVal(n));
         break; // int value
     case NumF:
-        old_emit(IMMF);
-        old_emit(ast_NumVal(n));
+        emit_IMMF(ast_NumVal(n));
         break; // float value
     case Load:
         gen(n + 2);                                           // load the value
@@ -2285,8 +2316,7 @@ static void gen(int* n) {
         old_emit(PSH);
         old_emit((ast_NumVal(n) == CHAR) ? LC : LI);
         old_emit(PSH);
-        old_emit(IMM);
-        old_emit((ast_NumVal(n) >= PTR2)
+        emit_IMM((ast_NumVal(n) >= PTR2)
                      ? sizeof(int)
                      : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1));
         old_emit((i == Inc) ? ADD : SUB);
@@ -2528,10 +2558,8 @@ static void gen(int* n) {
                 b = (uint16_t*)t[j];
             }
             sys_free(t);
-            if (i == Syscall) {
-                old_emit(IMM);
-                old_emit((sj + 1) | ((Func_entry(n).parm_types >> 10) << 10));
-            }
+            if (i == Syscall)
+                emit_IMM((sj + 1) | ((Func_entry(n).parm_types >> 10) << 10));
         }
         if (i == Syscall)
             old_emit(SYSC);
@@ -2699,8 +2727,9 @@ static void gen(int* n) {
     case Enter:
         emit_ENT(ast_NumVal(n));
         gen(n + 2);
-        if (*e != LEV)
-            emit_LEV();
+        if (*(e - 2) != 0x46bd && *(e - 1) != 0xbdf0)
+            emit_LEV(); // don't issue it again if already emitted by return stmt
+        patch_literals();
         break;
     case Label: // target of goto
         label = (struct ident_s*)ast_NumVal(n);
@@ -3033,7 +3062,7 @@ static void stmt(int ctx) {
                     ARMSTATE state;
                     disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
                     disasm_address(&state, (int)(se + 1));
-                    while (state.address + state.size < (int)(e - 1)) {
+                    while (state.address < (int)(e - 1)) {
                         uint16_t* nxt = (uint16_t*)(state.address + state.size);
                         disasm_thumb(&state, *nxt, *(nxt + 1));
                         printf("%s\n", state.text);
