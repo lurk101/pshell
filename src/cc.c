@@ -156,84 +156,7 @@ static struct member_s** members; // array (indexed by type) of struct member li
 // tokens and classes (operators last and in precedence order)
 // ( >= 128 so not to collide with ASCII-valued tokens)
 enum {
-    Func = 128,
-    Syscall,
-    Main,
-    Glo,
-    Par,
-    Loc,
-    Keyword,
-    Id,
-    Load,
-    Enter,
-    Num,
-    NumF,
-    Enum,
-    Char,
-    Int,
-    Float,
-    Struct,
-    Union,
-    Sizeof,
-    Return,
-    Goto,
-    Break,
-    Continue,
-    If,
-    DoWhile,
-    While,
-    For,
-    Switch,
-    Case,
-    Default,
-    Else,
-    Label,
-    Assign,   // operator =, keep Assign as highest priority operator
-    OrAssign, // |=, ^=, &=, <<=, >>=
-    XorAssign,
-    AndAssign,
-    ShlAssign,
-    ShrAssign,
-    AddAssign, // +=, -=, *=, /=, %=
-    SubAssign,
-    MulAssign,
-    DivAssign,
-    ModAssign,
-    Cond, // operator: ?
-    Lor,  // operator: ||, &&, |, ^, &
-    Lan,
-    Or,
-    Xor,
-    And,
-    Eq, // operator: ==, !=, >=, <, >, <=
-    Ne,
-    Ge,
-    Lt,
-    Gt,
-    Le,
-    Shl, // operator: <<, >>, +, -, *, /, %
-    Shr,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    AddF, // float type operators (hidden)
-    SubF,
-    MulF,
-    DivF,
-    EqF,
-    NeF,
-    GeF,
-    LtF,
-    GtF,
-    LeF,
-    CastF,
-    Inc, // operator: ++, --, ., ->, [
-    Dec,
-    Dot,
-    Arrow,
-    Bracket
+#include "cc_tokns.h"
 };
 
 // opcodes
@@ -252,130 +175,38 @@ enum {
  */
 enum {
     LEA, /*  0 */
-    /* LEA addressed the problem how to fetch arguments inside sub-function.
-     * Let's check out what a calling frame looks like before learning how
-     * to fetch arguments (Note that arguments are pushed in its calling
-     * order):
-     *
-     *     sub_function(arg1, arg2, arg3);
-     *
-     *     |    ....       | high address
-     *     +---------------+
-     *     | arg: 1        |    new_bp + 4
-     *     +---------------+
-     *     | arg: 2        |    new_bp + 3
-     *     +---------------+
-     *     | arg: 3        |    new_bp + 2
-     *     +---------------+
-     *     |return address |    new_bp + 1
-     *     +---------------+
-     *     | old BP        | <- new BP
-     *     +---------------+
-     *     | local var 1   |    new_bp - 1
-     *     +---------------+
-     *     | local var 2   |    new_bp - 2
-     *     +---------------+
-     *     |    ....       |  low address
-     *
-     * If we need to refer to arg1, we need to fetch new_bp + 4, which can not
-     * be achieved by restricted ADD instruction. Thus another special
-     * instrcution is introduced to do this: LEA <offset>.
-     * Together with JSR, ENT, ADJ, LEV, and LEA instruction, we are able to
-     * make function calls.
-     */
-    IMM, //  1
-    /* IMM <num> to put immediate <num> into R0 */
-    IMMF, // 2
-    /* IMM <num> to put immediate <num> into S0 */
-    JMP, /*  3 */
-    /* JMP <addr> will unconditionally set the value PC register to <addr> */
-    JSR, /*  4 */
-    /* Jump to address, setting link register for return address */
-    BZ,  /*  5 : conditional jump if R0 is zero (jump-if-zero) */
-    BNZ, /*  6 : conditional jump if R0 is not zero */
-    ENT, /*  7 */
-    /* ENT <size> is called when we are about to enter the function call to
-     * "make a new calling frame". It will store the current PC value onto
-     * the stack, and save some space(<size> bytes) to store the local
-     * variables for function.
-     */
-    ADJ, /*  8 */
-    /* ADJ <size> is to adjust the stack, to "remove arguments from frame"
-     * The following pseudocode illustrates how ADJ works:
-     *     if (op == ADJ) { sp += *pc++; } // add esp, <size>
-     */
-    LEV, /*  9 */
-    /* LEV fetches bookkeeping info to resume previous execution.
-     * There is no POP instruction in our design, and the following pseudocode
-     * illustrates how LEV works:
-     *     if (op == LEV) { sp = bp; bp = (int *) *sp++;
-     *                  pc = (int *) *sp++; } // restore call frame and PC
-     */
-    PSH, /* 10 */
-    /* PSH pushes the value in R0 onto the stack */
-    PSHF, /* 11 */
-    /* PSH pushes the value in R0 onto the stack */
-    LC, /* 12 */
-    /* LC loads a character into R0 from a given memory
-     * address which is stored in R0 before execution.
-     */
-    LI, /* 13 */
-    /* LI loads an integer into R0 from a given memory
-     * address which is stored in R0 before execution.
-     */
-    LF, /* 14 */
-    /* LI loads a float into S0 from a given memory
-     * address which is stored in R0 before execution.
-     */
-    SC, /* 15 */
-    /* SC stores the character in R0 into the memory whose
-     * address is stored on the top of the stack.
-     */
-    SI, /* 16 */
-    /* SI stores the integer in R0 into the memory whose
-     * address is stored on the top of the stack.
-     */
-    SF, /* 17 */
-    /* SI stores the float in S0 into the memory whose
-     * address is stored on the top of the stack.
-     */
-    OR,   // 18 */
-    XOR,  // 19 */
-    AND,  // 20 */
-    EQ,   // 21 */
-    NE,   // 22 */
-    GE,   // 23 */
-    LT,   // 24 */
-    GT,   // 25 */
-    LE,   // 26 */
-    SHL,  // 27 */
-    SHR,  // 28 */
-    ADD,  // 29 */
-    SUB,  // 30 */
-    MUL,  // 31 */
-    DIV,  // 32 */
-    MOD,  // 33 */
-    ADDF, // 34 */
-    SUBF, // 35 */
-    MULF, // 36 */
-    DIVF, // 37 */
-    FTOI, // 38 */
-    ITOF, // 39 */
-    EQF,  // 40 */
-    NEF,  // 41 */
-    GEF,  // 42 */
-    LTF,  // 43 */
-    GTF,  // 44 */
-    LEF,  // 45 */
-    /* arithmetic instructions
-     * Each operator has two arguments: the first one is stored on the top
-     * of the stack while the second is stored in R0.
-     * After the calculation is done, the argument on the stack will be poped
-     * off and the result will be stored in R0.
-     */
-    SYSC, /* 46 system call */
-    EXIT,
-    INVALID
+/* LEA addressed the problem how to fetch arguments inside sub-function.
+ * Let's check out what a calling frame looks like before learning how
+ * to fetch arguments (Note that arguments are pushed in its calling
+ * order):
+ *
+ *     sub_function(arg1, arg2, arg3);
+ *
+ *     |    ....       | high address
+ *     +---------------+
+ *     | arg: 1        |    new_bp + 4
+ *     +---------------+
+ *     | arg: 2        |    new_bp + 3
+ *     +---------------+
+ *     | arg: 3        |    new_bp + 2
+ *     +---------------+
+ *     |return address |    new_bp + 1
+ *     +---------------+
+ *     | old BP        | <- new BP
+ *     +---------------+
+ *     | local var 1   |    new_bp - 1
+ *     +---------------+
+ *     | local var 2   |    new_bp - 2
+ *     +---------------+
+ *     |    ....       |  low address
+ *
+ * If we need to refer to arg1, we need to fetch new_bp + 4, which can not
+ * be achieved by restricted ADD instruction. Thus another special
+ * instrcution is introduced to do this: LEA <offset>.
+ * Together with JSR, ENT, ADJ, LEV, and LEA instruction, we are able to
+ * make function calls.
+ */
+#include "cc_ops.h"
 };
 
 static const char* instr_str[] = {
@@ -737,237 +568,8 @@ static const struct {
     int is_printf : 1;
     int is_sprintf : 1;
 } externs[] = {
-    {"acosf", 1 | (1 << 5) | (1 << 10), math_defines, acosf, 1, 0, 0},
-    {"acoshf", 1 | (1 << 5) | (1 << 10), math_defines, acoshf, 1, 0, 0},
-    {"adc_fifo_drain", 0, adc_defines, adc_fifo_drain, 0, 0, 0},
-    {"adc_fifo_get", 0, adc_defines, adc_fifo_get, 0, 0, 0},
-    {"adc_fifo_get_blocking", 0, adc_defines, adc_fifo_get_blocking, 0, 0, 0},
-    {"adc_fifo_get_level", 0, adc_defines, adc_fifo_get_level, 0, 0, 0},
-    {"adc_fifo_is_empty", 0, adc_defines, adc_fifo_is_empty, 0, 0, 0},
-    {"adc_fifo_setup", 5, adc_defines, adc_fifo_setup, 0, 0, 0},
-    {"adc_get_selected_input", 0, adc_defines, adc_get_selected_input, 0, 0, 0},
-    {"adc_gpio_init", 1, adc_defines, adc_gpio_init, 0, 0, 0},
-    {"adc_init", 0, adc_defines, adc_init, 0, 0, 0},
-    {"adc_irq_set_enabled", 1, adc_defines, adc_irq_set_enabled, 0, 0, 0},
-    {"adc_read", 0, adc_defines, adc_read, 0, 0, 0},
-    {"adc_run", 1, adc_defines, adc_run, 0, 0, 0},
-    {"adc_select_input", 1, adc_defines, adc_select_input, 0, 0, 0},
-    {"adc_set_clkdiv", 1, adc_defines, adc_set_clkdiv, 0, 0, 0},
-    {"adc_set_round_robin", 1, adc_defines, adc_set_round_robin, 0, 0, 0},
-    {"adc_set_temp_sensor_enabled", 1, adc_defines, adc_set_temp_sensor_enabled, 0, 0, 0},
-    {"asinf", 1 | (1 << 5) | (1 << 10), math_defines, asinf, 1, 0, 0},
-    {"asinhf", 1 | (1 << 5) | (1 << 10), math_defines, asinhf, 1, 0, 0},
-    {"atan2f", 2 | (2 << 5) | (0b11 << 10), math_defines, atan2f, 1, 0, 0},
-    {"atanf", 1 | (1 << 5) | (1 << 10), math_defines, atanf, 1, 0, 0},
-    {"atanhf", 1 | (1 << 5) | (1 << 10), math_defines, atanhf, 1, 0, 0},
-    {"atoi", 1, stdlib_defines, atoi, 0, 0, 0},
-    {"clock_configure", 5, clk_defines, clock_configure, 0, 0, 0},
-    {"clock_configure_gpin", 4, clk_defines, clock_configure_gpin, 0, 0, 0},
-    {"clock_get_hz", 1, clk_defines, clock_get_hz, 0, 0, 0},
-    {"clock_gpio_init", 3, clk_defines, clock_gpio_init, 0, 0, 0},
-    {"clocks_enable_resus", 1, clk_defines, clocks_enable_resus, 0, 0, 0},
-    {"clock_set_reported_hz", 2, clk_defines, clock_set_reported_hz, 0, 0, 0},
-    {"clocks_init", 0, clk_defines, clocks_init, 0, 0, 0},
-    {"clock_stop", 1, clk_defines, clock_stop, 0, 0, 0},
-    {"close", 1, stdio_defines, wrap_close, 0, 0, 0},
-    {"cosf", 1 | (1 << 5) | (1 << 10), math_defines, cosf, 1, 0, 0},
-    {"coshf", 1 | (1 << 5) | (1 << 10), math_defines, coshf, 1, 0, 0},
-    {"exit", 1, stdlib_defines, exit, 0, 0, 0},
-    {"fmodf", 2 | (2 << 5) | (0b11 << 10), math_defines, fmodf, 1, 0, 0},
-    {"free", 1, stdlib_defines, sys_free, 0, 0, 0},
-    {"frequency_count_khz", 1, clk_defines, frequency_count_khz, 0, 0, 0},
-    {"frequency_count_mhz", 1, clk_defines, frequency_count_mhz, 0, 0, 0},
-    {"getchar", 0, stdio_defines, getchar, 0, 0, 0},
-    {"getchar_timeout_us", 1, stdio_defines, getchar_timeout_us, 0, 0, 0},
-    {"gpio_acknowledge_irq", 2, gpio_defines, gpio_acknowledge_irq, 0, 0, 0},
-    {"gpio_add_raw_irq_handler", 2, gpio_defines, gpio_add_raw_irq_handler, 0, 0, 0},
-    {"gpio_add_raw_irq_handler_masked", 2, gpio_defines, gpio_add_raw_irq_handler_masked, 0, 0, 0},
-    {"gpio_add_raw_irq_handler_with_order_priority", 3, gpio_defines,
-     gpio_add_raw_irq_handler_with_order_priority, 0, 0, 0},
-    {"gpio_add_raw_irq_handler_with_order_priority_masked", 3, gpio_defines,
-     gpio_add_raw_irq_handler_with_order_priority_masked, 0, 0, 0},
-    {"gpio_clr_mask", 1, gpio_defines, gpio_clr_mask, 0, 0, 0},
-    {"gpio_deinit", 1, gpio_defines, gpio_deinit, 0, 0, 0},
-    {"gpio_disable_pulls", 1, gpio_defines, gpio_disable_pulls, 0, 0, 0},
-    {"gpio_get", 1, gpio_defines, gpio_get, 0, 0, 0},
-    {"gpio_get_all", 0, gpio_defines, gpio_get_all, 0, 0, 0},
-    {"gpio_get_dir", 1, gpio_defines, gpio_get_dir, 0, 0, 0},
-    {"gpio_get_drive_strength", 1, gpio_defines, gpio_get_drive_strength, 0, 0, 0},
-    {"gpio_get_function", 1, gpio_defines, gpio_get_function, 0, 0, 0},
-    {"gpio_get_irq_event_mask", 1, gpio_defines, gpio_get_irq_event_mask, 0, 0, 0},
-    {"gpio_get_out_level", 1, gpio_defines, gpio_get_out_level, 0, 0, 0},
-    {"gpio_get_slew_rate", 1, gpio_defines, gpio_get_slew_rate, 0, 0, 0},
-    {"gpio_init", 1, gpio_defines, gpio_init, 0, 0, 0},
-    {"gpio_init_mask", 1, gpio_defines, gpio_init_mask, 0, 0, 0},
-    {"gpio_is_dir_out", 1, gpio_defines, gpio_is_dir_out, 0, 0, 0},
-    {"gpio_is_input_hysteresis_enabled", 1, gpio_defines, gpio_is_input_hysteresis_enabled, 0, 0,
-     0},
-    {"gpio_is_pulled_down", 1, gpio_defines, gpio_is_pulled_down, 0, 0, 0},
-    {"gpio_is_pulled_up", 1, gpio_defines, gpio_is_pulled_up, 0, 0, 0},
-    {"gpio_pull_down", 1, gpio_defines, gpio_pull_down, 0, 0, 0},
-    {"gpio_pull_up", 1, gpio_defines, gpio_pull_up, 0, 0, 0},
-    {"gpio_put", 2, gpio_defines, gpio_put, 0, 0, 0},
-    {"gpio_put_all", 1, gpio_defines, gpio_put_all, 0, 0, 0},
-    {"gpio_put_masked", 2, gpio_defines, gpio_put_masked, 0, 0, 0},
-    {"gpio_remove_raw_irq_handler", 2, gpio_defines, gpio_remove_raw_irq_handler, 0, 0, 0},
-    {"gpio_remove_raw_irq_handler_masked", 2, gpio_defines, gpio_remove_raw_irq_handler_masked, 0,
-     0, 0},
-    {"gpio_set_dir", 2, gpio_defines, gpio_set_dir, 0, 0, 0},
-    {"gpio_set_dir_all_bits", 1, gpio_defines, gpio_set_dir_all_bits, 0, 0, 0},
-    {"gpio_set_dir_in_masked", 1, gpio_defines, gpio_set_dir_in_masked, 0, 0, 0},
-    {"gpio_set_dir_masked", 2, gpio_defines, gpio_set_dir_masked, 0, 0, 0},
-    {"gpio_set_dir_out_masked", 1, gpio_defines, gpio_set_dir_out_masked, 0, 0, 0},
-    {"gpio_set_dormant_irq_enabled", 3, gpio_defines, gpio_set_dormant_irq_enabled, 0, 0, 0},
-    {"gpio_set_drive_strength", 2, gpio_defines, gpio_set_drive_strength, 0, 0, 0},
-    {"gpio_set_function", 2, gpio_defines, gpio_set_function, 0, 0, 0},
-    {"gpio_set_inover", 2, gpio_defines, gpio_set_inover, 0, 0, 0},
-    {"gpio_set_input_enabled", 2, gpio_defines, gpio_set_input_enabled, 0, 0, 0},
-    {"gpio_set_input_hysteresis_enabled", 2, gpio_defines, gpio_set_input_hysteresis_enabled, 0, 0,
-     0},
-    {"gpio_set_irq_callback", 1, gpio_defines, gpio_set_irq_callback, 0, 0, 0},
-    {"gpio_set_irq_enabled", 3, gpio_defines, gpio_set_irq_enabled, 0, 0, 0},
-    {"gpio_set_irq_enabled_with_callback", 4, gpio_defines, gpio_set_irq_enabled_with_callback, 0,
-     0, 0},
-    {"gpio_set_irqover", 2, gpio_defines, gpio_set_irqover, 0, 0, 0},
-    {"gpio_set_mask", 1, gpio_defines, gpio_set_mask, 0, 0, 0},
-    {"gpio_set_oeover", 2, gpio_defines, gpio_set_oeover, 0, 0, 0},
-    {"gpio_set_outover", 2, gpio_defines, gpio_set_outover, 0, 0, 0},
-    {"gpio_set_pulls", 3, gpio_defines, gpio_set_pulls, 0, 0, 0},
-    {"gpio_set_slew_rate", 2, gpio_defines, gpio_set_slew_rate, 0, 0, 0},
-    {"gpio_xor_mask", 1, gpio_defines, gpio_xor_mask, 0, 0, 0},
-    {"i2c_deinit", 1, i2c_defines, i2c_deinit, 0, 0, 0},
-    {"i2c_get_dreq", 2, i2c_defines, i2c_get_dreq, 0, 0, 0},
-    {"i2c_get_hw", 1, i2c_defines, i2c_get_hw, 0, 0, 0},
-    {"i2c_get_read_available", 1, i2c_defines, i2c_get_read_available, 0, 0, 0},
-    {"i2c_get_write_available", 1, i2c_defines, i2c_get_write_available, 0, 0, 0},
-    {"i2c_hw_index", 1, i2c_defines, i2c_hw_index, 0, 0, 0},
-    {"i2c_init", 2, i2c_defines, i2c_init, 0, 0, 0},
-    {"i2c_read_blocking", 5, i2c_defines, i2c_read_blocking, 0, 0, 0},
-    {"i2c_read_raw_blocking", 3, i2c_defines, i2c_read_raw_blocking, 0, 0, 0},
-    {"i2c_read_timeout_per_char_us", 6, i2c_defines, i2c_read_timeout_per_char_us, 0, 0, 0},
-    {"i2c_read_timeout_us", 6, i2c_defines, i2c_read_timeout_us, 0, 0, 0},
-    {"i2c_set_baudrate", 2, i2c_defines, i2c_set_baudrate, 0, 0, 0},
-    {"i2c_set_slave_mode", 3, i2c_defines, i2c_set_slave_mode, 0, 0, 0},
-    {"i2c_write_blocking", 5, i2c_defines, i2c_write_blocking, 0, 0, 0},
-    {"i2c_write_raw_blocking", 3, i2c_defines, i2c_write_raw_blocking, 0, 0, 0},
-    {"i2c_write_timeout_per_char_us", 6, i2c_defines, i2c_write_timeout_per_char_us, 0, 0, 0},
-    {"i2c_write_timeout_us", 6, i2c_defines, i2c_write_timeout_us, 0, 0, 0},
-    {"irq_add_shared_handler", 3, irq_defines, irq_add_shared_handler, 0, 0, 0},
-    {"irq_clear", 1, irq_defines, irq_clear, 0, 0, 0},
-    {"irq_get_exclusive_handler", 1, irq_defines, irq_get_exclusive_handler, 0, 0, 0},
-    {"irq_get_priority", 1, irq_defines, irq_get_priority, 0, 0, 0},
-    {"irq_get_vtable_handler", 1, irq_defines, irq_get_vtable_handler, 0, 0, 0},
-    {"irq_has_shared_handler", 1, irq_defines, irq_has_shared_handler, 0, 0, 0},
-    {"irq_init_priorities", 0, irq_defines, irq_init_priorities, 0, 0, 0},
-    {"irq_is_enabled", 1, irq_defines, irq_is_enabled, 0, 0, 0},
-    {"irq_remove_handler", 2, irq_defines, irq_remove_handler, 0, 0, 0},
-    {"irq_set_enabled", 2, irq_defines, irq_set_enabled, 0, 0, 0},
-    {"irq_set_exclusive_handler", 2, irq_defines, irq_set_exclusive_handler, 0, 0, 0},
-    {"irq_set_mask_enabled", 2, irq_defines, irq_set_mask_enabled, 0, 0, 0},
-    {"irq_set_pending", 1, irq_defines, irq_set_pending, 0, 0, 0},
-    {"irq_set_priority", 2, irq_defines, irq_set_priority, 0, 0, 0},
-    {"log10f", 1 | (1 << 5) | (1 << 10), math_defines, log10f, 1, 0, 0},
-    {"logf", 1 | (1 << 5) | (1 << 10), math_defines, logf, 1, 0, 0},
-    {"lseek", 3, stdio_defines, wrap_lseek, 0, 0, 0},
-    {"malloc", 1, stdlib_defines, wrap_malloc, 0, 0, 0},
-    {"memcmp", 3, string_defines, memcmp, 0, 0, 0},
-    {"memcpy", 3, string_defines, memcpy, 0, 0, 0},
-    {"memset", 3, string_defines, memset, 0, 0, 0},
-    {"open", 2, stdio_defines, wrap_open, 0, 0, 0},
-    {"opendir", 1, stdio_defines, wrap_opendir, 0, 0, 0},
-    {"popcount", 1, stdlib_defines, wrap_popcount, 0, 0, 0},
-    {"powf", 2 | (2 << 5) | (0b11 << 10), math_defines, powf, 1, 0, 0},
-    {"printf", 1, stdio_defines, wrap_printf, 0, 1, 0},
-    {"putchar", 1, stdio_defines, putchar, 0, 0, 0},
-    {"pwm_advance_count", 1, pwm_defines, pwm_advance_count, 0, 0, 0},
-    {"pwm_clear_irq", 1, pwm_defines, pwm_clear_irq, 0, 0, 0},
-    {"pwm_config_set_clkdiv", 2 | (1 << 5) | (0b01 << 10), pwm_defines, pwm_config_set_clkdiv, 0, 0,
-     0},
-    {"pwm_config_set_clkdiv_int", 2, pwm_defines, pwm_config_set_clkdiv_int, 0, 0, 0},
-    {"pwm_config_set_clkdiv_int_frac", 3, pwm_defines, pwm_config_set_clkdiv_int_frac, 0, 0, 0},
-    {"pwm_config_set_clkdiv_mode", 2, pwm_defines, pwm_config_set_clkdiv_mode, 0, 0, 0},
-    {"pwm_config_set_output_polarity", 3, pwm_defines, pwm_config_set_output_polarity, 0, 0, 0},
-    {"pwm_config_set_phase_correct", 2, pwm_defines, pwm_config_set_phase_correct, 0, 0, 0},
-    {"pwm_config_set_wrap", 2, pwm_defines, pwm_config_set_wrap, 0, 0, 0},
-    {"pwm_force_irq", 1, pwm_defines, pwm_force_irq, 0, 0, 0},
-    {"pwm_get_counter", 1, pwm_defines, pwm_get_counter, 0, 0, 0},
-    {"pwm_get_default_config", 0, pwm_defines, pwm_get_default_config, 0, 0, 0},
-    {"pwm_get_dreq", 1, pwm_defines, pwm_get_dreq, 0, 0, 0},
-    {"pwm_get_irq_status_mask", 0, pwm_defines, pwm_get_irq_status_mask, 0, 0, 0},
-    {"pwm_gpio_to_channel", 1, pwm_defines, pwm_gpio_to_channel, 0, 0, 0},
-    {"pwm_gpio_to_slice_num", 1, pwm_defines, pwm_gpio_to_slice_num, 0, 0, 0},
-    {"pwm_init", 3, pwm_defines, pwm_init, 0, 0, 0},
-    {"pwm_retard_count", 1, pwm_defines, pwm_retard_count, 0, 0, 0},
-    {"pwm_set_both_levels", 3, pwm_defines, pwm_set_both_levels, 0, 0, 0},
-    {"pwm_set_chan_level", 3, pwm_defines, pwm_set_chan_level, 0, 0, 0},
-    {"pwm_set_clkdiv", 2, pwm_defines, pwm_set_clkdiv, 0, 0, 0},
-    {"pwm_set_clkdiv_int_frac", 3, pwm_defines, pwm_set_clkdiv_int_frac, 0, 0, 0},
-    {"pwm_set_clkdiv_mode", 2, pwm_defines, pwm_set_clkdiv_mode, 0, 0, 0},
-    {"pwm_set_counter", 2, pwm_defines, pwm_set_counter, 0, 0, 0},
-    {"pwm_set_enabled", 2, pwm_defines, pwm_set_enabled, 0, 0, 0},
-    {"pwm_set_gpio_level", 2, pwm_defines, pwm_set_gpio_level, 0, 0, 0},
-    {"pwm_set_irq_enabled", 2, pwm_defines, pwm_set_irq_enabled, 0, 0, 0},
-    {"pwm_set_irq_mask_enabled", 2, pwm_defines, pwm_set_irq_mask_enabled, 0, 0, 0},
-    {"pwm_set_mask_enabled", 1, pwm_defines, pwm_set_mask_enabled, 0, 0, 0},
-    {"pwm_set_output_polarity", 3, pwm_defines, pwm_set_output_polarity, 0, 0, 0},
-    {"pwm_set_phase_correct", 2, pwm_defines, pwm_set_phase_correct, 0, 0, 0},
-    {"pwm_set_wrap", 2, pwm_defines, pwm_set_wrap, 0, 0, 0},
-    {"rand", 0, stdlib_defines, rand, 0, 0, 0},
-    {"read", 3, stdio_defines, wrap_read, 0, 0, 0},
-    {"readdir", 2, stdio_defines, wrap_readdir, 0, 0, 0},
-    {"remove", 1, stdio_defines, wrap_remove, 0, 0, 0},
-    {"rename", 2, stdio_defines, wrap_rename, 0, 0, 0},
-    {"screen_height", 0, stdio_defines, wrap_screen_height, 0, 0, 0},
-    {"screen_width", 0, stdio_defines, wrap_screen_width, 0, 0, 0},
-    {"sinf", 1 | (1 << 5) | (1 << 10), math_defines, sinf, 1, 0, 0},
-    {"sinhf", 1 | (1 << 5) | (1 << 10), math_defines, sinhf, 1, 0, 0},
-    {"sleep_ms", 1, time_defines, sleep_ms, 0, 0, 0},
-    {"sleep_us", 1, time_defines, sleep_us, 0, 0, 0},
-    {"spi_deinit", 1, spi_defines, spi_deinit, 0, 0, 0},
-    {"spi_get_baudrate", 1, spi_defines, spi_get_baudrate, 0, 0, 0},
-    {"spi_get_const_hw", 1, spi_defines, spi_get_const_hw, 0, 0, 0},
-    {"spi_get_dreq", 2, spi_defines, spi_get_dreq, 0, 0, 0},
-    {"spi_get_hw", 1, spi_defines, spi_get_hw, 0, 0, 0},
-    {"spi_get_index", 1, spi_defines, spi_get_index, 0, 0, 0},
-    {"spi_init", 2, spi_defines, spi_init, 0, 0, 0},
-    {"spi_is_busy", 1, spi_defines, spi_is_busy, 0, 0, 0},
-    {"spi_is_readable", 1, spi_defines, spi_is_readable, 0, 0, 0},
-    {"spi_is_writable", 1, spi_defines, spi_is_writable, 0, 0, 0},
-    {"spi_read16_blocking", 4, spi_defines, spi_read16_blocking, 0, 0, 0},
-    {"spi_read_blocking", 4, spi_defines, spi_read_blocking, 0, 0, 0},
-    {"spi_set_baudrate", 2, spi_defines, spi_set_baudrate, 0, 0, 0},
-    {"spi_set_format", 5, spi_defines, spi_set_format, 0, 0, 0},
-    {"spi_set_slave", 2, spi_defines, spi_set_slave, 0, 0, 0},
-    {"spi_write16_blocking", 3, spi_defines, spi_write16_blocking, 0, 0, 0},
-    {"spi_write16_read16_blocking", 4, spi_defines, spi_write16_read16_blocking, 0, 0, 0},
-    {"spi_write_blocking", 3, spi_defines, spi_write_blocking, 0, 0, 0},
-    {"spi_write_read_blocking", 4, spi_defines, spi_write_read_blocking, 0, 0, 0},
-    {"sprintf", 1, stdio_defines, wrap_sprintf, 0, 0, 1},
-    {"sqrtf", 1 | (1 << 5) | (1 << 10), math_defines, sqrtf, 1, 0, 0},
-    {"srand", 1, stdlib_defines, srand, 0, 0, 0},
-    {"strcat", 2, string_defines, strcat, 0, 0, 0},
-    {"strchr", 2, string_defines, strchr, 0, 0, 0},
-    {"strcmp", 2, string_defines, strcmp, 0, 0, 0},
-    {"strcpy", 2, string_defines, strcpy, 0, 0, 0},
-    {"strdup", 1, string_defines, strdup, 0, 0, 0},
-    {"strlen", 1, string_defines, strlen, 0, 0, 0},
-    {"strncat", 3, string_defines, strncat, 0, 0, 0},
-    {"strncmp", 3, string_defines, strncmp, 0, 0, 0},
-    {"strncpy", 3, string_defines, strncpy, 0, 0, 0},
-    {"strrchr", 2, string_defines, strrchr, 0, 0, 0},
-    {"tanf", 1 | (1 << 5) | (1 << 10), math_defines, tanf, 1, 0, 0},
-    {"tanhf", 1 | (1 << 5) | (1 << 10), math_defines, tanhf, 1, 0, 0},
-    {"time_us_32", 0, time_defines, time_us_32, 0, 0, 0},
-    {"user_irq_claim", 1, irq_defines, user_irq_claim, 0, 0, 0},
-    {"user_irq_claim_unused", 1, irq_defines, user_irq_claim_unused, 0, 0, 0},
-    {"user_irq_is_claimed", 1, irq_defines, user_irq_is_claimed, 0, 0, 0},
-    {"user_irq_unclaim", 1, irq_defines, user_irq_unclaim, 0, 0, 0},
-    {"wfi", 0, sync_defines, wrap_wfi, 0, 0, 0},
-    {"wrap_aeabi_fadd", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fadd, 1, 0, 0},
-    {"wrap_aeabi_fdiv", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fdiv, 1, 0, 0},
-    {"wrap_aeabi_fmul", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fmul, 1, 0, 0},
-    {"wrap_aeabi_fsub", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fsub, 1, 0, 0},
-    {"write", 3, stdio_defines, wrap_write, 0, 0, 0}};
+#include "cc_extrns.h"
+};
 
 static struct {
     char* name;
@@ -3434,7 +3036,7 @@ static void stmt(int ctx) {
                     while (state.address + state.size < (int)(e - 1)) {
                         uint16_t* nxt = (uint16_t*)(state.address + state.size);
                         disasm_thumb(&state, *nxt, *(nxt + 1));
-                        printf("%08x %d %s\n", state.address, state.size, state.text);
+                        printf("%s\n", state.text);
                     }
                     disasm_cleanup(&state);
                 }
@@ -4019,7 +3621,8 @@ int cc(int argc, char** argv) {
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
 
-    text_base = le = e = sys_malloc(TEXT_BYTES, 1);
+    text_base = le = sys_malloc(TEXT_BYTES, 1);
+    e = text_base - 1;
     members = sys_malloc(MEMBER_DICT_BYTES, 1);
 
     src = lp = p = sys_malloc(siz + 1, 1);
