@@ -2251,9 +2251,9 @@ static void patch_literals(void) {
 
 static void emit_IMM(int n) {
     if (n < 256)          //
-        emit(0x2600 | n); // movs r6, #n
+        emit(0x2000 | n); // movs r0, #n
     else {                //
-        emit(0x4e00);     // ldr r6, [pc, n]
+        emit(0x4800);     // ldr r0, [pc, n]
         struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
         l->addr = e;
         l->val = n;
@@ -2264,6 +2264,11 @@ static void emit_IMM(int n) {
 }
 
 static void emit_IMMF(int n) { emit_IMM(n); }
+
+static void emit_LEA(int n) {
+    emit_IMM((-n + 5) * 4);
+    emit(0x4438); // add r0, r7
+}
 
 // AST parsing for IR generatiion
 // With a modular code generator, new targets can be easily supported such as
@@ -2288,8 +2293,7 @@ static void gen(int* n) {
         old_emit((ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2));
         break;
     case Loc:
-        old_emit(LEA);
-        old_emit(ast_NumVal(n));
+        emit_LEA(ast_NumVal(n));
         break; // get address of variable
     case '{':
         gen((int*)ast_NumVal(n));
