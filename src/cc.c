@@ -537,29 +537,13 @@ static struct define_grp irq_defines[] = {
      PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY},
     {0}};
 
-// stubs for now
-void sys_close(void){};
-void sys_lseek(void){};
-void sys_open(void){};
-void sys_opendir(void){};
-void sys_popcount(void){};
-void sys_printf(void){};
-void sys_read(void){};
-void sys_readdir(void){};
-void sys_remove(void){};
-void sys_rename(void){};
-void sys_screen_height(void){};
-void sys_screen_width(void){};
-void sys_wfi(void){};
-void sys_write(void){};
-
 static jmp_buf done_jmp;
 static int* malloc_list;
 
-#define die(fmt, ...) die_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
+#define fatal(fmt, ...) fatal_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
-static __attribute__((__noreturn__)) void die_func(const char* func, int lne, const char* fmt,
-                                                   ...) {
+static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, const char* fmt,
+                                                     ...) {
     printf("\n");
 #ifndef NDEBUG
     printf("error in compiler function %s at line %d\n", func, lne);
@@ -581,7 +565,7 @@ static __attribute__((__noreturn__)) void die_func(const char* func, int lne, co
     longjmp(done_jmp, 1);
 }
 
-static __attribute__((__noreturn__)) void run_die(const char* fmt, ...) {
+static __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
     printf("\n" VT_BOLD "run time error : " VT_NORMAL);
     va_list ap;
     va_start(ap, fmt);
@@ -591,10 +575,14 @@ static __attribute__((__noreturn__)) void run_die(const char* fmt, ...) {
     longjmp(done_jmp, 1);
 }
 
-static void* sys_malloc(int l) {
+static void* sys_malloc(int l, int die) {
     int* p = malloc(l + 8);
-    if (!p)
-        die("out of memory");
+    if (!p) {
+        if (die)
+            fatal("out of memory");
+        else
+            return 0;
+    }
     memset(p + 2, 0, l);
     p[0] = (int)malloc_list;
     malloc_list = p;
@@ -603,7 +591,7 @@ static void* sys_malloc(int l) {
 
 static void sys_free(void* p) {
     if (!p)
-        die("freeing a NULL pointer");
+        fatal("freeing a NULL pointer");
     int* p2 = (int*)p - 2;
     int* last = (int*)&malloc_list;
     int* pi = (int*)(*last);
@@ -616,8 +604,126 @@ static void sys_free(void* p) {
         last = pi;
         pi = (int*)pi[0];
     }
-    die("corrupted memory");
+    fatal("corrupted memory");
 }
+
+// stubs for now
+static void* wrap_malloc(int len) { return sys_malloc(len, 0); };
+
+static struct file_handle {
+    struct file_handle* next;
+    bool is_dir;
+    union {
+        lfs_file_t file;
+        lfs_dir_t dir;
+    } u;
+} * file_list;
+
+static int wrap_open(char* name, int mode) {
+    struct file_handle* h = sys_malloc(sizeof(struct file_handle), 1);
+    h->is_dir = false;
+    if (fs_file_open(&h->u.file, full_path(name), mode) < LFS_ERR_OK) {
+        sys_free(h);
+        return 0;
+    }
+    h->next = file_list;
+    file_list = h;
+    return (int)h;
+}
+
+static int wrap_opendir(char* name) {
+    struct file_handle* h = sys_malloc(sizeof(struct file_handle), 1);
+    h->is_dir = true;
+    if (fs_dir_open(&h->u.dir, full_path(name)) < LFS_ERR_OK) {
+        sys_free(h);
+        return 0;
+    }
+    h->next = file_list;
+    file_list = h;
+    return (int)h;
+}
+
+static void wrap_close(int handle) {
+    struct file_handle* last_h = (void*)&file_list;
+    struct file_handle* h = file_list;
+    while (h) {
+        if (h == (struct file_handle*)handle) {
+            last_h->next = h->next;
+            if (h->is_dir)
+                fs_dir_close(&h->u.dir);
+            else
+                fs_file_close(&h->u.file);
+            sys_free(h);
+            return;
+        }
+        last_h = h;
+        h = h->next;
+    }
+    fatal("closing unopened file!");
+}
+
+static int wrap_read(int handle, void* buf, int len) {
+    struct file_handle* h = (struct file_handle*)handle;
+    if (h->is_dir)
+        fatal("use readdir to read from directories");
+    return fs_file_read(&h->u.file, buf, len);
+}
+
+static int wrap_readdir(int handle, void* buf) {
+    struct file_handle* h = (struct file_handle*)handle;
+    if (!h->is_dir)
+        fatal("use read to read from files");
+    return fs_dir_read(&h->u.dir, buf);
+}
+
+static int wrap_write(int handle, void* buf, int len) {
+    struct file_handle* h = (struct file_handle*)handle;
+    return fs_file_write(&h->u.file, buf, len);
+}
+
+static int wrap_lseek(int handle, int pos, int set) {
+    struct file_handle* h = (struct file_handle*)handle;
+    return fs_file_seek(&h->u.file, pos, set);
+};
+
+static int wrap_popcount(int n) { return __builtin_popcount(n); };
+
+static int wrap_printf(void){};
+static int wrap_sprintf(void){};
+
+static int wrap_remove(char* name) { return fs_remove(full_path(name)); };
+
+static int wrap_rename(char* old, char* new) {
+    char* fp = full_path(old);
+    char* fpa = sys_malloc(strlen(fp) + 1, 1);
+    strcpy(fpa, fp);
+    char* fpb = full_path(new);
+    int r = fs_rename(fpa, fpb);
+    sys_free(fpa);
+    return r;
+}
+
+static int wrap_screen_height(void) {
+    int x, y;
+    get_screen_xy(&y, &x);
+    return y;
+}
+
+static int wrap_screen_width(void) {
+    int x, y;
+    get_screen_xy(&y, &x);
+    return x;
+}
+
+static void wrap_wfi(void) { __wfi(); };
+
+static float wrap_aeabi_fadd(float a, float b) { return a + b; }
+
+static float wrap_aeabi_fdiv(float a, float b) { return a / b; }
+
+static float wrap_aeabi_fmul(float a, float b) { return a * b; }
+
+static float wrap_aeabi_fsub(float a, float b) { return a - b; }
 
 static const struct {
     char* name;
@@ -660,12 +766,12 @@ static const struct {
     {"clock_set_reported_hz", 2, clk_defines, clock_set_reported_hz, 0, 0, 0},
     {"clocks_init", 0, clk_defines, clocks_init, 0, 0, 0},
     {"clock_stop", 1, clk_defines, clock_stop, 0, 0, 0},
-    {"close", 1, stdio_defines, sys_close, 0, 0, 0},
+    {"close", 1, stdio_defines, wrap_close, 0, 0, 0},
     {"cosf", 1 | (1 << 5) | (1 << 10), math_defines, cosf, 1, 0, 0},
     {"coshf", 1 | (1 << 5) | (1 << 10), math_defines, coshf, 1, 0, 0},
     {"exit", 1, stdlib_defines, exit, 0, 0, 0},
     {"fmodf", 2 | (2 << 5) | (0b11 << 10), math_defines, fmodf, 1, 0, 0},
-    {"free", 1, stdlib_defines, free, 0, 0, 0},
+    {"free", 1, stdlib_defines, sys_free, 0, 0, 0},
     {"frequency_count_khz", 1, clk_defines, frequency_count_khz, 0, 0, 0},
     {"frequency_count_mhz", 1, clk_defines, frequency_count_mhz, 0, 0, 0},
     {"getchar", 0, stdio_defines, getchar, 0, 0, 0},
@@ -759,16 +865,16 @@ static const struct {
     {"irq_set_priority", 2, irq_defines, irq_set_priority, 0, 0, 0},
     {"log10f", 1 | (1 << 5) | (1 << 10), math_defines, log10f, 1, 0, 0},
     {"logf", 1 | (1 << 5) | (1 << 10), math_defines, logf, 1, 0, 0},
-    {"lseek", 3, stdio_defines, sys_lseek, 0, 0, 0},
-    {"malloc", 1, stdlib_defines, sys_malloc, 0, 0, 0},
+    {"lseek", 3, stdio_defines, wrap_lseek, 0, 0, 0},
+    {"malloc", 1, stdlib_defines, wrap_malloc, 0, 0, 0},
     {"memcmp", 3, string_defines, memcmp, 0, 0, 0},
     {"memcpy", 3, string_defines, memcpy, 0, 0, 0},
     {"memset", 3, string_defines, memset, 0, 0, 0},
-    {"open", 2, stdio_defines, sys_open, 0, 0, 0},
-    {"opendir", 1, stdio_defines, sys_opendir, 0, 0, 0},
-    {"popcount", 1, stdlib_defines, sys_popcount, 0, 0, 0},
+    {"open", 2, stdio_defines, wrap_open, 0, 0, 0},
+    {"opendir", 1, stdio_defines, wrap_opendir, 0, 0, 0},
+    {"popcount", 1, stdlib_defines, wrap_popcount, 0, 0, 0},
     {"powf", 2 | (2 << 5) | (0b11 << 10), math_defines, powf, 1, 0, 0},
-    {"printf", 1, stdio_defines, sys_printf, 0, 1, 0},
+    {"printf", 1, stdio_defines, wrap_printf, 0, 1, 0},
     {"putchar", 1, stdio_defines, putchar, 0, 0, 0},
     {"pwm_advance_count", 1, pwm_defines, pwm_advance_count, 0, 0, 0},
     {"pwm_clear_irq", 1, pwm_defines, pwm_clear_irq, 0, 0, 0},
@@ -804,12 +910,12 @@ static const struct {
     {"pwm_set_phase_correct", 2, pwm_defines, pwm_set_phase_correct, 0, 0, 0},
     {"pwm_set_wrap", 2, pwm_defines, pwm_set_wrap, 0, 0, 0},
     {"rand", 0, stdlib_defines, rand, 0, 0, 0},
-    {"read", 3, stdio_defines, sys_read, 0, 0, 0},
-    {"readdir", 2, stdio_defines, sys_readdir, 0, 0, 0},
-    {"remove", 1, stdio_defines, sys_remove, 0, 0, 0},
-    {"rename", 2, stdio_defines, sys_rename, 0, 0, 0},
-    {"screen_height", 0, stdio_defines, sys_screen_height, 0, 0, 0},
-    {"screen_width", 0, stdio_defines, sys_screen_width, 0, 0, 0},
+    {"read", 3, stdio_defines, wrap_read, 0, 0, 0},
+    {"readdir", 2, stdio_defines, wrap_readdir, 0, 0, 0},
+    {"remove", 1, stdio_defines, wrap_remove, 0, 0, 0},
+    {"rename", 2, stdio_defines, wrap_rename, 0, 0, 0},
+    {"screen_height", 0, stdio_defines, wrap_screen_height, 0, 0, 0},
+    {"screen_width", 0, stdio_defines, wrap_screen_width, 0, 0, 0},
     {"sinf", 1 | (1 << 5) | (1 << 10), math_defines, sinf, 1, 0, 0},
     {"sinhf", 1 | (1 << 5) | (1 << 10), math_defines, sinhf, 1, 0, 0},
     {"sleep_ms", 1, time_defines, sleep_ms, 0, 0, 0},
@@ -833,7 +939,7 @@ static const struct {
     {"spi_write16_read16_blocking", 4, spi_defines, spi_write16_read16_blocking, 0, 0, 0},
     {"spi_write_blocking", 3, spi_defines, spi_write_blocking, 0, 0, 0},
     {"spi_write_read_blocking", 4, spi_defines, spi_write_read_blocking, 0, 0, 0},
-    {"sprintf", 1, stdio_defines, sprintf, 0, 0, 1},
+    {"sprintf", 1, stdio_defines, wrap_sprintf, 0, 0, 1},
     {"sqrtf", 1 | (1 << 5) | (1 << 10), math_defines, sqrtf, 1, 0, 0},
     {"srand", 1, stdlib_defines, srand, 0, 0, 0},
     {"strcat", 2, string_defines, strcat, 0, 0, 0},
@@ -853,8 +959,12 @@ static const struct {
     {"user_irq_claim_unused", 1, irq_defines, user_irq_claim_unused, 0, 0, 0},
     {"user_irq_is_claimed", 1, irq_defines, user_irq_is_claimed, 0, 0, 0},
     {"user_irq_unclaim", 1, irq_defines, user_irq_unclaim, 0, 0, 0},
-    {"wfi", 0, sync_defines, sys_wfi, 0, 0, 0},
-    {"write", 3, stdio_defines, sys_write, 0, 0, 0}};
+    {"wfi", 0, sync_defines, wrap_wfi, 0, 0, 0},
+    {"wrap_aeabi_fadd", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fadd, 1, 0, 0},
+    {"wrap_aeabi_fdiv", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fdiv, 1, 0, 0},
+    {"wrap_aeabi_fmul", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fmul, 1, 0, 0},
+    {"wrap_aeabi_fsub", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fsub, 1, 0, 0},
+    {"write", 3, stdio_defines, wrap_write, 0, 0, 0}};
 
 static struct {
     char* name;
@@ -878,15 +988,6 @@ static struct {
 static lfs_file_t* fd;
 static char* fp;
 
-struct file_handle {
-    struct file_handle* next;
-    bool is_dir;
-    union {
-        lfs_file_t file;
-        lfs_dir_t dir;
-    } u;
-} * file_list;
-
 static void clear_globals(void) {
     e = le = text_base = NULL;
     base_sp = cas = tsize = n = malloc_list =
@@ -906,14 +1007,14 @@ static void clear_globals(void) {
 
 #define numof(a) (sizeof(a) / sizeof(a[0]))
 
-static int extern_getidx(char* name) // get cache index of external function
+static int extern_search(char* name) // get cache index of external function
 {
     int first = 0, last = numof(externs) - 1, middle;
     while (first <= last) {
         middle = (first + last) / 2;
-        if (strcmp(externs[middle].name, name) < 0)
+        if (strcmp(name, externs[middle].name) > 0)
             first = middle + 1;
-        else if (strcmp(externs[middle].name, name) > 0)
+        else if (strcmp(name, externs[middle].name) < 0)
             last = middle - 1;
         else
             return middle;
@@ -1022,7 +1123,7 @@ static void next() {
                 p += 6;
                 next();
                 if (tk != Id)
-                    die("No identifier");
+                    fatal("No identifier");
                 ++pplev;
                 if ((((id->class != Num) ? 0 : 1) ^ (t ? 1 : 0)) & 1) {
                     t = pplevt;
@@ -1039,7 +1140,7 @@ static void next() {
                 ++pplev;
             } else if (!strncmp(p, "endif", 5)) {
                 if (--pplev < 0)
-                    die("preprocessor context nesting error");
+                    fatal("preprocessor context nesting error");
                 if (pplev == pplevt)
                     return;
             }
@@ -1076,7 +1177,7 @@ static void next() {
                 // a string, copying characters to data
                 if (tk == '"') {
                     if (data >= data_base + (DATA_BYTES / 4))
-                        die("program data exceeds data segment");
+                        fatal("program data exceeds data segment");
                     *data++ = tkv.i;
                 }
             }
@@ -1455,21 +1556,21 @@ static void typecheck(int op, int tl, int tr) {
         else if (op >= Eq && op <= Le && ast_Tk(n) == Num && ast_NumVal(n) == 0)
             ; // ok
         else
-            die("bad pointer arithmetic or cast needed");
+            fatal("bad pointer arithmetic or cast needed");
     } else if (pt == 3 && op != Assign && op != Sub &&
                (op < Eq || op > Le)) // pointers to same type
-        die("bad pointer arithmetic");
+        fatal("bad pointer arithmetic");
 
     if (pt == 0 && op != Assign && (it == 1 || it == 2))
-        die("cast operation needed");
+        fatal("cast operation needed");
 
     if (pt == 0 && st != 0)
-        die("illegal operation with dereferenced struct");
+        fatal("illegal operation with dereferenced struct");
 }
 
 static void bitopcheck(int tl, int tr) {
     if (tl >= FLOAT || tr >= FLOAT)
-        die("bit operation on non-int types");
+        fatal("bit operation on non-int types");
 }
 
 static bool is_power_of_2(int n) { return ((n - 1) & n) == 0; }
@@ -1521,7 +1622,7 @@ static void expr(int lev) {
                 goto resolve_fnproto;
             if (d->class < Func || d->class > Syscall) {
                 if (d->class != 0)
-                    die("bad function call");
+                    fatal("bad function call");
                 d->type = INT;
                 d->etype = 0;
             resolve_fnproto:
@@ -1529,9 +1630,9 @@ static void expr(int lev) {
                 int namelen = d->hash & 0x3f;
                 char ch = d->name[namelen];
                 d->name[namelen] = 0;
-                int ix = extern_getidx(d->name);
+                int ix = extern_search(d->name);
                 if (ix < 0)
-                    die("Unknown external function %s", d->name);
+                    fatal("Unknown external function %s", d->name);
                 d->val = ix;
                 d->type = externs[ix].ret_float ? FLOAT : INT;
                 d->etype = externs[ix].etype;
@@ -1559,15 +1660,15 @@ static void expr(int lev) {
                 if (tk == ',') {
                     next();
                     if (tk == ')')
-                        die("unexpected comma in function call");
+                        fatal("unexpected comma in function call");
                 } else if (tk != ')')
-                    die("missing comma in function call");
+                    fatal("missing comma in function call");
             }
             if (t > ADJ_MASK)
-                die("maximum of %d function parameters", ADJ_MASK);
+                fatal("maximum of %d function parameters", ADJ_MASK);
             tt = (tt << 10) + (nf << 5) + t; // func etype not like other etype
             if (d->etype != tt && !externs[d->val].is_printf && externs[d->val].is_sprintf)
-                die("argument type mismatch");
+                fatal("argument type mismatch");
             next();
             // function or system call id
             ast_Func(tt, t, d->val, (int)b, d->class);
@@ -1589,7 +1690,7 @@ static void expr(int lev) {
                 ast_Num(d->val);
                 break;
             default:
-                die("undefined variable %.*s", d->hash & ADJ_MASK, d->name);
+                fatal("undefined variable %.*s", d->hash & ADJ_MASK, d->name);
             }
             if ((d->type & 3) && d->class != Par) { // push reference address
                 ty = d->type & ~3;
@@ -1616,11 +1717,11 @@ static void expr(int lev) {
         // continuous `"` handles C-style multiline text such as `"abc" "def"`
         while (tk == '"') {
             if (data >= data_base + (DATA_BYTES / 4))
-                die("program data exceeds data segment");
+                fatal("program data exceeds data segment");
             next();
         }
         if (data >= data_base + (DATA_BYTES / 4))
-            die("program data exceeds data segment");
+            fatal("program data exceeds data segment");
         data = (char*)(((int)data + sizeof(int)) & (-sizeof(int)));
         ty = CHAR + PTR;
         break;
@@ -1630,7 +1731,7 @@ static void expr(int lev) {
     case Sizeof:
         next();
         if (tk != '(')
-            die("open parenthesis expected in sizeof");
+            fatal("open parenthesis expected in sizeof");
         next();
         d = 0;
         if (tk == Num || tk == NumF) {
@@ -1653,7 +1754,7 @@ static void expr(int lev) {
             case Union:
                 next();
                 if (tk != Id || id->type <= ATOM_TYPE || id->type >= PTR)
-                    die("bad struct/union type");
+                    fatal("bad struct/union type");
                 ty = id->type;
                 next();
                 break;
@@ -1665,7 +1766,7 @@ static void expr(int lev) {
             }
         }
         if (tk != ')')
-            die("close parenthesis expected in sizeof");
+            fatal("close parenthesis expected in sizeof");
         next();
         ast_Num((ty & 3) ? (((ty - PTR) >= PTR) ? sizeof(int) : tsize[(ty - PTR) >> 2])
                          : ((ty >= PTR) ? sizeof(int) : tsize[ty >> 2]));
@@ -1688,7 +1789,7 @@ static void expr(int lev) {
             default:
                 next();
                 if (tk != Id || id->type <= ATOM_TYPE || id->type >= PTR)
-                    die("bad struct/union type");
+                    fatal("bad struct/union type");
                 t = id->type;
                 next();
                 break;
@@ -1699,7 +1800,7 @@ static void expr(int lev) {
                 t += PTR;
             }
             if (tk != ')')
-                die("bad cast");
+                fatal("bad cast");
             next();
             expr(Inc); // cast has precedence as Inc(++)
             if (t != ty && (t == FLOAT || ty == FLOAT)) {
@@ -1720,7 +1821,7 @@ static void expr(int lev) {
                         ast_CastF(FTOI, (int)b);
                     }
                 } else
-                    die("explicit cast required");
+                    fatal("explicit cast required");
             }
             ty = t;
         } else {
@@ -1733,7 +1834,7 @@ static void expr(int lev) {
                     ast_Begin((int)b);
             }
             if (tk != ')')
-                die("close parenthesis expected");
+                fatal("close parenthesis expected");
             next();
         }
         break;
@@ -1741,7 +1842,7 @@ static void expr(int lev) {
         next();
         expr(Inc); // dereference has the same precedence as Inc(++)
         if (ty < PTR)
-            die("bad dereference");
+            fatal("bad dereference");
         ty -= PTR;
         ast_Load(ty);
         break;
@@ -1752,7 +1853,7 @@ static void expr(int lev) {
         next();
         expr(Inc);
         if (ast_Tk(n) != Load)
-            die("bad address-of");
+            fatal("bad address-of");
         n += 2;
         ty += PTR;
         break;
@@ -1760,7 +1861,7 @@ static void expr(int lev) {
         next();
         expr(Inc);
         if (ty > ATOM_TYPE && ty < PTR)
-            die("!(struct/union) is meaningless");
+            fatal("!(struct/union) is meaningless");
         if (ast_Tk(n) == Num)
             ast_NumVal(n) = !ast_NumVal(n);
         else {
@@ -1773,7 +1874,7 @@ static void expr(int lev) {
         next();
         expr(Inc);
         if (ty > ATOM_TYPE)
-            die("~ptr is illegal");
+            fatal("~ptr is illegal");
         if (ast_Tk(n) == Num)
             ast_NumVal(n) = ~ast_NumVal(n);
         else {
@@ -1786,13 +1887,13 @@ static void expr(int lev) {
         next();
         expr(Inc);
         if (ty > ATOM_TYPE)
-            die("unary '+' illegal on ptr");
+            fatal("unary '+' illegal on ptr");
         break;
     case Sub:
         next();
         expr(Inc);
         if (ty > ATOM_TYPE)
-            die("unary '-' illegal on ptr");
+            fatal("unary '-' illegal on ptr");
         if (ast_Tk(n) == Num)
             ast_NumVal(n) = -ast_NumVal(n);
         else if (ast_Tk(n) == NumF) {
@@ -1813,15 +1914,15 @@ static void expr(int lev) {
         next();
         expr(Inc);
         if (ty == FLOAT)
-            die("no ++/-- on float");
+            fatal("no ++/-- on float");
         if (ast_Tk(n) != Load)
-            die("bad lvalue in pre-increment");
+            fatal("bad lvalue in pre-increment");
         ast_Tk(n) = t;
         break;
     case 0:
-        die("unexpected EOF in expression");
+        fatal("unexpected EOF in expression");
     default:
-        die("bad expression");
+        fatal("bad expression");
     }
 
     // "precedence climbing" or "Top Down Operator Precedence" method
@@ -1833,11 +1934,11 @@ static void expr(int lev) {
         switch (tk) {
         case Assign:
             if (t & 3)
-                die("Cannot assign to array type lvalue");
+                fatal("Cannot assign to array type lvalue");
             // the left part is processed by the variable part of `tk=ID`
             // and pushes the address
             if (ast_Tk(n) != Load)
-                die("bad lvalue in assignment");
+                fatal("bad lvalue in assignment");
             // get the value of the right part `expr` as the result of `a=expr`
             n += 2;
             b = n;
@@ -1858,9 +1959,9 @@ static void expr(int lev) {
         case DivAssign:
         case ModAssign:
             if (t & 3)
-                die("Cannot assign to array type lvalue");
+                fatal("Cannot assign to array type lvalue");
             if (ast_Tk(n) != Load)
-                die("bad lvalue in assignment");
+                fatal("bad lvalue in assignment");
             otk = tk;
             n += 2;
             b = n;
@@ -1884,12 +1985,12 @@ static void expr(int lev) {
             expr(Assign);
             tc = ty;
             if (tk != ':')
-                die("conditional missing colon");
+                fatal("conditional missing colon");
             next();
             c = n;
             expr(Cond);
             if (tc != ty)
-                die("both results need same type");
+                fatal("both results need same type");
             ast_Cond((int)n, (int)c, (int)b);
             break;
         case Lor: // short circuit, the logical or
@@ -2221,12 +2322,12 @@ static void expr(int lev) {
         case Inc:
         case Dec:
             if (ty & 3)
-                die("can't inc/dec an array variable");
+                fatal("can't inc/dec an array variable");
             if (ty == FLOAT)
-                die("no ++/-- on float");
+                fatal("no ++/-- on float");
             sz = (ty >= PTR2) ? sizeof(int) : ((ty >= PTR) ? tsize[(ty - PTR) >> 2] : 1);
             if (ast_Tk(n) != Load)
-                die("bad lvalue in post-increment");
+                fatal("bad lvalue in post-increment");
             ast_Tk(n) = tk;
             ast_Num(sz);
             ast_Oper((int)b, (tk == Inc) ? Sub : Add);
@@ -2262,7 +2363,7 @@ static void expr(int lev) {
             expr(Inc);
             typecheck(Mod, t, ty);
             if (ty == FLOAT)
-                die("use fmodf() for float modulo");
+                fatal("use fmodf() for float modulo");
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 ast_NumVal(b) %= ast_NumVal(n);
                 n = b;
@@ -2281,15 +2382,15 @@ static void expr(int lev) {
                 n += 2; // struct
         case Arrow:
             if (t <= PTR + ATOM_TYPE || t >= PTR2)
-                die("structure expected");
+                fatal("structure expected");
             next();
             if (tk != Id)
-                die("structure member expected");
+                fatal("structure member expected");
             m = members[(t - PTR) >> 2];
             while (m && m->id != id)
                 m = m->next;
             if (!m)
-                die("structure member not found");
+                fatal("structure member not found");
             if (m->offset) {
                 ast_Num(m->offset);
                 ast_Oper((int)(n + 2), Add);
@@ -2306,7 +2407,7 @@ static void expr(int lev) {
             t = ty & ~3;
         case Bracket:
             if (t < PTR)
-                die("pointer type expected");
+                fatal("pointer type expected");
             if (memsub == 0) {
                 dim = id->type & 3, ee = id->etype;
             }
@@ -2323,9 +2424,9 @@ static void expr(int lev) {
                 next();
                 expr(Assign);
                 if (ty >= FLOAT)
-                    die("non-int array index");
+                    fatal("non-int array index");
                 if (tk != ']')
-                    die("close bracket expected");
+                    fatal("close bracket expected");
                 c = n;
                 next();
                 if (dim) {
@@ -2383,7 +2484,7 @@ static void expr(int lev) {
                 ast_Load(((ty = t) >= PTR) ? INT : ty);
             break;
         default:
-            die("%d: compiler error tk=%d\n", line, tk);
+            fatal("%d: compiler error tk=%d\n", line, tk);
         }
     }
 }
@@ -2398,7 +2499,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
     // Global is preferred to local.
     // Either suggest global or automatically move to global scope.
     if (tn->class != Glo)
-        die("only global array initialization supported");
+        fatal("only global array initialization supported");
 
     switch (tn->type & ~3) {
     case (CHAR | PTR2):
@@ -2415,7 +2516,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
         match = FLOAT;
         break;
     default:
-        die("array-init must be literal ints, floats, or strings");
+        fatal("array-init must be literal ints, floats, or strings");
     }
 
     vi = (int*)tn->val;
@@ -2427,7 +2528,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
             if (cursor)
                 --cursor;
             else
-                die("overly nested initializer");
+                fatal("overly nested initializer");
             empty = 1;
             continue;
         } else if (tk == '}') {
@@ -2440,7 +2541,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
         } else {
             expr(Cond);
             if (ast_Tk(n) != Num && ast_Tk(n) != NumF)
-                die("non-literal initializer");
+                fatal("non-literal initializer");
 
             if (ty == CHAR + PTR) {
                 if (match == CHAR + PTR2) {
@@ -2455,7 +2556,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
                     memcpy((char*)vi + i, (char*)ast_NumVal(n), off);
                     i += inc[0];
                 } else
-                    die("can't assign string to scalar");
+                    fatal("can't assign string to scalar");
             } else if (ty == match)
                 vi[i++] = ast_NumVal(n);
             else if (ty == INT) {
@@ -2470,7 +2571,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
                 if (match == INT) {
                     vi[i++] = (int)*((float*)(n + 1));
                 } else
-                    die("illegal char/string initializer");
+                    fatal("illegal char/string initializer");
             }
             n += 2; // clean up AST
             empty = 0;
@@ -2482,7 +2583,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 
 void emit(int n) {
     if (e >= text_base + (TEXT_BYTES / 4))
-        die("code segment exceeded, program is too big");
+        fatal("code segment exceeded, program is too big");
     *++e = n;
 }
 
@@ -2507,7 +2608,7 @@ static void gen(int* n) {
     case Load:
         gen(n + 2);                                           // load the value
         if (ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR) // unreachable?
-            die("struct copies not yet supported");
+            fatal("struct copies not yet supported");
         emit((ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2));
         break;
     case Loc:
@@ -2526,7 +2627,7 @@ static void gen(int* n) {
         // Add SC/SI instruction to save value in register to variable address
         // held on stack.
         if (l > ATOM_TYPE && l < PTR)
-            die("struct assign not yet supported");
+            fatal("struct assign not yet supported");
         if ((ast_NumVal(n) >> 16) == FLOAT && l == INT)
             emit(FTOI);
         else if ((ast_NumVal(n) >> 16) == INT && l == FLOAT)
@@ -2764,7 +2865,7 @@ static void gen(int* n) {
         if (k) {
             l = Func_entry(n).parm_types >> 10;
             int* t;
-            t = sys_malloc(sizeof(int) * (k + 1));
+            t = sys_malloc(sizeof(int) * (k + 1), 1);
             j = 0;
             while (ast_Tk(b)) {
                 t[j++] = (int)b;
@@ -2903,7 +3004,7 @@ static void gen(int* n) {
         *cas = (int)e;
         gen((int*)ast_NumVal(n)); // condition
         if (*(e - 1) != IMM)
-            die("case label not a numeric literal");
+            fatal("case label not a numeric literal");
         emit(SUB);
         emit(BNZ);
         emit(0);
@@ -2918,7 +3019,7 @@ static void gen(int* n) {
     case Break:
         emit(JMP);
         emit(0);
-        patch = sys_malloc(sizeof(struct patch_s));
+        patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->addr = e;
         patch->next = brks;
         brks = patch;
@@ -2926,7 +3027,7 @@ static void gen(int* n) {
     case Continue:
         emit(JMP);
         emit(0);
-        patch = sys_malloc(sizeof(struct patch_s));
+        patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->next = cnts;
         patch->addr = e;
         cnts = patch;
@@ -2939,7 +3040,7 @@ static void gen(int* n) {
             label->val = (int)e; // Define label address later
         break;
     case Default:
-        patch = sys_malloc(sizeof(struct patch_s));
+        patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->next = def;
         patch->addr = e + 1;
         def = patch;
@@ -2960,7 +3061,7 @@ static void gen(int* n) {
     case Label: // target of goto
         label = (struct ident_s*)ast_NumVal(n);
         if (label->class != 0)
-            die("duplicate label definition");
+            fatal("duplicate label definition");
         d = e + 1;
         b = (uint16_t*)label->val;
         while (b != 0) {
@@ -2973,7 +3074,7 @@ static void gen(int* n) {
         break;
     default:
         if (i != ';')
-            die("%d: compiler error gen=%08x\n", line, i);
+            fatal("%d: compiler error gen=%08x\n", line, i);
     }
 }
 
@@ -2985,7 +3086,7 @@ static void check_label(int** tt) {
         ++ss;
     if (*ss == ':') {
         if (id->class != 0 || !(id->type == 0 || id->type == -1))
-            die("invalid label");
+            fatal("invalid label");
         id->type = -1; // hack for id->class deficiency
         ast_Label((int)id);
         ast_Begin((int)*tt);
@@ -3006,11 +3107,11 @@ static void loc_array_decl(int ct, int extent[3], int* dims, int* et, int* size)
         } else {
             expr(Cond);
             if (ast_Tk(n) != Num)
-                die("non-const array size");
+                fatal("non-const array size");
             if (ast_NumVal(n) <= 0)
-                die("non-positive array dimension");
+                fatal("non-positive array dimension");
             if (tk != ']')
-                die("missing ]");
+                fatal("missing ]");
             next();
             extent[*dims] = ast_NumVal(n);
             *size *= ast_NumVal(n);
@@ -3019,7 +3120,7 @@ static void loc_array_decl(int ct, int extent[3], int* dims, int* et, int* size)
         ++*dims;
     } while (tk == Bracket && *dims < 3);
     if (tk == Bracket)
-        die("three subscript max on decl");
+        fatal("three subscript max on decl");
     switch (*dims) {
     case 1:
         *et = (extent[0] - 1);
@@ -3027,12 +3128,12 @@ static void loc_array_decl(int ct, int extent[3], int* dims, int* et, int* size)
     case 2:
         *et = ((extent[0] - 1) << 16) + (extent[1] - 1);
         if (extent[0] > 32768 || extent[1] > 65536)
-            die("max bounds [32768][65536]");
+            fatal("max bounds [32768][65536]");
         break;
     case 3:
         *et = ((extent[0] - 1) << 21) + ((extent[1] - 1) << 11) + (extent[2] - 1);
         if (extent[0] > 1024 || extent[1] > 1024 || extent[2] > 2048)
-            die("max bounds [1024][1024][2048]");
+            fatal("max bounds [1024][1024][2048]");
         break;
     }
 }
@@ -3097,7 +3198,7 @@ static void stmt(int ctx) {
     int bt;
 
     if (ctx == Glo && (tk < Enum || tk > Union))
-        die("syntax: statement used outside function");
+        fatal("syntax: statement used outside function");
 
     switch (tk) {
     case Enum:
@@ -3113,14 +3214,14 @@ static void stmt(int ctx) {
                 // Current token should be enum name.
                 // If current token is not identifier, stop parsing.
                 if (tk != Id)
-                    die("bad enum identifier");
+                    fatal("bad enum identifier");
                 dd = id;
                 next();
                 if (tk == Assign) {
                     next();
                     expr(Cond);
                     if (ast_Tk(n) != Num)
-                        die("bad enum initializer");
+                        fatal("bad enum initializer");
                     i = ast_NumVal(n);
                     n += 2; // Set enum value
                 }
@@ -3133,7 +3234,7 @@ static void stmt(int ctx) {
             next(); // Skip "}"
         } else if (tk == Id) {
             if (ctx != Par)
-                die("enum can only be declared as parameter");
+                fatal("enum can only be declared as parameter");
             id->type = INT;
             id->class = ctx;
             id->val = ld++;
@@ -3169,7 +3270,7 @@ static void stmt(int ctx) {
             if (tk == '{') {
                 next();
                 if (members[bt >> 2])
-                    die("duplicate structure definition");
+                    fatal("duplicate structure definition");
                 tsize[bt >> 2] = 0; // for unions
                 i = 0;
                 while (tk != '}') {
@@ -3185,7 +3286,7 @@ static void stmt(int ctx) {
                     case Union:
                         next();
                         if (tk != Id || id->type <= ATOM_TYPE || id->type >= PTR)
-                            die("bad struct/union declaration");
+                            fatal("bad struct/union declaration");
                         mbt = id->type;
                         next();
                         break;
@@ -3199,9 +3300,9 @@ static void stmt(int ctx) {
                             ty += PTR;
                         }
                         if (tk != Id)
-                            die("bad struct member definition");
+                            fatal("bad struct member definition");
                         sz = (ty >= PTR) ? sizeof(int) : tsize[ty >> 2];
-                        struct member_s* m = (struct member_s*)sys_malloc(sizeof(struct member_s));
+                        struct member_s* m = sys_malloc(sizeof(struct member_s), 1);
                         m->id = id;
                         m->etype = 0;
                         next();
@@ -3248,15 +3349,15 @@ static void stmt(int ctx) {
             switch (ctx) { // check non-callable identifiers
             case Glo:
                 if (tk != Id)
-                    die("bad global declaration");
+                    fatal("bad global declaration");
                 if (id->class >= ctx)
-                    die("duplicate global definition");
+                    fatal("duplicate global definition");
                 break;
             case Loc:
                 if (tk != Id)
-                    die("bad local declaration");
+                    fatal("bad local declaration");
                 if (id->class >= ctx)
-                    die("duplicate local definition");
+                    fatal("duplicate local definition");
                 break;
             }
             next();
@@ -3266,18 +3367,18 @@ static void stmt(int ctx) {
             }
             dd = id;
             if (dd->forward && (dd->type != ty))
-                die("Function return type does not match prototype");
+                fatal("Function return type does not match prototype");
             dd->type = ty;
             if (tk == '(') { // function
                 if (b != 0)
-                    die("func decl can't be mixed with var decl(s)");
+                    fatal("func decl can't be mixed with var decl(s)");
                 if (ctx != Glo)
-                    die("nested function");
+                    fatal("nested function");
                 if (ty > ATOM_TYPE && ty < PTR)
-                    die("return type can't be struct");
+                    fatal("return type can't be struct");
                 if (id->class == Func && id->val > (int)text_base && id->val < (int)e &&
                     id->forward == 0)
-                    die("duplicate global definition");
+                    fatal("duplicate global definition");
                 int ddetype = 0;
                 dd->class = Func;       // type is function
                 dd->val = (int)(e + 1); // function Pointer? offset/address
@@ -3294,12 +3395,12 @@ static void stmt(int ctx) {
                         next();
                 }
                 if (ld > ADJ_MASK)
-                    die("maximum of %d function parameters", ADJ_MASK);
+                    fatal("maximum of %d function parameters", ADJ_MASK);
                 // function etype is not like other etypes
                 next();
                 ddetype = (ddetype << 10) + (nf << 5) + ld; // prm info
                 if (dd->forward && (ddetype != dd->etype))
-                    die("parameters don't match prototype");
+                    fatal("parameters don't match prototype");
                 if (dd->forward) { // patch the forward jump
                     *(dd->forward) = dd->val;
                     dd->forward = 0;
@@ -3313,7 +3414,7 @@ static void stmt(int ctx) {
                     dd->forward = e;
                 } else { // function with body
                     if (tk != '{')
-                        die("bad function definition");
+                        fatal("bad function definition");
                     loc = ++ld;
                     next();
                     // Not declaration and must not be function, analyze inner block.
@@ -3328,7 +3429,7 @@ static void stmt(int ctx) {
                             ast_Begin((int)t);
                     }
                     if (rtf == 0 && rtt != -1)
-                        die("expecting return value");
+                        fatal("expecting return value");
                     ast_Enter(ld - loc);
                     cas = 0;
                     se = e;
@@ -3353,7 +3454,7 @@ static void stmt(int ctx) {
                         id->val = 0;
                         id->type = 0;
                     } else if (id->class == 0 && id->type == -1)
-                        die("%d: label %.*s not defined\n", line, id->hash & 0x3f, id->name);
+                        fatal("%d: label %.*s not defined\n", line, id->hash & 0x3f, id->name);
                     id++;
                 }
             } else {
@@ -3374,21 +3475,21 @@ static void stmt(int ctx) {
                 if (ctx == Glo) {
                     dd->val = (int)data;
                     if (data + sz >= data_base + (DATA_BYTES / 4))
-                        die("program data exceeds data segment");
+                        fatal("program data exceeds data segment");
                     data += sz;
                 } else if (ctx == Loc) {
                     dd->val = (ld += sz / sizeof(int));
                     ir_var[ir_count++] = dd;
                 } else if (ctx == Par) {
                     if (ty > ATOM_TYPE && ty < PTR) // local struct decl
-                        die("struct parameters must be pointers");
+                        fatal("struct parameters must be pointers");
                     dd->val = ld++;
                     ir_var[ir_count++] = dd;
                 }
                 if (tk == Assign) {
                     next();
                     if (ctx == Par)
-                        die("default arguments not supported");
+                        fatal("default arguments not supported");
                     if (tk == '{' && (dd->type & 3))
                         init_array(dd, nd, j);
                     else {
@@ -3409,9 +3510,9 @@ static void stmt(int ctx) {
                             expr(Cond);
                             typecheck(Assign, i, ty);
                             if (ast_Tk(n) != Num && ast_Tk(n) != NumF)
-                                die("global assignment must eval to lit expr");
+                                fatal("global assignment must eval to lit expr");
                             if (ty == CHAR + PTR && (dd->type & 3) != 1)
-                                die("use decl char foo[nn] = \"...\";");
+                                fatal("use decl char foo[nn] = \"...\";");
                             if ((ast_Tk(n) == Num && (i == CHAR || i == INT)) ||
                                 (ast_Tk(n) == NumF && i == FLOAT))
                                 *((int*)dd->val) = ast_NumVal(n);
@@ -3423,7 +3524,7 @@ static void stmt(int ctx) {
                                 }
                                 memcpy((char*)dd->val, (char*)ast_NumVal(n), i);
                             } else
-                                die("unsupported global initializer");
+                                fatal("unsupported global initializer");
                             n += 2;
                         }
                     }
@@ -3436,12 +3537,12 @@ static void stmt(int ctx) {
     case If:
         next();
         if (tk != '(')
-            die("open parenthesis expected");
+            fatal("open parenthesis expected");
         next();
         expr(Assign);
         a = n;
         if (tk != ')')
-            die("close parenthesis expected");
+            fatal("close parenthesis expected");
         next();
         stmt(ctx);
         b = n;
@@ -3456,12 +3557,12 @@ static void stmt(int ctx) {
     case While:
         next();
         if (tk != '(')
-            die("open parenthesis expected");
+            fatal("open parenthesis expected");
         next();
         expr(Assign);
         b = n; // condition
         if (tk != ')')
-            die("close parenthesis expected");
+            fatal("close parenthesis expected");
         next();
         ++brkc;
         ++cntc;
@@ -3480,16 +3581,16 @@ static void stmt(int ctx) {
         --brkc;
         --cntc;
         if (tk != While)
-            die("while expected");
+            fatal("while expected");
         next();
         if (tk != '(')
-            die("open parenthesis expected");
+            fatal("open parenthesis expected");
         next();
         ast_Single(';');
         expr(Assign);
         b = n;
         if (tk != ')')
-            die("close parenthesis expected");
+            fatal("close parenthesis expected");
         next();
         ast_While((int)b, (int)a, DoWhile);
         return;
@@ -3501,12 +3602,12 @@ static void stmt(int ctx) {
         cas = &i;
         next();
         if (tk != '(')
-            die("open parenthesis expected");
+            fatal("open parenthesis expected");
         next();
         expr(Assign);
         a = n;
         if (tk != ')')
-            die("close parenthesis expected");
+            fatal("close parenthesis expected");
         next();
         ++swtc;
         ++brkc;
@@ -3520,19 +3621,19 @@ static void stmt(int ctx) {
         return;
     case Case:
         if (!swtc)
-            die("case-statement outside of switch");
+            fatal("case-statement outside of switch");
         i = *cas;
         next();
         expr(Or);
         a = n;
         if (ast_Tk(n) != Num)
-            die("case label not a numeric literal");
+            fatal("case label not a numeric literal");
         j = ast_NumVal(n);
         ast_NumVal(n) -= i;
         *cas = j;
         ast_Single(';');
         if (tk != ':')
-            die("colon expected");
+            fatal("colon expected");
         next();
         stmt(ctx);
         b = n;
@@ -3540,28 +3641,28 @@ static void stmt(int ctx) {
         return;
     case Break:
         if (!brkc)
-            die("misplaced break statement");
+            fatal("misplaced break statement");
         next();
         if (tk != ';')
-            die("semicolon expected");
+            fatal("semicolon expected");
         next();
         ast_Single(Break);
         return;
     case Continue:
         if (!cntc)
-            die("misplaced continue statement");
+            fatal("misplaced continue statement");
         next();
         if (tk != ';')
-            die("semicolon expected");
+            fatal("semicolon expected");
         next();
         ast_Single(Continue);
         return;
     case Default:
         if (!swtc)
-            die("default-statement outside of switch");
+            fatal("default-statement outside of switch");
         next();
         if (tk != ':')
-            die("colon expected");
+            fatal("colon expected");
         next();
         stmt(ctx);
         a = n;
@@ -3575,16 +3676,16 @@ static void stmt(int ctx) {
             expr(Assign);
             a = n;
             if (rtt == -1)
-                die("not expecting return value");
+                fatal("not expecting return value");
             typecheck(Eq, rtt, ty);
         } else {
             if (rtt != -1)
-                die("return value expected");
+                fatal("return value expected");
         }
         rtf = 1; // signal a return statement exisits
         ast_Return((int)a);
         if (tk != ';')
-            die("semicolon expected");
+            fatal("semicolon expected");
         next();
         return;
     /* For iteration is implemented as:
@@ -3594,7 +3695,7 @@ static void stmt(int ctx) {
     case For:
         next();
         if (tk != '(')
-            die("open parenthesis expected");
+            fatal("open parenthesis expected");
         next();
         ast_Single(';');
         if (tk != ';')
@@ -3607,14 +3708,14 @@ static void stmt(int ctx) {
         }
         d = n;
         if (tk != ';')
-            die("semicolon expected");
+            fatal("semicolon expected");
         next();
         ast_Single(';');
         if (tk != ';') {
             expr(Assign);
             a = n; // Point to entry of for cond
             if (tk != ';')
-                die("semicolon expected");
+                fatal("semicolon expected");
         } else
             a = 0;
         next();
@@ -3629,7 +3730,7 @@ static void stmt(int ctx) {
         }
         b = n;
         if (tk != ')')
-            die("close parenthesis expected");
+            fatal("close parenthesis expected");
         next();
         ++brkc;
         ++cntc;
@@ -3642,12 +3743,12 @@ static void stmt(int ctx) {
     case Goto:
         next();
         if (tk != Id || (id->type != 0 && id->type != -1) || (id->class != Label && id->class != 0))
-            die("goto expects label");
+            fatal("goto expects label");
         id->type = -1; // hack for id->class deficiency
         ast_Goto((int)id);
         next();
         if (tk != ';')
-            die("semicolon expected");
+            fatal("semicolon expected");
         next();
         return;
     // stmt -> '{' stmt '}'
@@ -3671,7 +3772,7 @@ static void stmt(int ctx) {
     default:
         expr(Assign);
         if (tk != ';' && tk != ',')
-            die("semicolon expected");
+            fatal("semicolon expected");
         next();
     }
 }
@@ -3756,7 +3857,7 @@ static void help(char* lib) {
                 show_defines(includes[i].grp);
             return;
         }
-    die("unknown lib %s", lib);
+    fatal("unknown lib %s", lib);
     return;
 }
 
@@ -3777,7 +3878,7 @@ int cc(int argc, char** argv) {
     if (setjmp(done_jmp))
         goto done;
 
-    sym = sys_malloc(SYM_TBL_BYTES);
+    sym = sys_malloc(SYM_TBL_BYTES, 1);
 
     // Register keywords in symbol stack. Must match the sequence of enum
     p = "enum char int float struct union sizeof return goto break continue "
@@ -3799,9 +3900,9 @@ int cc(int argc, char** argv) {
     struct ident_s* idmain = id;
     id->class = Main; // keep track of main
 
-    data_base = data = sys_malloc(DATA_BYTES);
-    tsize = sys_malloc(TS_TBL_BYTES);
-    ast = sys_malloc(AST_TBL_BYTES);
+    data_base = data = sys_malloc(DATA_BYTES, 1);
+    tsize = sys_malloc(TS_TBL_BYTES, 1);
+    ast = sys_malloc(AST_TBL_BYTES, 1);
     n = ast + (AST_TBL_BYTES / 4) - 1;
 
     // add primitive types
@@ -3829,7 +3930,7 @@ int cc(int argc, char** argv) {
             p = &(*argv)[2];
             next();
             if (tk != Id)
-                die("bad -D identifier");
+                fatal("bad -D identifier");
             struct ident_s* dd = id;
             next();
             int i = 0;
@@ -3837,7 +3938,7 @@ int cc(int argc, char** argv) {
                 next();
                 expr(Cond);
                 if (ast_Tk(n) != Num)
-                    die("bad -D initializer");
+                    fatal("bad -D initializer");
                 i = ast_NumVal(n);
                 n += 2;
             }
@@ -3862,27 +3963,27 @@ int cc(int argc, char** argv) {
     add_defines(spi_defines);
     add_defines(irq_defines);
 
-    char* fn = sys_malloc(strlen(full_path(*argv)) + 3);
+    char* fn = sys_malloc(strlen(full_path(*argv)) + 3, 1);
     strcpy(fn, full_path(*argv));
     if (strrchr(fn, '.') == NULL)
         strcat(fn, ".c");
-    fd = sys_malloc(sizeof(lfs_file_t));
+    fd = sys_malloc(sizeof(lfs_file_t), 1);
     if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
         sys_free(fd);
         fd = NULL;
-        die("could not open %s \n", fn);
+        fatal("could not open %s \n", fn);
     }
     sys_free(fn);
 
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
 
-    text_base = le = e = sys_malloc(TEXT_BYTES);
-    members = sys_malloc(MEMBER_DICT_BYTES);
+    text_base = le = e = sys_malloc(TEXT_BYTES, 1);
+    members = sys_malloc(MEMBER_DICT_BYTES, 1);
 
-    src = lp = p = sys_malloc(siz + 1);
+    src = lp = p = sys_malloc(siz + 1, 1);
     if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
-        die("unable to read from source file");
+        fatal("unable to read from source file");
     p[siz] = 0;
     fs_file_close(fd);
     sys_free(fd);
@@ -3899,7 +4000,7 @@ int cc(int argc, char** argv) {
     // check for unpatched forward JMPs
     for (struct ident_s* scan = sym; scan->tk; ++scan)
         if (scan->class == Func && scan->forward)
-            die("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
+            fatal("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
     sys_free(ast);
     ast = NULL;
     sys_free(src);
@@ -3909,7 +4010,7 @@ int cc(int argc, char** argv) {
     sys_free(tsize);
     tsize = NULL;
     if (!idmain->val)
-        die("main() not defined\n");
+        fatal("main() not defined\n");
 
     if (src_opt)
         goto done;

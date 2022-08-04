@@ -1,3 +1,7 @@
+What's new in version 1.1.16
+
+- fix broken keyboard BREAK option
+
 What's new in version 1.1.15
 
 - fix handling of . and .. notation for directory names
