@@ -5,8 +5,6 @@
  * The following options are supported:
  *   -s : Print source and generated representation.
  *
- * If -s is omitted, the compiled code is executed immediately
- *
  * All modifications as of Feb 19 2022 are by HPCguy.
  * See AMaCC project repository for baseline code prior to that date.
  *
@@ -68,6 +66,17 @@
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 extern void get_screen_xy(int* x, int* y);
+
+extern void __wrap___aeabi_idiv();
+extern void __wrap___aeabi_i2f();
+extern void __wrap___aeabi_fadd();
+extern void __wrap___aeabi_fsub();
+extern void __wrap___aeabi_fmul();
+extern void __wrap___aeabi_fdiv();
+extern void __wrap___aeabi_fcmple();
+extern void __wrap___aeabi_fcmpgt();
+extern void __wrap___aeabi_fcmplt();
+extern void __wrap___aeabi_fcmpge();
 
 extern void test_func();
 
@@ -2305,6 +2314,28 @@ static void emit_JMP(int n) {
     emit(0xe000 | ofs); // JMP n
 }
 
+static void emit_B(int n, int cond) {
+    uint16_t i;
+    switch (cond) {
+    case BZ:
+        i = 0xd000; // beq n
+        break;
+    case BNZ:
+        i = 0xd100; // bne n
+        break;
+    default:
+        fatal("unexpected compiler error");
+    }
+    int ofs = 0;
+    if (n) {
+        ofs = (n - (int)e) / 2 - 1;
+        if (ofs < -128 || ofs > 127)
+            fatal("branch too far");
+        ofs &= 0xff;
+    }
+    emit(i | ofs);
+}
+
 static void emit_OP(int op) {
     switch (op) {
     case OR:
@@ -2346,9 +2377,43 @@ static void emit_OP(int op) {
     case LT:
     case GT:
     case LE:
+        emit(0xbc02); // pop {r1}
+        emit(0x4288); // cmp r0, r1
+        emit_IMM(1);
+        uint16_t i;
+        switch (op) {
+        case EQ:
+            emit(0xd001); // beq * + 2
+            break;
+        case NE:
+            emit(0xd101); // bne * + 2
+            break;
+        case GE:
+            emit(0xda01); // bge * + 2
+            break;
+        case LT:
+            emit(0xdb01); // blt * + 2
+            break;
+        case GT:
+            emit(0xdc01); // bgt * + 2
+            break;
+        case LE:
+            emit(0xdd01); // ble * + 2
+            break;
+        default:
+            fatal("unexpected compiler error");
+        }
+        emit_IMM(0);
         break;
+
     case DIV:
     case MOD:
+        emit(0xbc02); // pop {r1}
+        emit(0x4a00); // ldr r2, [pc, n]
+        new_lit(e, (int)__wrap___aeabi_idiv, pc_relative);
+        emit(0x4790); // blx r2
+        if (op == MOD)
+            emit(0x4608); // mov r0,r1
         break;
     default:
         fatal("unexpected compiler error");
@@ -2361,39 +2426,59 @@ static void emit_OP_F(int op) {
     case SUBF:
     case MULF:
     case DIVF:
-        break;
+        emit(0xbc02); // pop {r1}
+        emit(0x4a00); // ldr r2, [pc, n]
+        switch (op) {
+        case ADDF:
+            new_lit(e, (int)__wrap___aeabi_fadd, pc_relative);
+            break;
+        case SUBF:
+            new_lit(e, (int)__wrap___aeabi_fsub, pc_relative);
+            break;
+        case MULF:
+            new_lit(e, (int)__wrap___aeabi_fmul, pc_relative);
+            break;
+        case DIVF:
+            new_lit(e, (int)__wrap___aeabi_fdiv, pc_relative);
+            break;
+        }
+        emit(0x4790); // blx r2
+
     case EQF:
+        emit_OP(EQ);
+        break;
     case NEF:
+        emit_OP(NE);
+        break;
+
     case GEF:
     case LTF:
     case GTF:
     case LEF:
+        emit(0xbc02); // pop {r1}
+        emit(0x4a00); // ldr r2, [pc, n]
+        switch (op) {
+        case GEF:
+            new_lit(e, (int)__wrap___aeabi_fcmpge, pc_relative);
+            break;
+        case LTF:
+            new_lit(e, (int)__wrap___aeabi_fcmplt, pc_relative);
+            break;
+        case GTF:
+            new_lit(e, (int)__wrap___aeabi_fcmpgt, pc_relative);
+            break;
+        case LEF:
+            new_lit(e, (int)__wrap___aeabi_fcmple, pc_relative);
+            break;
+        default:
+            fatal("unexpected compiler error");
+        }
+        emit(0x4790); // blx r2
         break;
-    default:
-        fatal("unexpected compiler error");
-    }
-}
 
-static void emit_B(int n, int cond) {
-    uint16_t i;
-    switch (cond) {
-    case BZ:
-        i = 0xd000; // beq n
-        break;
-    case BNZ:
-        i = 0xd100; // bne n
-        break;
     default:
         fatal("unexpected compiler error");
     }
-    int ofs = 0;
-    if (n) {
-        ofs = (n - (int)e) / 2 - 1;
-        if (ofs < -128 || ofs > 127)
-            fatal("branch too far");
-        ofs &= 0xff;
-    }
-    emit(i | ofs);
 }
 
 // AST parsing for IR generatiion

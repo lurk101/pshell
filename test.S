@@ -16,6 +16,9 @@
 test_func:
 		push {lr}
 		pop  {pc}
+		blx r2
+		mov	r0,r1
+		cmp  r0, r1
         push {r4-r7, lr}
 		mov  r7, sp
 		sub  sp, #0
