@@ -69,6 +69,8 @@ extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int sflag);
 extern void get_screen_xy(int* x, int* y);
 
+extern void test_func();
+
 enum {
     pc_relative = 0,
 };
@@ -123,6 +125,7 @@ static int* n;                  // current position in emitted abstract syntax t
 static int ld;                  // local variable depth
 static int pplev, pplevt;       // preprocessor conditional level
 static int* ast;                // abstract syntax tree
+static ARMSTATE state;          // disassembler state
 
 // identifier
 #define MAX_IR 64 // maximum number of local variable or function parameters
@@ -2207,6 +2210,15 @@ static void emit_Word(uint32_t n) {
     ++e;
 }
 
+static void new_lit(uint16_t* addr, int val, int type) {
+    struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
+    l->addr = addr;
+    l->val = val;
+    l->patch_type = type;
+    l->next = lit;
+    lit = l;
+}
+
 static void emit_ENT(int n) {
     emit(0xb5f0);             // push    {r4, r5, r6, r7, lr}
     emit(0x466f);             // mov  r7, sp
@@ -2216,12 +2228,7 @@ static void emit_ENT(int n) {
         else {                //
             emit(0x4900);     // ldr r1, [pc, n]
             emit(0x448d);     // add sp, r1
-            struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
-            l->addr = e - 1;
-            l->val = loc - ld;
-            l->patch_type = pc_relative;
-            l->next = lit;
-            lit = l;
+            new_lit(e - 1, loc - ld, pc_relative);
         }
     }
 }
@@ -2238,7 +2245,10 @@ static void patch_literals(void) {
         emit_Word(lit->val);
         switch (lit->patch_type) {
         case pc_relative:
-            *lit->addr |= ((int)e - ((int)lit->addr & ~3)) / 4 - 1;
+            int v = ((int)e - ((int)lit->addr & ~3)) / 4 - 1;
+            if (v >= 256)
+                fatal("pc relative too far");
+            *lit->addr |= v;
             break;
         default:
             fatal("unexpected compiler error");
@@ -2254,12 +2264,7 @@ static void emit_IMM(int n) {
         emit(0x2000 | n); // movs r0, #n
     else {                //
         emit(0x4800);     // ldr r0, [pc, n]
-        struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
-        l->addr = e;
-        l->val = n;
-        l->patch_type = pc_relative;
-        l->next = lit;
-        lit = l;
+        new_lit(e, n, pc_relative);
     }
 }
 
@@ -2268,6 +2273,127 @@ static void emit_IMMF(int n) { emit_IMM(n); }
 static void emit_LEA(int n) {
     emit_IMM((-n + 5) * 4);
     emit(0x4438); // add r0, r7
+}
+
+static void emit_PSH(void) {
+    emit(0xb401); // push {r0}
+}
+
+static void emit_S(int n) {
+    emit(0xbc02); // pop {r1}
+    switch (n) {
+    case SC:
+        emit(0x7008); // strb    r0, [r1, #0]
+        break;
+    case SI:
+    case SF:
+        emit(0x6008); // str r0, [r1, #0]
+        break;
+    default:
+        fatal("unexpected compiler error");
+    }
+}
+
+static void emit_JMP(int n) {
+    int ofs = 0;
+    if (n) {
+        ofs = (n - (int)e) / 2 - 1;
+        if (ofs < -1024 || ofs > 1023)
+            fatal("jmp too far");
+        ofs &= 0x7ff;
+    }
+    emit(0xe000 | ofs); // JMP n
+}
+
+static void emit_OP(int op) {
+    switch (op) {
+    case OR:
+        emit(0xbc02); // pop {r1}
+        emit(0x4308);
+        break;
+    case XOR:
+        emit(0xbc02); // pop {r1}
+        emit(0x4048);
+        break;
+    case AND:
+        emit(0xbc02); // pop {r1}
+        emit(0x4008);
+        break;
+    case SHL:
+        emit(0xbc02); // pop {r1}
+        emit(0x4088);
+        break;
+    case SHR:
+        emit(0xbc02); // pop {r1}
+        emit(0x4108);
+        break;
+    case SUB:
+        emit(0xbc02); // pop {r1}
+        emit(0x1a40); // subs    r0, r0, r1;
+        break;
+    case ADD:
+        emit(0xbc02); // pop {r1}
+        emit(0x1840); // adds    r0, r0, r1;
+        break;
+    case MUL:
+        emit(0xbc02); // pop {r1}
+        emit(0x4348); // muls    r0, r1;
+        break;
+
+    case EQ:
+    case NE:
+    case GE:
+    case LT:
+    case GT:
+    case LE:
+        break;
+    case DIV:
+    case MOD:
+        break;
+    default:
+        fatal("unexpected compiler error");
+    }
+}
+
+static void emit_OP_F(int op) {
+    switch (op) {
+    case ADDF:
+    case SUBF:
+    case MULF:
+    case DIVF:
+        break;
+    case EQF:
+    case NEF:
+    case GEF:
+    case LTF:
+    case GTF:
+    case LEF:
+        break;
+    default:
+        fatal("unexpected compiler error");
+    }
+}
+
+static void emit_B(int n, int cond) {
+    uint16_t i;
+    switch (cond) {
+    case BZ:
+        i = 0xd000; // beq n
+        break;
+    case BNZ:
+        i = 0xd100; // bne n
+        break;
+    default:
+        fatal("unexpected compiler error");
+    }
+    int ofs = 0;
+    if (n) {
+        ofs = (n - (int)e) / 2 - 1;
+        if (ofs < -128 || ofs > 127)
+            fatal("branch too far");
+        ofs &= 0xff;
+    }
+    emit(i | ofs);
 }
 
 // AST parsing for IR generatiion
@@ -2301,7 +2427,7 @@ static void gen(int* n) {
         break;   // parse AST expr or stmt
     case Assign: // assign the value to variables
         gen((int*)Assign_entry(n).right_part);
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 3);
         l = ast_NumVal(n) & 0xffff;
         // Add SC/SI instruction to save value in register to variable address
@@ -2312,26 +2438,25 @@ static void gen(int* n) {
             old_emit(FTOI);
         else if ((ast_NumVal(n) >> 16) == INT && l == FLOAT)
             old_emit(ITOF);
-        old_emit((l >= PTR) ? SI : SC + (l >> 2));
+        emit_S((l >= PTR) ? SI : SC + (l >> 2));
         break;
     case Inc: // increment or decrement variables
     case Dec:
         gen(n + 2);
-        old_emit(PSH);
+        emit_PSH();
         old_emit((ast_NumVal(n) == CHAR) ? LC : LI);
-        old_emit(PSH);
+        emit_PSH();
         emit_IMM((ast_NumVal(n) >= PTR2)
                      ? sizeof(int)
                      : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1));
-        old_emit((i == Inc) ? ADD : SUB);
-        old_emit((ast_NumVal(n) == CHAR) ? SC : SI);
+        emit_OP((i == Inc) ? ADD : SUB);
+        emit_S((ast_NumVal(n) == CHAR) ? SC : SI);
         break;
     case Cond:                              // if else condition case
         gen((int*)Cond_entry(n).cond_part); // condition
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
-        old_emit(BZ);
-        old_emit(0);
+        emit_B(0, BZ);
         b = e;
         gen((int*)Cond_entry(n).if_part); // expression
         // Patch the jump address field pointed to by "b" to hold the address
@@ -2340,15 +2465,14 @@ static void gen(int* n) {
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
-            *b = (int)(e + 3);
-            old_emit(JMP);
-            old_emit(0);
+            //*b = (int)(e + 3); // *** FIX ***
+            emit_JMP(0);
             b = e;
             gen((int*)Cond_entry(n).else_part);
         } // else statment
         // Patch the jump address field pointed to by "d" to hold the address
         // past the false branch.
-        *b = (int)(e + 1);
+        //*b = (int)(e + 1); // ***FIX***
         break;
     // operators
     /* If current token is logical OR operator:
@@ -2360,15 +2484,15 @@ static void gen(int* n) {
      */
     case Lor:
         gen((int*)ast_NumVal(n));
-        old_emit(BNZ);
-        b = ++e;
+        emit_B(0, BNZ);
+        b = e;
         gen(n + 2);
         ast_Tk(b) = (int)(e + 1);
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
-        old_emit(BZ);
-        b = ++e;
+        emit_B(0, BZ);
+        b = e;
         gen(n + 2);
         ast_Tk(b) = (int)(e + 1);
         break;
@@ -2379,159 +2503,159 @@ static void gen(int* n) {
      */
     case Or:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(OR);
+        emit_OP(OR);
         break;
     case Xor:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(XOR);
+        emit_OP(XOR);
         break;
     case And:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(AND);
+        emit_OP(AND);
         break;
     case Eq:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(EQ);
+        emit_OP(EQ);
         break;
     case Ne:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(NE);
+        emit_OP(NE);
         break;
     case Ge:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(GE);
+        emit_OP(GE);
         break;
     case Lt:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(LT);
+        emit_OP(LT);
         break;
     case Gt:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(GT);
+        emit_OP(GT);
         break;
     case Le:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(LE);
+        emit_OP(LE);
         break;
     case Shl:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(SHL);
+        emit_OP(SHL);
         break;
     case Shr:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(SHR);
+        emit_OP(SHR);
         break;
     case Add:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(ADD);
+        emit_OP(ADD);
         break;
     case Sub:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(SUB);
+        emit_OP(SUB);
         break;
     case Mul:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(MUL);
+        emit_OP(MUL);
         break;
     case Div:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(DIV);
+        emit_OP(DIV);
         break;
     case Mod:
         gen((int*)ast_NumVal(n));
-        old_emit(PSH);
+        emit_PSH();
         gen(n + 2);
-        old_emit(MOD);
+        emit_OP(MOD);
         break;
     case AddF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(ADDF);
+        emit_OP_F(ADDF);
         break;
     case SubF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(SUBF);
+        emit_OP_F(SUBF);
         break;
     case MulF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(MULF);
+        emit_OP_F(MULF);
         break;
     case DivF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(DIVF);
+        emit_OP_F(DIVF);
         break;
     case EqF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(EQF);
+        emit_OP_F(EQF);
         break;
     case NeF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(NEF);
+        emit_OP_F(NEF);
         break;
     case GeF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(GEF);
+        emit_OP_F(GEF);
         break;
     case LtF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(LTF);
+        emit_OP_F(LTF);
         break;
     case GtF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(GTF);
+        emit_OP_F(GTF);
         break;
     case LeF:
         gen((int*)ast_NumVal(n));
-        old_emit(PSHF);
+        emit_PSH();
         gen(n + 2);
-        old_emit(LEF);
+        emit_OP_F(LEF);
         break;
     case CastF:
         gen((int*)CastF_entry(n).val);
@@ -2553,11 +2677,7 @@ static void gen(int* n) {
             int sj = j;
             while (j >= 0) { // push arguments
                 gen((int*)b + 1);
-                if ((l & (1 << j)))
-                    old_emit(PSHF);
-                else
-                    old_emit(PSH);
-
+                emit_PSH();
                 --j;
                 b = (uint16_t*)t[j];
             }
@@ -2578,8 +2698,8 @@ static void gen(int* n) {
     case While:
     case DoWhile:
         if (i == While) {
-            old_emit(JMP);
-            a = ++e;
+            emit_JMP(0);
+            a = e;
         }
         d = (e + 1);
         b = (uint16_t*)brks;
@@ -2587,21 +2707,20 @@ static void gen(int* n) {
         c = (uint16_t*)cnts;
         cnts = 0;
         gen((int*)While_entry(n).body); // loop body
-        if (i == While)
-            *a = (int)(e + 1);
+        // if (i == While) // *** FIX ***
+        //    *a = (int)(e + 1);
         while (cnts) {
             t = (uint16_t*)cnts->next;
-            *cnts->addr = (int)(e + 1);
+            //*cnts->addr = (int)(e + 1); // *** FIX ***
             sys_free(cnts);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
         gen((int*)While_entry(n).cond); // condition
-        old_emit(BNZ);
-        old_emit((int)d);
+        emit_B((int)d, BNZ);
         while (brks) {
             t = (uint16_t*)brks->next;
-            *brks->addr = (int)(e + 1);
+            // *brks->addr = (int)(e + 1); // ***FIX***
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -2609,8 +2728,8 @@ static void gen(int* n) {
         break;
     case For:
         gen((int*)For_entry(n).init); // init
-        old_emit(JMP);
-        a = ++e;
+        emit_JMP(0);
+        a = e;
         d = (e + 1);
         b = (uint16_t*)brks;
         brks = 0;
@@ -2619,24 +2738,22 @@ static void gen(int* n) {
         gen((int*)For_entry(n).body); // loop body
         while (cnts) {
             t = (uint16_t*)cnts->next;
-            *cnts->addr = (int)(e + 1);
+            //*cnts->addr = (int)(e + 1); // ***FIX ***
             sys_free(cnts);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
         gen((int*)For_entry(n).incr); // increment
-        *a = (int)(e + 1);
+        //*a = (int)(e + 1); // *** FIX ***
         if (For_entry(n).cond) {
             gen((int*)For_entry(n).cond); // condition
-            old_emit(BNZ);
-            old_emit((int)d);
+            emit_B((int)d, BNZ);
         } else {
-            old_emit(JMP);
-            old_emit((int)d);
+            emit_JMP((int)d);
         }
         while (brks) {
             t = (uint16_t*)brks->next;
-            *brks->addr = (int)(e + 1);
+            //*brks->addr = (int)(e + 1); // *** FIX ***
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -2645,8 +2762,7 @@ static void gen(int* n) {
     case Switch:
         gen((int*)Switch_entry(n).cond); // condition
         a = (uint16_t*)cas;
-        old_emit(JMP);
-        old_emit(0);
+        emit_JMP(0);
         cas = (int*)e;
         b = (uint16_t*)brks;
         d = (uint16_t*)def;
@@ -2656,15 +2772,15 @@ static void gen(int* n) {
         // deal with no default inside switch case
         if (def) {
             t = (uint16_t*)def->next;
-            *cas = (int)def->addr;
+            //*cas = (int)def->addr; // ***FIX***
             sys_free(def);
             def = (struct patch_s*)t;
         } else
-            *cas = (int)(e + 1);
-        cas = (int*)a;
+            //*cas = (int)(e + 1); // ***FIX***
+            cas = (int*)a;
         while (brks) {
             t = (uint16_t*)brks->next;
-            *brks->addr = (int)(e + 1);
+            //*brks->addr = (int)(e + 1); // ***FIX***
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -2672,38 +2788,34 @@ static void gen(int* n) {
         def = (struct patch_s*)d;
         break;
     case Case:
-        old_emit(JMP);
-        ++e;
+        emit_JMP(0);
         a = 0;
-        *e = (int)(e + 7);
-        old_emit(PSH);
+        //*e = (int)(e + 7); // ***FIX***
+        emit_PSH();
         i = *cas;
-        *cas = (int)e;
+        //*cas = (int)e; // ***FIX***
         gen((int*)ast_NumVal(n)); // condition
-        if (*(e - 1) != IMM)
-            fatal("case label not a numeric literal");
-        old_emit(SUB);
-        old_emit(BNZ);
-        old_emit(0);
+        // if (*(e - 1) != IMM) // ***FIX***
+        //    fatal("case label not a numeric literal");
+        emit_OP(SUB);
+        emit_B(0, BNZ);
         cas = (int*)e;
-        *e = i + e[-3];
-        if (*((int*)Case_entry(n).expr) == Switch)
-            a = (uint16_t*)cas;
+        //*e = i + e[-3]; // ***FIX***
+        // if (*((int*)Case_entry(n).expr) == Switch) // ***FIX***
+        //    a = (uint16_t*)cas;
         gen((int*)Case_entry(n).expr); // expression
-        if (a != 0)
-            cas = (int*)a;
+        // if (a != 0) // ***FIX***
+        //    cas = (int*)a;
         break;
     case Break:
-        old_emit(JMP);
-        old_emit(0);
+        emit_JMP(0);
         patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->addr = e;
         patch->next = brks;
         brks = patch;
         break;
     case Continue:
-        old_emit(JMP);
-        old_emit(0);
+        emit_JMP(0);
         patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->next = cnts;
         patch->addr = e;
@@ -2711,8 +2823,7 @@ static void gen(int* n) {
         break;
     case Goto:
         label = (struct ident_s*)ast_NumVal(n);
-        old_emit(JMP);
-        old_emit(label->val);
+        emit_JMP(label->val);
         if (label->class == 0)
             label->val = (int)e; // Define label address later
         break;
@@ -2733,7 +2844,6 @@ static void gen(int* n) {
         gen(n + 2);
         if (*(e - 2) != 0x46bd && *(e - 1) != 0xbdf0)
             emit_LEV(); // don't issue it again if already emitted by return stmt
-        patch_literals();
         break;
     case Label: // target of goto
         label = (struct ident_s*)ast_NumVal(n);
@@ -3034,8 +3144,7 @@ static void stmt(int ctx) {
                 uint16_t* se;
                 if (tk == ';') { // check for prototype
                     se = e;
-                    old_emit(JMP);
-                    old_emit((int)e);
+                    emit_JMP((int)e);
                     dd->forward = e;
                 } else { // function with body
                     if (tk != '{')
@@ -3059,19 +3168,17 @@ static void stmt(int ctx) {
                     cas = 0;
                     se = e;
                     gen(n);
+                    patch_literals();
                 }
                 if (src_opt) {
                     printf("%d: %.*s\n", line, p - lp, lp);
                     lp = p;
-                    ARMSTATE state;
-                    disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
                     disasm_address(&state, (int)(se + 1));
                     while (state.address < (int)(e - 1)) {
                         uint16_t* nxt = (uint16_t*)(state.address + state.size);
                         disasm_thumb(&state, *nxt, *(nxt + 1));
                         printf("%s\n", state.text);
                     }
-                    disasm_cleanup(&state);
                 }
                 id = sym;
                 if (src_opt)
@@ -3631,6 +3738,8 @@ int cc(int argc, char** argv) {
         goto done;
     }
 
+    if (src_opt)
+        disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
     add_defines(stdio_defines);
     add_defines(gpio_defines);
     add_defines(pwm_defines);
@@ -3695,6 +3804,9 @@ int cc(int argc, char** argv) {
     printf("\n");
 
 done:
+    test_func();
+    if (src_opt)
+        disasm_cleanup(&state);
     if (fd)
         fs_file_close(fd);
     while (file_list) {

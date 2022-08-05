@@ -52,7 +52,7 @@
      * address is stored on the top of the stack.
      */
     SF, /* 17 */
-    /* SI stores the float in S0 into the memory whose
+    /* SF stores the float in S0 into the memory whose
      * address is stored on the top of the stack.
      */
     OR,   // 18 */
