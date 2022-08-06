@@ -62,7 +62,7 @@ add_executable(${PSHELL}
     src/cc.c src/cc.h src/cc_extrns.h src/cc_tokns.h src/cc_ops.h
     src/tar.c src/tar.h
     src/cc_printf.S
-	test.S)
+)
 
 if (USB_CONSOLE)
   pico_enable_stdio_uart(${PSHELL} 0)

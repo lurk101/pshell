@@ -10,7 +10,7 @@
 .extern __wrap_printf
 .extern __wrap_sprintf
 
-// int cc_printf(void* stk, int wrds);
+// int cc_printf(void* stk, int wrds, int prnt);
 
 cc_printf:
 
@@ -64,9 +64,9 @@ l3:     cmp  r5, #0       // move up to the 1st 4 words
 
 l4:     cmp  r7, 0
 	    bne  l5
-        bl  __wrap_printf // call SDK's printf
+        bl  __wrap_sprintf // call SDK's printf
         b    l6
-l5:     bl  __wrap_sprintf // call SDK's sprintf
+l5:     bl  __wrap_printf // call SDK's sprintf
 
 l6:     mov  sp, r6       // restore the stack and top regs
         pop  {r4-r7,pc}  

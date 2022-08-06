@@ -64,11 +64,12 @@
 #endif
 
 extern char* full_path(char* name);
-extern int cc_printf(void* stk, int wrds, int sflag);
+extern int cc_printf(void* stk, int wrds, int prnt);
 extern void get_screen_xy(int* x, int* y);
 
 extern void __wrap___aeabi_idiv();
 extern void __wrap___aeabi_i2f();
+extern void __wrap___aeabi_f2iz();
 extern void __wrap___aeabi_fadd();
 extern void __wrap___aeabi_fsub();
 extern void __wrap___aeabi_fmul();
@@ -78,8 +79,6 @@ extern void __wrap___aeabi_fcmpgt();
 extern void __wrap___aeabi_fcmplt();
 extern void __wrap___aeabi_fcmpge();
 
-extern void test_func();
-
 enum {
     pc_relative = 0,
 };
@@ -88,7 +87,6 @@ struct patch_s {
     struct patch_s* next;
     uint16_t* addr;
     int val;
-    int patch_type;
 };
 
 static char *p, *lp;            // current position in source code
@@ -576,7 +574,7 @@ static float wrap_aeabi_fmul(float a, float b) { return a * b; }
 
 static float wrap_aeabi_fsub(float a, float b) { return a - b; }
 
-static const struct {
+struct externs_s {
     char* name;
     int etype;
     struct define_grp* grp;
@@ -584,7 +582,9 @@ static const struct {
     int ret_float : 1;
     int is_printf : 1;
     int is_sprintf : 1;
-} externs[] = {
+};
+
+static struct externs_s externs[] = {
 #include "cc_extrns.h"
 };
 
@@ -2199,10 +2199,6 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
     } while (1);
 }
 
-static void old_emit(int n) {
-    // e = 0;
-}
-
 static void emit(uint16_t n) {
     if (e >= text_base + (TEXT_BYTES / sizeof(*e)))
         fatal("code segment exceeded, program is too big");
@@ -2219,11 +2215,10 @@ static void emit_Word(uint32_t n) {
     ++e;
 }
 
-static void new_lit(uint16_t* addr, int val, int type) {
+static void literal(uint16_t* addr, int val) {
     struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
     l->addr = addr;
     l->val = val;
-    l->patch_type = type;
     l->next = lit;
     lit = l;
 }
@@ -2237,7 +2232,7 @@ static void emit_ENT(int n) {
         else {                //
             emit(0x4900);     // ldr r1, [pc, n]
             emit(0x448d);     // add sp, r1
-            new_lit(e - 1, loc - ld, pc_relative);
+            literal(e - 1, loc - ld);
         }
     }
 }
@@ -2249,19 +2244,13 @@ static void emit_LEV(void) {
         emit(0x46c0);      // nop ; (mov r8, r8)
 }
 
-static void patch_literals(void) {
+static void emit_literals(void) {
     while (lit) {
         emit_Word(lit->val);
-        switch (lit->patch_type) {
-        case pc_relative:
-            int v = ((int)e - ((int)lit->addr & ~3)) / 4 - 1;
-            if (v >= 256)
-                fatal("pc relative too far");
-            *lit->addr |= v;
-            break;
-        default:
-            fatal("unexpected compiler error");
-        }
+        int v = ((int)e - ((int)lit->addr & ~3)) / 4 - 1;
+        if (v >= 256)
+            fatal("pc relative too far");
+        *lit->addr |= v;
         struct patch_s* tlit = lit->next;
         sys_free(lit);
         lit = tlit;
@@ -2273,7 +2262,7 @@ static void emit_IMM(int n) {
         emit(0x2000 | n); // movs r0, #n
     else {                //
         emit(0x4800);     // ldr r0, [pc, n]
-        new_lit(e, n, pc_relative);
+        literal(e, n);
     }
 }
 
@@ -2297,6 +2286,21 @@ static void emit_S(int n) {
     case SI:
     case SF:
         emit(0x6008); // str r0, [r1, #0]
+        break;
+    default:
+        fatal("unexpected compiler error");
+    }
+}
+
+static void emit_L(int n) {
+    emit(0xbc02); // pop {r1}
+    switch (n) {
+    case LC:
+        emit(0x7000); // ldrb    r0, [r0, #0]
+        break;
+    case LI:
+    case LF:
+        emit(0x6000); // ldr r0, [r0, #0]
         break;
     default:
         fatal("unexpected compiler error");
@@ -2410,7 +2414,7 @@ static void emit_OP(int op) {
     case MOD:
         emit(0xbc02); // pop {r1}
         emit(0x4a00); // ldr r2, [pc, n]
-        new_lit(e, (int)__wrap___aeabi_idiv, pc_relative);
+        literal(e, (int)__wrap___aeabi_idiv);
         emit(0x4790); // blx r2
         if (op == MOD)
             emit(0x4608); // mov r0,r1
@@ -2430,16 +2434,16 @@ static void emit_OP_F(int op) {
         emit(0x4a00); // ldr r2, [pc, n]
         switch (op) {
         case ADDF:
-            new_lit(e, (int)__wrap___aeabi_fadd, pc_relative);
+            literal(e, (int)__wrap___aeabi_fadd);
             break;
         case SUBF:
-            new_lit(e, (int)__wrap___aeabi_fsub, pc_relative);
+            literal(e, (int)__wrap___aeabi_fsub);
             break;
         case MULF:
-            new_lit(e, (int)__wrap___aeabi_fmul, pc_relative);
+            literal(e, (int)__wrap___aeabi_fmul);
             break;
         case DIVF:
-            new_lit(e, (int)__wrap___aeabi_fdiv, pc_relative);
+            literal(e, (int)__wrap___aeabi_fdiv);
             break;
         }
         emit(0x4790); // blx r2
@@ -2459,16 +2463,16 @@ static void emit_OP_F(int op) {
         emit(0x4a00); // ldr r2, [pc, n]
         switch (op) {
         case GEF:
-            new_lit(e, (int)__wrap___aeabi_fcmpge, pc_relative);
+            literal(e, (int)__wrap___aeabi_fcmpge);
             break;
         case LTF:
-            new_lit(e, (int)__wrap___aeabi_fcmplt, pc_relative);
+            literal(e, (int)__wrap___aeabi_fcmplt);
             break;
         case GTF:
-            new_lit(e, (int)__wrap___aeabi_fcmpgt, pc_relative);
+            literal(e, (int)__wrap___aeabi_fcmpgt);
             break;
         case LEF:
-            new_lit(e, (int)__wrap___aeabi_fcmple, pc_relative);
+            literal(e, (int)__wrap___aeabi_fcmple);
             break;
         default:
             fatal("unexpected compiler error");
@@ -2478,6 +2482,83 @@ static void emit_OP_F(int op) {
 
     default:
         fatal("unexpected compiler error");
+    }
+}
+
+static void emit_FTOI() {
+    emit(0x4a00); // ldr r2, [pc, n]
+    literal(e, (int)__wrap___aeabi_f2iz);
+}
+
+static void emit_ITOF() {
+    emit(0x4a00); // ldr r2, [pc, n]
+    literal(e, (int)__wrap___aeabi_i2f);
+}
+
+static void emit_CastF(int n) {
+    switch (n) {
+    case ITOF:
+        emit_ITOF();
+        break;
+    case FTOI:
+        emit_FTOI();
+        break;
+    default:
+        fatal("unexpected compiler error");
+    }
+}
+
+static void emit_ADJ(int n) {
+    emit(0xb000 | n); // add sp, #n*4
+}
+
+static void emit_JSR(int n) {
+    int ofs = (n - (int)e) / 2 - 3;
+    if (ofs < -8388608 || ofs > 8388607)
+        fatal("subroutine call too far");
+    int s = (ofs >> 31) & 1;
+    // I1 = NOT(J1 EOR S); I2 = NOT(J2 EOR S); imm32 = SignExtend(S:I1:I2:imm10:imm11:’0’, 32);
+    int i1 = ((ofs >> 22) & 1) ^ 1;
+    int i2 = ((ofs >> 21) & 1) ^ 1;
+    int j1 = s ^ i1;
+    int j2 = s ^ i2;
+    int i11 = ofs & ((1 << 11) - 1);
+    int i10 = (ofs >> 11) & ((1 << 10) - 1);
+    emit(0xf000 | (s << 10) | i10);
+    emit(0xd000 | (j1 << 13) | (j2 << 11) | i11);
+}
+
+static int common_vfunc(int etype, int prnt, int* sp);
+
+static void emit_SYSC(int n) {
+    const struct externs_s* p = externs + n;
+    if (p->is_printf) {
+        emit(0x466a); // mov r2, sp
+        emit(0x2101); // movs r1, #1
+        emit_IMM(p->etype);
+        emit(0x4c00); // ldr r4, [pc, #]
+        literal(e, (int)common_vfunc);
+        emit(0x47a0); // blx r4
+    } else if (p->is_sprintf) {
+        emit(0x466a); // mov r2, sp
+        emit(0x2100); // movs r1, #0
+        emit_IMM(p->etype);
+        emit(0x4c00); // ldr r4, [pc, #]
+        literal(e, (int)common_vfunc);
+        emit(0x47a0); // blx r4
+    } else {
+        int np = p->etype & ADJ_MASK;
+        if (np == 1)
+            emit(0xbc01); // pop {r0}
+        else if (np == 2)
+            emit(0xbc03); // pop {r0-r1}
+        else if (np == 3)
+            emit(0xbc07); // pop {r0-r2}
+        if (np >= 4)
+            emit(0xbc0f); // pop {r0-r3}
+        emit(0x4c00);     // ldr r4, [pc, #]
+        literal(e, (int)p->extrn);
+        emit(0x47a0); // blx r4
     }
 }
 
@@ -2501,7 +2582,7 @@ static void gen(int* n) {
         gen(n + 2);                                           // load the value
         if (ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR) // unreachable?
             fatal("struct copies not yet supported");
-        old_emit((ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2));
+        emit_L((ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2));
         break;
     case Loc:
         emit_LEA(ast_NumVal(n));
@@ -2520,16 +2601,16 @@ static void gen(int* n) {
         if (l > ATOM_TYPE && l < PTR)
             fatal("struct assign not yet supported");
         if ((ast_NumVal(n) >> 16) == FLOAT && l == INT)
-            old_emit(FTOI);
+            emit_FTOI();
         else if ((ast_NumVal(n) >> 16) == INT && l == FLOAT)
-            old_emit(ITOF);
+            emit_ITOF();
         emit_S((l >= PTR) ? SI : SC + (l >> 2));
         break;
     case Inc: // increment or decrement variables
     case Dec:
         gen(n + 2);
         emit_PSH();
-        old_emit((ast_NumVal(n) == CHAR) ? LC : LI);
+        emit_L((ast_NumVal(n) == CHAR) ? LC : LI);
         emit_PSH();
         emit_IMM((ast_NumVal(n) >= PTR2)
                      ? sizeof(int)
@@ -2744,7 +2825,7 @@ static void gen(int* n) {
         break;
     case CastF:
         gen((int*)CastF_entry(n).val);
-        old_emit(CastF_entry(n).way);
+        emit_CastF(CastF_entry(n).way);
         break;
     case Func:
     case Syscall:
@@ -2767,18 +2848,16 @@ static void gen(int* n) {
                 b = (uint16_t*)t[j];
             }
             sys_free(t);
-            if (i == Syscall)
-                emit_IMM((sj + 1) | ((Func_entry(n).parm_types >> 10) << 10));
         }
         if (i == Syscall)
-            old_emit(SYSC);
+            emit_SYSC(Func_entry(n).addr);
         if (i == Func)
-            old_emit(JSR);
-        old_emit(Func_entry(n).addr);
-        if (Func_entry(n).n_parms) {
-            old_emit(ADJ);
-            old_emit((i == Syscall) ? Func_entry(n).parm_types : Func_entry(n).n_parms);
-        }
+            emit_JSR(Func_entry(n).addr);
+        int np = Func_entry(n).n_parms;
+        if (i == Syscall)
+            np = (np > 4) ? np - 4 : 0;
+        if (np)
+            emit_ADJ(np);
         break;
     case While:
     case DoWhile:
@@ -2927,7 +3006,7 @@ static void gen(int* n) {
     case Enter:
         emit_ENT(ast_NumVal(n));
         gen(n + 2);
-        if (*(e - 2) != 0x46bd && *(e - 1) != 0xbdf0)
+        if (*(e - 1) != 0x46bd && *e != 0xbdf0)
             emit_LEV(); // don't issue it again if already emitted by return stmt
         break;
     case Label: // target of goto
@@ -3253,7 +3332,7 @@ static void stmt(int ctx) {
                     cas = 0;
                     se = e;
                     gen(n);
-                    patch_literals();
+                    emit_literals();
                 }
                 if (src_opt) {
                     printf("%d: %.*s\n", line, p - lp, lp);
@@ -3620,15 +3699,13 @@ static Inline int f_as_i(float f) {
     return u.i;
 }
 
-static int common_vfunc(int ac, int sflag, int* sp) {
-    // HACK ALLERT, we need to figure out which parameters
-    // are floats. Scan the format string.
+static int common_vfunc(int etype, int prntf, int* sp) {
     int stack[ADJ_MASK + ADJ_MASK + 2];
     int stkp = 0;
-    int n_parms = (ac & ADJ_MASK);
-    ac >>= 10;
+    int n_parms = (etype & ADJ_MASK);
+    etype >>= 10;
     for (int j = n_parms - 1; j >= 0; j--)
-        if ((ac & (1 << j)) == 0)
+        if ((etype & (1 << j)) == 0)
             stack[stkp++] = sp[j];
         else {
             if (stkp & 1)
@@ -3641,10 +3718,10 @@ static int common_vfunc(int ac, int sflag, int* sp) {
             stack[stkp++] = u.ii[0];
             stack[stkp++] = u.ii[1];
         }
-    int r = cc_printf(stack, stkp, sflag);
-    if (!sflag)
+    int r = cc_printf(stack, stkp, prntf);
+    if (prntf)
         fflush(stdout);
-    return r;
+    return 0;
 }
 
 static void show_defines(struct define_grp* grp) {
@@ -3887,9 +3964,17 @@ int cc(int argc, char** argv) {
         goto done;
 
     printf("\n");
-
+    asm volatile("mov  r0, %0 \n"
+                 "push {r0}   \n"
+                 "mov  r0, %1 \n"
+                 "push {r0}   \n"
+                 "mov  r1, %2 \n"
+                 "blx  r1     \n"
+                 "add  sp, #8 \n"
+                 :
+                 : "r"(argc), "r"(argv), "r"(idmain->val | 1)
+                 : "r0", "r1");
 done:
-    test_func();
     if (src_opt)
         disasm_cleanup(&state);
     if (fd)
