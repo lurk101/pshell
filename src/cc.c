@@ -574,7 +574,8 @@ static float wrap_aeabi_fmul(float a, float b) { return a * b; }
 
 static float wrap_aeabi_fsub(float a, float b) { return a - b; }
 
-static int common_vfunc(int etype, int prnt, int* sp);
+static int x_printf(int etype, int* sp);
+static int x_sprintf(int etype, int* sp);
 
 struct externs_s {
     char* name;
@@ -1266,13 +1267,9 @@ static void expr(int lev) {
             	d->name[namelen] = 0;
 				if (d->class == Func)
 					disasm_symbol(&state, d->name, d->val, ARMMODE_THUMB);
-				else {
-					if (!strcmp(d->name, "printf") || !strcmp(d->name, "sprintf"))
-						disasm_symbol(&state, "vfunc", (int)externs[d->val].extrn | 1, ARMMODE_THUMB);
-					else
-						disasm_symbol(&state, d->name, (int)externs[d->val].extrn | 1, ARMMODE_THUMB);
-				}
-            	d->name[namelen] = ch;
+                else
+                    disasm_symbol(&state, d->name, (int)externs[d->val].extrn | 1, ARMMODE_THUMB);
+                d->name[namelen] = ch;
 			}
             next();
             t = 0;
@@ -2548,18 +2545,16 @@ static void emit_JSR(int n) {
 static void emit_SYSC(int n) {
     const struct externs_s* p = externs + n;
     if (p->is_printf) {
-        emit(0x466a); // mov r2, sp
-        emit(0x2101); // movs r1, #1
+        emit(0x4669); // mov r1, sp
         emit_IMM(p->etype);
         emit(0x4e00); // ldr r6, [pc, #0]
-        literal(e, (int)common_vfunc);
+        literal(e, (int)x_printf);
         emit(0x47b0); // blx r6
     } else if (p->is_sprintf) {
-        emit(0x466a); // mov r2, sp
-        emit(0x2100); // movs r1, #0
+        emit(0x4669); // mov r1, sp
         emit_IMM(p->etype);
         emit(0x4e00); // ldr r6, [pc, #0]
-        literal(e, (int)common_vfunc);
+        literal(e, (int)x_sprintf);
         emit(0x47b0); // blx r6
     } else {
         int np = p->etype & ADJ_MASK;
@@ -3745,6 +3740,10 @@ static int common_vfunc(int etype, int prntf, int* sp) {
         fflush(stdout);
     return 0;
 }
+
+static int x_printf(int etype, int* sp) { common_vfunc(etype, 1, sp); }
+
+static int x_sprintf(int etype, int* sp) { common_vfunc(etype, 0, sp); }
 
 static void show_defines(struct define_grp* grp) {
     if (grp->name == 0)
