@@ -48,7 +48,6 @@
 #define TS_TBL_BYTES (2 * K)
 #define AST_TBL_BYTES (16 * K)
 #define MEMBER_DICT_BYTES (4 * K)
-#define STACK_BYTES (16 * K)
 
 #define CTLC 3
 #define VT_BOLD "\033[1m"
@@ -150,6 +149,7 @@ struct ident_s {
     int val, hval;
     int etype, hetype; // extended type info. different meaning for funcs.
     uint16_t* forward; // forward call patch address
+	uint8_t inserted : 1; // inserted in disassembler table
 };
 
 struct ident_s *id,  // currently parsed identifier
@@ -574,6 +574,8 @@ static float wrap_aeabi_fmul(float a, float b) { return a * b; }
 
 static float wrap_aeabi_fsub(float a, float b) { return a - b; }
 
+static int common_vfunc(int etype, int prnt, int* sp);
+
 struct externs_s {
     char* name;
     int etype;
@@ -669,6 +671,7 @@ static void next() {
             id->name = pp;
             id->hash = tk;
             id->forward = 0;
+            id->inserted = 0;
             tk = id->tk = Id; // token type identifier
             return;
         }
@@ -1256,6 +1259,21 @@ static void expr(int lev) {
                 d->etype = externs[ix].etype;
                 d->name[namelen] = ch;
             }
+			if (src_opt && !d->inserted) {
+				d ->inserted;
+            	int namelen = d->hash & 0x3f;
+            	char ch = d->name[namelen];
+            	d->name[namelen] = 0;
+				if (d->class == Func)
+					disasm_symbol(&state, d->name, d->val, ARMMODE_THUMB);
+				else {
+					if (!strcmp(d->name, "printf") || !strcmp(d->name, "sprintf"))
+						disasm_symbol(&state, "vfunc", (int)externs[d->val].extrn | 1, ARMMODE_THUMB);
+					else
+						disasm_symbol(&state, d->name, (int)externs[d->val].extrn | 1, ARMMODE_THUMB);
+				}
+            	d->name[namelen] = ch;
+			}
             next();
             t = 0;
             b = c = 0;
@@ -2224,7 +2242,7 @@ static void literal(uint16_t* addr, int val) {
 }
 
 static void emit_ENT(int n) {
-    emit(0xb5f0);             // push    {r4, r5, r6, r7, lr}
+    emit(0xb5c0);             // push {r6, r7, lr}
     emit(0x466f);             // mov  r7, sp
     if (n) {                  //
         if (n < 128)          //
@@ -2239,7 +2257,7 @@ static void emit_ENT(int n) {
 
 static void emit_LEV(void) {
     emit(0x46bd);          // mov sp, r7
-    emit(0xbdf0);          // pop {r4, r5, r6, r7, pc}
+    emit(0xbdc0);          // pop {r6, r7, pc}
     if (((int)e & 2) == 0) //
         emit(0x46c0);      // nop ; (mov r8, r8)
 }
@@ -2269,8 +2287,8 @@ static void emit_IMM(int n) {
 static void emit_IMMF(int n) { emit_IMM(n); }
 
 static void emit_LEA(int n) {
-    emit_IMM((-n + 5) * 4);
-    emit(0x4438); // add r0, r7
+    emit_IMM(-n * 4);
+    emit(0x4468); // add r0, sp
 }
 
 static void emit_PSH(void) {
@@ -2278,14 +2296,14 @@ static void emit_PSH(void) {
 }
 
 static void emit_S(int n) {
-    emit(0xbc02); // pop {r1}
+    emit(0xbc40); // pop {r6}
     switch (n) {
     case SC:
-        emit(0x7008); // strb    r0, [r1, #0]
+        emit(0x7030); // strb r0, [r6, #0]
         break;
     case SI:
     case SF:
-        emit(0x6008); // str r0, [r1, #0]
+        emit(0x6030); // str r0, [r6, #0]
         break;
     default:
         fatal("unexpected compiler error");
@@ -2293,14 +2311,13 @@ static void emit_S(int n) {
 }
 
 static void emit_L(int n) {
-    emit(0xbc02); // pop {r1}
     switch (n) {
     case LC:
-        emit(0x7000); // ldrb    r0, [r0, #0]
+        emit(0x7800); // ldrb    r0, [r0, #0]
         break;
     case LI:
     case LF:
-        emit(0x6000); // ldr r0, [r0, #0]
+        emit(0x6800); // ldr r0, [r0, #0]
         break;
     default:
         fatal("unexpected compiler error");
@@ -2528,24 +2545,22 @@ static void emit_JSR(int n) {
     emit(0xd000 | (j1 << 13) | (j2 << 11) | i11);
 }
 
-static int common_vfunc(int etype, int prnt, int* sp);
-
 static void emit_SYSC(int n) {
     const struct externs_s* p = externs + n;
     if (p->is_printf) {
         emit(0x466a); // mov r2, sp
         emit(0x2101); // movs r1, #1
         emit_IMM(p->etype);
-        emit(0x4c00); // ldr r4, [pc, #]
+        emit(0x4e00); // ldr r6, [pc, #0]
         literal(e, (int)common_vfunc);
-        emit(0x47a0); // blx r4
+        emit(0x47b0); // blx r6
     } else if (p->is_sprintf) {
         emit(0x466a); // mov r2, sp
         emit(0x2100); // movs r1, #0
         emit_IMM(p->etype);
-        emit(0x4c00); // ldr r4, [pc, #]
+        emit(0x4e00); // ldr r6, [pc, #0]
         literal(e, (int)common_vfunc);
-        emit(0x47a0); // blx r4
+        emit(0x47b0); // blx r6
     } else {
         int np = p->etype & ADJ_MASK;
         if (np == 1)
@@ -2554,11 +2569,11 @@ static void emit_SYSC(int n) {
             emit(0xbc03); // pop {r0-r1}
         else if (np == 3)
             emit(0xbc07); // pop {r0-r2}
-        if (np >= 4)
+        else if (np >= 4)
             emit(0xbc0f); // pop {r0-r3}
-        emit(0x4c00);     // ldr r4, [pc, #]
+        emit(0x4e00);     // ldr r6, [pc, #0]
         literal(e, (int)p->extrn);
-        emit(0x47a0); // blx r4
+        emit(0x47b0); // blx r6
     }
 }
 
@@ -3377,6 +3392,13 @@ static void stmt(int ctx) {
                 }
                 sz = (sz + 3) & -4;
                 if (ctx == Glo) {
+					if (src_opt && !dd->inserted) {
+						int len = dd->etype & ADJ_MASK;
+						char ch = dd->name[len];
+						dd->name[len] = 0;
+						disasm_symbol(&state, dd->name, (int)data, ARMMODE_THUMB);
+						dd->name[len] = ch;
+					}
                     dd->val = (int)data;
                     if (data + sz >= data_base + (DATA_BYTES / 4))
                         fatal("program data exceeds data segment");
@@ -3816,6 +3838,12 @@ static void add_defines(struct define_grp* d) {
     }
 }
 
+#ifndef NDEBUG 
+void __no_inline_not_in_flash_func(dummy)(void) {
+#include "cc_nops.h"
+}
+#endif
+
 int cc(int argc, char** argv) {
 
     clear_globals();
@@ -3925,7 +3953,11 @@ int cc(int argc, char** argv) {
     int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
     fs_file_rewind(fd);
 
+#ifdef NDEBUG
     text_base = le = sys_malloc(TEXT_BYTES, 1);
+#else
+    text_base = le = (uint16_t*)((int)dummy & ~1);
+#endif
     e = text_base - 1;
     members = sys_malloc(MEMBER_DICT_BYTES, 1);
 
