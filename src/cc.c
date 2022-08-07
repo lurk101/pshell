@@ -2599,6 +2599,14 @@ static void emit_SYSC(int n, int np) {
     }
 }
 
+static void patch_jmp(uint16_t* from, uint16_t* to) {
+    int ofs = ((int)to - (int)from) / 2 - 1;
+    if (ofs < -1024 || ofs > 1023)
+        fatal("jmp too far");
+    ofs &= 0x7ff;
+    *from |= ofs;
+}
+
 // AST parsing for IR generatiion
 // With a modular code generator, new targets can be easily supported such as
 // native Arm machine code.
@@ -2668,14 +2676,14 @@ static void gen(int* n) {
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
-            //*b = (int)(e + 3); // *** FIX ***
+            patch_jmp(b, e + 1);
             emit_JMP(0);
             b = e;
             gen((int*)Cond_entry(n).else_part);
         } // else statment
         // Patch the jump address field pointed to by "d" to hold the address
         // past the false branch.
-        //*b = (int)(e + 1); // ***FIX***
+        patch_jmp(b, e);
         break;
     // operators
     /* If current token is logical OR operator:
@@ -2917,7 +2925,7 @@ static void gen(int* n) {
         }
         while (cnts) {
             t = (uint16_t*)cnts->next;
-            //*cnts->addr = (int)(e + 1); // *** FIX ***
+            patch_jmp(cnts->addr, e);
             sys_free(cnts);
             cnts = (struct patch_s*)t;
         }
@@ -2926,7 +2934,7 @@ static void gen(int* n) {
         emit_B((int)(d - 1), BNZ);
         while (brks) {
             t = (uint16_t*)brks->next;
-            // *brks->addr = (int)(e + 1); // ***FIX***
+            patch_jmp(brks->addr, e);
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -2934,9 +2942,8 @@ static void gen(int* n) {
         break;
     case For:
         gen((int*)For_entry(n).init); // init
-        a = e;
         emit_JMP(0);
-        d = e;
+        a = e;
         b = (uint16_t*)brks;
         brks = 0;
         c = (uint16_t*)cnts;
@@ -2946,24 +2953,21 @@ static void gen(int* n) {
         while (cnts) {
             t = (uint16_t*)cnts->next;
             t2 = e;
-            //*cnts->addr = (int)(e + 1); // ***FIX ***
+            patch_jmp(cnts->addr, e);
             sys_free(cnts);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
         gen((int*)For_entry(n).incr); // increment
-        t2 = e;
-        e = a;
-        emit_JMP((int)t2 - 1);
-        e = t2;
+        patch_jmp(a, e);
         if (For_entry(n).cond) {
             gen((int*)For_entry(n).cond); // condition
-            emit_B((int)(d - 1), BNZ);
+            emit_B((int)(a - 1), BNZ);
         } else
-            emit_JMP((int)(d - 1));
+            emit_B((int)(a - 1), -1);
         while (brks) {
             t = (uint16_t*)brks->next;
-            //*brks->addr = (int)(e + 1); // *** FIX ***
+            patch_jmp(brks->addr, e);
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -2982,15 +2986,15 @@ static void gen(int* n) {
         // deal with no default inside switch case
         if (def) {
             t = (uint16_t*)def->next;
-            //*cas = (int)def->addr; // ***FIX***
+            patch_jmp((uint16_t*)cas, def->addr);
             sys_free(def);
             def = (struct patch_s*)t;
         } else
-            //*cas = (int)(e + 1); // ***FIX***
+            patch_jmp((uint16_t*)cas, e);
             cas = (int*)a;
         while (brks) {
             t = (uint16_t*)brks->next;
-            //*brks->addr = (int)(e + 1); // ***FIX***
+            patch_jmp((uint16_t*)(brks->next), e);
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -3000,10 +3004,10 @@ static void gen(int* n) {
     case Case:
         emit_JMP(0);
         a = 0;
-        //*e = (int)(e + 7); // ***FIX***
+        patch_jmp(e, e + 5);
         emit_PSH();
         i = *cas;
-        //*cas = (int)e; // ***FIX***
+        patch_jmp((uint16_t*)cas, e);
         gen((int*)ast_NumVal(n)); // condition
         // if (*(e - 1) != IMM) // ***FIX***
         //    fatal("case label not a numeric literal");

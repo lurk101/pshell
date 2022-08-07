@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
 option(USB_CONSOLE "build for USB console, otherwise UART" ON)
-option(WITH_IRQ "build with interrupt support" OFF)
-option(WITH_KBD_HALT "build with run-time CTL-C checking" ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -37,18 +35,6 @@ add_compile_options("-DLFS_NO_DEBUG")
 add_compile_options("-DLFS_NO_WARN")
 add_compile_options("-DPSHELL_VERSION=${PSHELL_VERSION}")
 
-if (WITH_IRQ)
-add_compile_options("-DWITH_IRQ=1")
-else()
-add_compile_options("-DWITH_IRQ=0")
-endif()
-
-if (WITH_KBD_HALT)
-add_compile_options("-DWITH_KBD_HALT=1")
-else()
-add_compile_options("-DWITH_KBD_HALT=0")
-endif()
-
 add_subdirectory(littlefs)
 add_subdirectory(disassembler)
 
@@ -81,12 +67,9 @@ target_link_libraries(${PSHELL} PUBLIC
 
 pico_add_extra_outputs(${PSHELL})
 
-message("---------------------------------------------------------------------")
+message("-----------------------------------------------------")
 message("-- CMake ${CMAKE_VERSION}")
 message("-- Build ${CMAKE_BUILD_TYPE} / ${CMAKE_SYSTEM_NAME}")
-message("--------------------------------------------------------- components")
-message("-- USB_CONSOLE      Build for USB, otherwise UART         ${USB_CONSOLE}")
-message("-- WITH_IRQ         Build with interrup handling support  ${WITH_IRQ}")
-message("-- WITH_KBD_HALT    Build with run-time kbd CTL-C checks  ${WITH_KBD_HALT}")
-message("---------------------------------------------------------------------")
+message("-- USB_CONSOLE ${USB_CONSOLE}, otherwise UART")
+message("-----------------------------------------------------")
 
