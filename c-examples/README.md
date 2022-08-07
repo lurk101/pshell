@@ -16,3 +16,4 @@ Example C source files.
 | sine.c | Math function test. Display a sine wave |
 | string.c | String function test. Compare then concatenate |
 | tictoc.c | Timer test |
+| wumpus.c | Hunt the Wumpus Game |
