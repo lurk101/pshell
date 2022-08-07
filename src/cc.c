@@ -2392,11 +2392,13 @@ static void emit_OP(int op) {
         emit(0x4008);
         break;
     case SHL:
-        emit(0xbc02); // pop {r1}
+        emit(0x4601); // mov r1, r0
+        emit(0xbc01); // pop {r0}
         emit(0x4088);
         break;
     case SHR:
-        emit(0xbc02); // pop {r1}
+        emit(0x4601); // mov r1, r0
+        emit(0xbc01); // pop {r0}
         emit(0x4108);
         break;
     case SUB:
@@ -2450,7 +2452,8 @@ static void emit_OP(int op) {
 
     case DIV:
     case MOD:
-        emit(0xbc02); // pop {r1}
+        emit(0x4601); // mov r1, r0
+        emit(0xbc01); // pop {r1}
         emit(0x4a00); // ldr r2, [pc, n]
         add_literal(e, (int)__wrap___aeabi_idiv);
         emit(0x4790); // blx r2
