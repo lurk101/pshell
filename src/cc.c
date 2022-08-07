@@ -1633,9 +1633,8 @@ static void expr(int lev) {
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 ast_NumVal(b) = ast_NumVal(b) || ast_NumVal(n);
                 n = b;
-            } else {
+            } else
                 ast_Oper((int)b, Lor);
-            }
             ty = INT;
             break;
         case Lan: // short circuit, logic and
@@ -1644,9 +1643,8 @@ static void expr(int lev) {
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 ast_NumVal(b) = ast_NumVal(b) && ast_NumVal(n);
                 n = b;
-            } else {
+            } else
                 ast_Oper((int)b, Lan);
-            }
             ty = INT;
             break;
         case Or: // push the current value, calculate the right value
@@ -1656,9 +1654,8 @@ static void expr(int lev) {
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 ast_NumVal(b) = ast_NumVal(b) | ast_NumVal(n);
                 n = b;
-            } else {
+            } else
                 ast_Oper((int)b, Or);
-            }
             ty = INT;
             break;
         case Xor:
@@ -1668,9 +1665,8 @@ static void expr(int lev) {
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 ast_NumVal(b) = ast_NumVal(b) ^ ast_NumVal(n);
                 n = b;
-            } else {
+            } else
                 ast_Oper((int)b, Xor);
-            }
             ty = INT;
             break;
         case And:
@@ -2600,10 +2596,19 @@ static void emit_SYSC(int n, int np) {
 }
 
 static void patch_jmp(uint16_t* from, uint16_t* to) {
-    int ofs = ((int)to - (int)from) / 2 - 1;
-    if (ofs < -1024 || ofs > 1023)
-        fatal("jmp too far");
-    ofs &= 0x7ff;
+    int ofs;
+    if ((*from & 0xf000) == 0xd000) {
+        ofs = ((int)to - (int)from) / 2 - 1;
+        if (ofs < -128 || ofs > 127)
+            fatal("jmp too far");
+        ofs &= 0xff;
+    } else if ((*from & 0xe000) == 0xe000) {
+        ofs = ((int)to - (int)from) / 2 - 1;
+        if (ofs < -1024 || ofs > 1023)
+            fatal("jmp too far");
+        ofs &= 0x7ff;
+    } else
+        fatal("unexpected compiler error");
     *from |= ofs;
 }
 
@@ -2676,7 +2681,7 @@ static void gen(int* n) {
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
-            patch_jmp(b, e + 1);
+            patch_jmp(b, e);
             emit_JMP(0);
             b = e;
             gen((int*)Cond_entry(n).else_part);
@@ -2698,14 +2703,14 @@ static void gen(int* n) {
         emit_B(0, BNZ);
         b = e;
         gen(n + 2);
-        ast_Tk(b) = (int)(e + 1);
+        patch_jmp(b, e);
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
         emit_B(0, BZ);
         b = e;
         gen(n + 2);
-        ast_Tk(b) = (int)(e + 1);
+        patch_jmp(b, e);
         break;
     /* If current token is bitwise OR operator:
      * Add "PSH" instruction to push LHS value in register to stack.
