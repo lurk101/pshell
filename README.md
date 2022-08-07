@@ -54,6 +54,12 @@ To build for UART (USB is the default):
 cmake .. -DUSB_CONSOLE=OFF
 ```
 
+Git branches
+
+- master: stable release branch
+- dev: development and fix branch
+- cm0+ : pico native code compiler (wip)
+
 C source code [examples].
 
 Example console log.
