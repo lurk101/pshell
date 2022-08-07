@@ -2353,12 +2353,16 @@ static void emit_JMP(int n) {
 
 static void emit_B(int n, int cond) {
     uint16_t i;
+    emit(0x2800); // cmp r0,#0
     switch (cond) {
     case BZ:
         i = 0xd000; // beq n
         break;
     case BNZ:
         i = 0xd100; // bne n
+        break;
+    case -1:
+        i = 0xe700; // b n
         break;
     default:
         fatal("unexpected compiler error");
@@ -2397,7 +2401,7 @@ static void emit_OP(int op) {
         break;
     case SUB:
         emit(0xbc02); // pop {r1}
-        emit(0x1a40); // subs    r0, r0, r1;
+        emit(0x1a08); // subs    r0, r1, r0;
         break;
     case ADD:
         emit(0xbc02); // pop {r1}
@@ -2415,8 +2419,7 @@ static void emit_OP(int op) {
     case GT:
     case LE:
         emit(0xbc02); // pop {r1}
-        emit(0x4288); // cmp r0, r1
-        emit_IMM(1);
+        emit(0x4281); // cmp r1, r0
         uint16_t i;
         switch (op) {
         case EQ:
@@ -2440,7 +2443,9 @@ static void emit_OP(int op) {
         default:
             fatal("unexpected compiler error");
         }
-        emit_IMM(0);
+        emit(0x2000); // movs r0, #0
+        emit(0xe000); // b.n *+2
+        emit(0x2001); // movs r0, #1
         break;
 
     case DIV:
@@ -2892,17 +2897,21 @@ static void gen(int* n) {
     case While:
     case DoWhile:
         if (i == While) {
-            emit_JMP(0);
             a = e;
+            emit_JMP(0);
         }
-        d = (e + 1);
+        d = e;
         b = (uint16_t*)brks;
         brks = 0;
         c = (uint16_t*)cnts;
         cnts = 0;
         gen((int*)While_entry(n).body); // loop body
-        // if (i == While) // *** FIX ***
-        //    *a = (int)(e + 1);
+        if (i == While) {
+            uint16_t* t = e;
+            e = a;
+            emit_JMP((int)(t - 1));
+            e = t;
+        }
         while (cnts) {
             t = (uint16_t*)cnts->next;
             //*cnts->addr = (int)(e + 1); // *** FIX ***
@@ -2911,7 +2920,7 @@ static void gen(int* n) {
         }
         cnts = (struct patch_s*)c;
         gen((int*)While_entry(n).cond); // condition
-        emit_B((int)d, BNZ);
+        emit_B((int)(d - 1), BNZ);
         while (brks) {
             t = (uint16_t*)brks->next;
             // *brks->addr = (int)(e + 1); // ***FIX***
@@ -2922,29 +2931,33 @@ static void gen(int* n) {
         break;
     case For:
         gen((int*)For_entry(n).init); // init
-        emit_JMP(0);
         a = e;
-        d = (e + 1);
+        emit_JMP(0);
+        d = e;
         b = (uint16_t*)brks;
         brks = 0;
         c = (uint16_t*)cnts;
         cnts = 0;
         gen((int*)For_entry(n).body); // loop body
+        uint16_t* t2;
         while (cnts) {
             t = (uint16_t*)cnts->next;
+            t2 = e;
             //*cnts->addr = (int)(e + 1); // ***FIX ***
             sys_free(cnts);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
         gen((int*)For_entry(n).incr); // increment
-        //*a = (int)(e + 1); // *** FIX ***
+        t2 = e;
+        e = a;
+        emit_JMP((int)t2 - 1);
+        e = t2;
         if (For_entry(n).cond) {
             gen((int*)For_entry(n).cond); // condition
-            emit_B((int)d, BNZ);
-        } else {
-            emit_JMP((int)d);
-        }
+            emit_B((int)(d - 1), BNZ);
+        } else
+            emit_JMP((int)(d - 1));
         while (brks) {
             t = (uint16_t*)brks->next;
             //*brks->addr = (int)(e + 1); // *** FIX ***
@@ -3758,7 +3771,7 @@ static int common_vfunc(int etype, int prntf, int* sp) {
     int r = cc_printf(stack, stkp, prntf);
     if (prntf)
         fflush(stdout);
-    return 0;
+    return r;
 }
 
 static int x_printf(int etype, int* sp) { common_vfunc(etype, 1, sp); }
@@ -4015,16 +4028,19 @@ int cc(int argc, char** argv) {
         goto done;
 
     printf("\n");
-    asm volatile("mov  r0, %0 \n"
+    int rslt;
+    asm volatile("mov  r0, %1 \n"
                  "push {r0}   \n"
-                 "mov  r0, %1 \n"
+                 "mov  r0, %2 \n"
                  "push {r0}   \n"
-                 "mov  r1, %2 \n"
+                 "mov  r1, %3 \n"
                  "blx  r1     \n"
                  "add  sp, #8 \n"
-                 :
+                 "mov  %0, r0 \n"
+                 : "=r"(rslt)
                  : "r"(argc), "r"(argv), "r"(idmain->val | 1)
                  : "r0", "r1");
+    printf("\nCC = %d\n", rslt);
 done:
     if (src_opt)
         disasm_cleanup(&state);
