@@ -5,6 +5,7 @@ Example C source files.
 | blink.c | GPIO interface test. Blink the default LED. |
 | clocks.c | CLOCKS test. Display the various Pico clock frequencies |
 | crash.c | CRASH recovery test. Intentional hard fault |
+| crc16.c | Calculate a file's CRC |
 | exit.c | exit function test |
 | fade.c | breathing LED, interrupt driven |
 | hello.c | Needs no introduction |
