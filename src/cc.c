@@ -95,7 +95,7 @@ static char* data_base;         // data/bss pointer
 static char* src;               //
 static int* base_sp;            // stack
 static uint16_t *e, *le, *text_base; // current position in emitted code
-static int* cas;                // case statement patch-up pointer
+static struct patch_s* cas;          // case statement patch-up pointer
 static struct patch_s* lit;     // literal patch-up pointer
 static struct patch_s* def;     // default statement patch-up pointer
 static struct patch_s* brks;    // break statement patch-up pointer
@@ -608,9 +608,9 @@ static char* fp;
 
 static void clear_globals(void) {
     e = le = text_base = NULL;
-    base_sp = cas = tsize = n = malloc_list =
+    base_sp = tsize = n = malloc_list =
         (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
-    lit = def = brks = cnts = NULL;
+    cas = lit = def = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
     swtc = brkc = cntc = tnew = tk = ty = loc = line = src_opt = trc_opt = ld = pplev = pplevt =
@@ -2336,41 +2336,29 @@ static void emit_L(int n) {
     }
 }
 
-static void emit_JMP(int n) {
-    int ofs = 0;
-    if (n) {
-        ofs = (n - (int)e) / 2 - 1;
-        if (ofs < -1024 || ofs > 1023)
+static void emit_BRANCH(uint16_t* to, int cond) {
+    int ofs = n ? (to - e) - 1 : 0;
+    if (cond == B) {
+        if (ofs >= -128 && ofs < 128)
+            emit(0xe700 | ofs);
+        else if (ofs >= -1024 && ofs < 1024)
+            emit(0xe000 | ofs); // JMP n
+        else
             fatal("jmp too far");
-        ofs &= 0x7ff;
     }
-    emit(0xe000 | ofs); // JMP n
-}
-
-static void emit_B(int n, int cond) {
     uint16_t i;
     emit(0x2800); // cmp r0,#0
     switch (cond) {
     case BZ:
-        i = 0xd000; // beq n
+        i = 0xd100; // bne *+2
         break;
     case BNZ:
-        i = 0xd100; // bne n
-        break;
-    case -1:
-        i = 0xe700; // b n
+        i = 0xd000; // be *+2
         break;
     default:
         fatal("unexpected compiler error");
     }
-    int ofs = 0;
-    if (n) {
-        ofs = (n - (int)e) / 2 - 1;
-        if (ofs < -128 || ofs > 127)
-            fatal("branch too far");
-        ofs &= 0xff;
-    }
-    emit(i | ofs);
+    emit(0xe000 | ofs);
 }
 
 static void emit_OP(int op) {
@@ -2595,12 +2583,12 @@ static void emit_SYSC(int n, int np) {
     }
 }
 
-static void patch_jmp(uint16_t* from, uint16_t* to) {
+static void patch_branch(uint16_t* from, uint16_t* to) {
     int ofs;
     if ((*from & 0xf000) == 0xd000) {
         ofs = ((int)to - (int)from) / 2 - 1;
         if (ofs < -128 || ofs > 127)
-            fatal("jmp too far");
+            fatal("jmp too far, from 0x%08x to 0x%08x", (int)from, (int)to);
         ofs &= 0xff;
     } else if ((*from & 0xe000) == 0xe000) {
         ofs = ((int)to - (int)from) / 2 - 1;
@@ -2672,7 +2660,7 @@ static void gen(int* n) {
         gen((int*)Cond_entry(n).cond_part); // condition
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
-        emit_B(0, BZ);
+        emit_BRANCH(0, BZ);
         b = e;
         gen((int*)Cond_entry(n).if_part); // expression
         // Patch the jump address field pointed to by "b" to hold the address
@@ -2681,14 +2669,14 @@ static void gen(int* n) {
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
-            patch_jmp(b, e);
-            emit_JMP(0);
+            patch_branch(b, e);
+            emit_BRANCH(0, B);
             b = e;
             gen((int*)Cond_entry(n).else_part);
         } // else statment
         // Patch the jump address field pointed to by "d" to hold the address
         // past the false branch.
-        patch_jmp(b, e);
+        patch_branch(b, e);
         break;
     // operators
     /* If current token is logical OR operator:
@@ -2700,17 +2688,17 @@ static void gen(int* n) {
      */
     case Lor:
         gen((int*)ast_NumVal(n));
-        emit_B(0, BNZ);
+        emit_BRANCH(0, BNZ);
         b = e;
         gen(n + 2);
-        patch_jmp(b, e);
+        patch_branch(b, e);
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
-        emit_B(0, BZ);
+        emit_BRANCH(0, BZ);
         b = e;
         gen(n + 2);
-        patch_jmp(b, e);
+        patch_branch(b, e);
         break;
     /* If current token is bitwise OR operator:
      * Add "PSH" instruction to push LHS value in register to stack.
@@ -2914,7 +2902,7 @@ static void gen(int* n) {
     case DoWhile:
         if (i == While) {
             a = e;
-            emit_JMP(0);
+            emit_BRANCH(0, B);
         }
         d = e;
         b = (uint16_t*)brks;
@@ -2922,24 +2910,21 @@ static void gen(int* n) {
         c = (uint16_t*)cnts;
         cnts = 0;
         gen((int*)While_entry(n).body); // loop body
-        if (i == While) {
-            uint16_t* t = e;
-            e = a;
-            emit_JMP((int)(t - 1));
-            e = t;
-        }
+        if (i == While)
+            patch_branch(a, e);
         while (cnts) {
             t = (uint16_t*)cnts->next;
-            patch_jmp(cnts->addr, e);
+            patch_branch(cnts->addr, e);
             sys_free(cnts);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
         gen((int*)While_entry(n).cond); // condition
-        emit_B((int)(d - 1), BNZ);
+        emit_BRANCH(e, BZ);
+        emit_BRANCH(d - 1, B);
         while (brks) {
             t = (uint16_t*)brks->next;
-            patch_jmp(brks->addr, e);
+            patch_branch(brks->addr, e);
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -2947,7 +2932,7 @@ static void gen(int* n) {
         break;
     case For:
         gen((int*)For_entry(n).init); // init
-        emit_JMP(0);
+        emit_BRANCH(0, B);
         a = e;
         b = (uint16_t*)brks;
         brks = 0;
@@ -2958,21 +2943,21 @@ static void gen(int* n) {
         while (cnts) {
             t = (uint16_t*)cnts->next;
             t2 = e;
-            patch_jmp(cnts->addr, e);
+            patch_branch(cnts->addr, e);
             sys_free(cnts);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
         gen((int*)For_entry(n).incr); // increment
-        patch_jmp(a, e);
+        patch_branch(a, e);
         if (For_entry(n).cond) {
             gen((int*)For_entry(n).cond); // condition
-            emit_B((int)(a - 1), BNZ);
+            emit_BRANCH(a - 1, BNZ);
         } else
-            emit_B((int)(a - 1), -1);
+            emit_BRANCH(a - 1, B);
         while (brks) {
             t = (uint16_t*)brks->next;
-            patch_jmp(brks->addr, e);
+            patch_branch(brks->addr, e);
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -2981,25 +2966,23 @@ static void gen(int* n) {
     case Switch:
         gen((int*)Switch_entry(n).cond); // condition
         a = (uint16_t*)cas;
-        emit_JMP(0);
-        cas = (int*)e;
+        emit_BRANCH(0, B);
+        cas = sys_malloc(sizeof(struct patch_s), 1);
+        cas->addr = e;
         b = (uint16_t*)brks;
         d = (uint16_t*)def;
         def = 0;
         brks = 0;
         gen((int*)Switch_entry(n).cas); // case statment
         // deal with no default inside switch case
-        if (def) {
-            t = (uint16_t*)def->next;
-            patch_jmp((uint16_t*)cas, def->addr);
+        patch_branch(cas->addr, def ? def->addr : e);
+        if (def)
             sys_free(def);
-            def = (struct patch_s*)t;
-        } else
-            patch_jmp((uint16_t*)cas, e);
-            cas = (int*)a;
+        sys_free(cas);
+        cas = (struct patch_s*)a;
         while (brks) {
             t = (uint16_t*)brks->next;
-            patch_jmp((uint16_t*)(brks->next), e);
+            patch_branch((uint16_t*)(brks->addr), e);
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
@@ -3007,34 +2990,34 @@ static void gen(int* n) {
         def = (struct patch_s*)d;
         break;
     case Case:
-        emit_JMP(0);
+        emit_BRANCH(0, B);
         a = 0;
-        patch_jmp(e, e + 5);
+        patch_branch(e, e + 5); // ???
         emit_PSH();
-        i = *cas;
-        patch_jmp((uint16_t*)cas, e);
+        i = (int)cas;
+        patch_branch((uint16_t*)(cas->addr), e);
         gen((int*)ast_NumVal(n)); // condition
         // if (*(e - 1) != IMM) // ***FIX***
         //    fatal("case label not a numeric literal");
         emit_OP(SUB);
-        emit_B(0, BNZ);
-        cas = (int*)e;
+        emit_BRANCH(0, BNZ);
+        cas->addr = e;
         //*e = i + e[-3]; // ***FIX***
-        // if (*((int*)Case_entry(n).expr) == Switch) // ***FIX***
-        //    a = (uint16_t*)cas;
+        if (*((int*)Case_entry(n).expr) == Switch)
+            a = (int16_t*)cas;
         gen((int*)Case_entry(n).expr); // expression
-        // if (a != 0) // ***FIX***
-        //    cas = (int*)a;
+        if (a != 0)
+            cas = (struct patch_s*)a;
         break;
     case Break:
-        emit_JMP(0);
+        emit_BRANCH(0, B);
         patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->addr = e;
         patch->next = brks;
         brks = patch;
         break;
     case Continue:
-        emit_JMP(0);
+        emit_BRANCH(0, B);
         patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->next = cnts;
         patch->addr = e;
@@ -3042,7 +3025,7 @@ static void gen(int* n) {
         break;
     case Goto:
         label = (struct ident_s*)ast_NumVal(n);
-        emit_JMP(label->val);
+        emit_BRANCH((uint16_t*)label->val, B);
         if (label->class == 0)
             label->val = (int)e; // Define label address later
         break;
@@ -3363,7 +3346,7 @@ static void stmt(int ctx) {
                 uint16_t* se;
                 if (tk == ';') { // check for prototype
                     se = e;
-                    emit_JMP((int)e);
+                    emit_BRANCH(0, B);
                     dd->forward = e;
                 } else { // function with body
                     if (tk != '{')
@@ -3565,7 +3548,7 @@ static void stmt(int ctx) {
         j = 0;
         if (cas)
             j = (int)cas;
-        cas = &i;
+        cas = (struct patch_s*)i;
         next();
         if (tk != '(')
             fatal("open parenthesis expected");
@@ -3583,12 +3566,12 @@ static void stmt(int ctx) {
         b = n;
         ast_Switch((int)b, (int)a);
         if (j)
-            cas = (int*)j;
+            cas = (struct patch_s*)j;
         return;
     case Case:
         if (!swtc)
             fatal("case-statement outside of switch");
-        i = *cas;
+        i = (int)cas->next;
         next();
         expr(Or);
         a = n;
@@ -3596,7 +3579,7 @@ static void stmt(int ctx) {
             fatal("case label not a numeric literal");
         j = ast_NumVal(n);
         ast_NumVal(n) -= i;
-        *cas = j;
+        cas->next = (struct patch_s*)j;
         ast_Single(';');
         if (tk != ':')
             fatal("colon expected");
@@ -3892,6 +3875,7 @@ int cc(int argc, char** argv) {
 
     clear_globals();
 
+    int rslt = -1;
     if (setjmp(done_jmp))
         goto done;
 
@@ -4040,7 +4024,6 @@ int cc(int argc, char** argv) {
         goto done;
 
     printf("\n");
-    int rslt;
     asm volatile("mov  r0, %1 \n"
                  "push {r0}   \n"
                  "mov  r0, %2 \n"
@@ -4070,5 +4053,5 @@ done:
         sys_free(malloc_list + 2);
     }
 
-    return 0;
+    return rslt;
 }

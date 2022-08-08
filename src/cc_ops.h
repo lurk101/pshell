@@ -91,5 +91,6 @@
      */
     SYSC, /* 46 system call */
     EXIT,
+	B,    // branch always
     INVALID
     // clang-format on

@@ -178,7 +178,7 @@ void tar(int ac, char* av[]) {
     root_len = strlen(path);
     int mode = LFS_O_RDONLY;
     if (op == CREATE_OP)
-        mode = LFS_O_WRONLY | LFS_O_CREAT;
+        mode = LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC;
     tar_fn = strdup(full_path(av[2]));
     if (!tar_fn) {
         printf("no memory");

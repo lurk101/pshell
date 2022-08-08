@@ -25,6 +25,9 @@
 #include "tar.h"
 #include "vi.h"
 #include "xmodem.h"
+#ifndef NDEBUG
+#include "tests.h"
+#endif
 
 #if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
 #define SDK14 1
@@ -163,7 +166,8 @@ static void put_cmd(void) {
         return;
     if (check_name())
         return;
-    if (fs_file_open(&file, full_path(argv[1]), LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
+    if (fs_file_open(&file, full_path(argv[1]), LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) <
+        LFS_ERR_OK) {
         strcpy(result, "Can't create file");
         return;
     }
@@ -273,7 +277,7 @@ static void cp_cmd(void) {
             break;
         }
         in_ok = true;
-        if (fs_file_open(&out, to, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
+        if (fs_file_open(&out, to, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
             sprintf(result, "error opening %s", from);
             break;
         }
@@ -576,6 +580,14 @@ static void tar_cmd(void) {
     tar(argc, argv);
 }
 
+#ifndef NDEBUG
+static void tests_cmd(void) {
+    if (check_mount(true))
+        return;
+    run_tests(argc, argv);
+}
+#endif
+
 static void vi_cmd(void) {
     if (check_mount(true))
         return;
@@ -637,6 +649,9 @@ cmd_t cmd_table[] = {
     {"rm",      rm_cmd,         "remove file or directory. -r for recursive"},
     {"status",  status_cmd,     "filesystem status"},
     {"tar",     tar_cmd,        "tar archiver"},
+#ifndef NDEBUG
+    {"tests",   tests_cmd,      "run all tests"},
+#endif
     {"unmount", unmount_cmd,    "unmount filesystem"},
 	{"version", version_cmd,    "display pshel version"},
     {"vi",      vi_cmd,         "editor"},
