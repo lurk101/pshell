@@ -95,9 +95,9 @@ static char* data_base;         // data/bss pointer
 static char* src;               //
 static int* base_sp;            // stack
 static uint16_t *e, *le, *text_base; // current position in emitted code
-static struct patch_s* cas;          // case statement patch-up pointer
+static uint16_t* cas;                // case statement patch-up pointer
 static struct patch_s* lit;     // literal patch-up pointer
-static struct patch_s* def;     // default statement patch-up pointer
+static uint16_t* def;           // default statement patch-up pointer
 static struct patch_s* brks;    // break statement patch-up pointer
 static struct patch_s* cnts;    // continue statement patch-up pointer
 static int swtc;                // !0 -> in a switch-stmt context
@@ -607,10 +607,10 @@ static lfs_file_t* fd;
 static char* fp;
 
 static void clear_globals(void) {
-    e = le = text_base = NULL;
+    cas = def = e = le = text_base = NULL;
     base_sp = tsize = n = malloc_list =
         (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
-    cas = lit = def = brks = cnts = NULL;
+    lit = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
     swtc = brkc = cntc = tnew = tk = ty = loc = line = src_opt = trc_opt = ld = pplev = pplevt =
@@ -2301,15 +2301,20 @@ static void emit_immediate(int n) {
 }
 
 static void emit_effective_addr(int n) {
-    if (n >= 0) // parameter
-        emit_immediate((n + 1) * 4);
-    else // local
-        emit_immediate((n + 1) * 4);
+    if (n == 0) {
+        emit(0x4638); // mov r0, r7
+        return;
+    }
+    emit_immediate((n + 1) * 4);
     emit(0x4438); // add r0, r7
 }
 
-static void emit_push(void) {
-    emit(0xb401); // push {r0}
+static void emit_push(int n) {
+    emit(0xb400 | (1 << n)); // push {rn}
+}
+
+static void emit_pop(int n) {
+    emit(0xbc00 | (1 << n)); // pop {rn}
 }
 
 static void emit_store(int n) {
@@ -2343,7 +2348,7 @@ static void emit_load(int n) {
 
 static void emit_forward_branch(void) { emit(0xe000); }
 
-static void emit_branch(uint16_t* to, int cond) {
+static void emit_branch(uint16_t* to, int cond, int comp) {
     int ofs = to - (e + 1);
     if (cond == B) {
         if (ofs >= -128 && ofs < 128 && to != 0)
@@ -2351,11 +2356,13 @@ static void emit_branch(uint16_t* to, int cond) {
         else if (ofs >= -1024 && ofs < 1024)
             emit(0xe000 | (ofs & 0x7ff)); // JMP n
         else
-            fatal("jmp too far");
+            fatal("jmp too far from %08x to %08x", to, e);
         return;
     }
-    emit(0x2800); // cmp r0,#0
-    ofs = to - (e + 1);
+    if (comp) {
+        emit(0x2800); // cmp r0,#0
+        --ofs;
+    }
     if (ofs >= -128 && ofs < 128) {
         switch (cond) {
         case BZ:
@@ -2379,47 +2386,47 @@ static void emit_branch(uint16_t* to, int cond) {
     default:
         fatal("unexpected compiler error");
     }
-    ofs = to - (e + 1);
+    --ofs;
     if (ofs >= -1024 && ofs < 1024) {
         emit(0xe000 | (ofs & 0x7ff)); // JMP to
     } else
-        fatal("jmp too far");
+        fatal("jmp too far from %08x to %08x", to, e);
 }
 
 static void emit_oper(int op) {
     switch (op) {
     case OR:
-        emit(0xbc02); // pop {r1}
+        emit_pop(1);
         emit(0x4308);
         break;
     case XOR:
-        emit(0xbc02); // pop {r1}
+        emit_pop(1);
         emit(0x4048);
         break;
     case AND:
-        emit(0xbc02); // pop {r1}
+        emit_pop(1);
         emit(0x4008);
         break;
     case SHL:
         emit(0x4601); // mov r1, r0
-        emit(0xbc01); // pop {r0}
+        emit_pop(0);
         emit(0x4088);
         break;
     case SHR:
         emit(0x4601); // mov r1, r0
-        emit(0xbc01); // pop {r0}
+        emit_pop(0);
         emit(0x4108);
         break;
     case SUB:
-        emit(0xbc02); // pop {r1}
+        emit_pop(1);
         emit(0x1a08); // subs    r0, r1, r0;
         break;
     case ADD:
-        emit(0xbc02); // pop {r1}
+        emit_pop(1);
         emit(0x1840); // adds    r0, r0, r1;
         break;
     case MUL:
-        emit(0xbc02); // pop {r1}
+        emit_pop(1);
         emit(0x4348); // muls    r0, r1;
         break;
 
@@ -2429,7 +2436,7 @@ static void emit_oper(int op) {
     case LT:
     case GT:
     case LE:
-        emit(0xbc02); // pop {r1}
+        emit_pop(1);
         emit(0x4281); // cmp r1, r0
         uint16_t i;
         switch (op) {
@@ -2462,7 +2469,7 @@ static void emit_oper(int op) {
     case DIV:
     case MOD:
         emit(0x4601); // mov r1, r0
-        emit(0xbc01); // pop {r1}
+        emit_pop(0);  // pop {r0}
         emit(0x4a00); // ldr r2, [pc, n]
         add_literal(e, (int)__wrap___aeabi_idiv);
         emit(0x4790); // blx r2
@@ -2480,7 +2487,8 @@ static void emit_float_oper(int op) {
     case SUBF:
     case MULF:
     case DIVF:
-        emit(0xbc02); // pop {r1}
+        emit(0x4601); // mov r1, r0
+        emit_pop(0);  // pop {r0}
         emit(0x4a00); // ldr r2, [pc, n]
         switch (op) {
         case ADDF:
@@ -2509,7 +2517,8 @@ static void emit_float_oper(int op) {
     case LTF:
     case GTF:
     case LEF:
-        emit(0xbc02); // pop {r1}
+        emit(0x4601); // mov r1, r0
+        emit_pop(0);  // pop {r0}
         emit(0x4a00); // ldr r2, [pc, n]
         switch (op) {
         case GEF:
@@ -2656,7 +2665,7 @@ static void gen(int* n) {
         break;   // parse AST expr or stmt
     case Assign: // assign the value to variables
         gen((int*)Assign_entry(n).right_part);
-        emit_push();
+        emit_push(0);
         gen(n + 3);
         l = ast_NumVal(n) & 0xffff;
         // Add SC/SI instruction to save value in register to variable address
@@ -2672,9 +2681,9 @@ static void gen(int* n) {
     case Inc: // increment or decrement variables
     case Dec:
         gen(n + 2);
-        emit_push();
+        emit_push(0);
         emit_load((ast_NumVal(n) == CHAR) ? LC : LI);
-        emit_push();
+        emit_push(0);
         emit_immediate((ast_NumVal(n) >= PTR2)
                            ? sizeof(int)
                            : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1));
@@ -2685,7 +2694,7 @@ static void gen(int* n) {
         gen((int*)Cond_entry(n).cond_part); // condition
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
-        emit_branch(e + 2, BNZ);
+        emit_branch(e + 2, BNZ, 1);
         emit_forward_branch();
         b = e;
         gen((int*)Cond_entry(n).if_part); // expression
@@ -2714,7 +2723,7 @@ static void gen(int* n) {
      */
     case Lor:
         gen((int*)ast_NumVal(n));
-        emit_branch(e + 2, BZ);
+        emit_branch(e + 2, BZ, 1);
         emit_forward_branch();
         b = e;
         gen(n + 2);
@@ -2722,7 +2731,7 @@ static void gen(int* n) {
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
-        emit_branch(e + 2, BNZ);
+        emit_branch(e + 2, BNZ, 1);
         emit_forward_branch();
         b = e;
         gen(n + 2);
@@ -2735,157 +2744,157 @@ static void gen(int* n) {
      */
     case Or:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(OR);
         break;
     case Xor:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(XOR);
         break;
     case And:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(AND);
         break;
     case Eq:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(EQ);
         break;
     case Ne:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(NE);
         break;
     case Ge:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(GE);
         break;
     case Lt:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(LT);
         break;
     case Gt:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(GT);
         break;
     case Le:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(LE);
         break;
     case Shl:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(SHL);
         break;
     case Shr:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(SHR);
         break;
     case Add:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(ADD);
         break;
     case Sub:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(SUB);
         break;
     case Mul:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(MUL);
         break;
     case Div:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(DIV);
         break;
     case Mod:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_oper(MOD);
         break;
     case AddF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(ADDF);
         break;
     case SubF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(SUBF);
         break;
     case MulF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(MULF);
         break;
     case DivF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(DIVF);
         break;
     case EqF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(EQF);
         break;
     case NeF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(NEF);
         break;
     case GeF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(GEF);
         break;
     case LtF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(LTF);
         break;
     case GtF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(GTF);
         break;
     case LeF:
         gen((int*)ast_NumVal(n));
-        emit_push();
+        emit_push(0);
         gen(n + 2);
         emit_float_oper(LEF);
         break;
@@ -2910,7 +2919,7 @@ static void gen(int* n) {
             int sj = j;
             while (j >= 0) { // push arguments
                 gen((int*)b + 1);
-                emit_push();
+                emit_push(0);
                 --j;
                 b = (uint16_t*)t[j];
             }
@@ -2948,7 +2957,7 @@ static void gen(int* n) {
         }
         cnts = (struct patch_s*)c;
         gen((int*)While_entry(n).cond); // condition
-        emit_branch(d - 1, BNZ);
+        emit_branch(d - 1, BNZ, 1);
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch(brks->addr, e);
@@ -2979,9 +2988,9 @@ static void gen(int* n) {
         patch_branch(a, e);
         if (For_entry(n).cond) {
             gen((int*)For_entry(n).cond); // condition
-            emit_branch(a - 1, BNZ);
+            emit_branch(a - 1, BNZ, 1);
         } else
-            emit_branch(a - 1, B);
+            emit_branch(a - 1, B, 1);
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch(brks->addr, e);
@@ -2992,50 +3001,45 @@ static void gen(int* n) {
         break;
     case Switch:
         gen((int*)Switch_entry(n).cond); // condition
-        a = (uint16_t*)cas;
+        a = cas;
         emit_forward_branch();
-        cas = sys_malloc(sizeof(struct patch_s), 1);
-        cas->addr = e;
+        cas = e;
         b = (uint16_t*)brks;
-        d = (uint16_t*)def;
+        d = def;
         def = 0;
         brks = 0;
         gen((int*)Switch_entry(n).cas); // case statment
         // deal with no default inside switch case
-        patch_branch(cas->addr, def ? def->addr : e);
-        if (def)
-            sys_free(def);
-        sys_free(cas);
-        cas = (struct patch_s*)a;
+        patch_branch(cas, def ? def : e);
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch((uint16_t*)(brks->addr), e);
             sys_free(brks);
             brks = (struct patch_s*)t;
         }
+        emit_adjust_stack(1);
+        cas = a;
         brks = (struct patch_s*)b;
-        def = (struct patch_s*)d;
+        def = d;
         break;
     case Case:
-        emit_forward_branch();
         a = 0;
-        patch_branch(e, e + 5); // ???
-        emit_push();
-        i = (int)cas;
-        patch_branch((uint16_t*)(cas->addr), e);
+        emit_push(0);
+        patch_branch(cas, e - 1);
         gen((int*)ast_NumVal(n)); // condition
         // if (*(e - 1) != IMM) // ***FIX***
         //    fatal("case label not a numeric literal");
-        emit_oper(SUB);
-        emit_branch(e + 1, BZ);
+        emit_pop(1);
+        emit_push(1);
+        emit(0x4288); // cmp r0, r1
+        emit_branch(e + 1, BZ, 0);
         emit_forward_branch();
-        cas->addr = e;
-        //*e = i + e[-3]; // ***FIX***
+        cas = e;
         if (*((int*)Case_entry(n).expr) == Switch)
             a = (int16_t*)cas;
         gen((int*)Case_entry(n).expr); // expression
         if (a != 0)
-            cas = (struct patch_s*)a;
+            cas = a;
         break;
     case Break:
         emit_forward_branch();
@@ -3053,15 +3057,17 @@ static void gen(int* n) {
         break;
     case Goto:
         label = (struct ident_s*)ast_NumVal(n);
-        emit_branch((uint16_t*)label->val, B);
-        if (label->class == 0)
-            label->val = (int)e; // Define label address later
+        if (label->class == 0) {
+            emit_forward_branch();
+            struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
+            l->addr = e;
+            l->next = (struct patch_s*)label->forward;
+            label->forward = (uint16_t*)l;
+        } else
+            emit_branch((uint16_t*)label->val, B, 1);
         break;
     case Default:
-        patch = sys_malloc(sizeof(struct patch_s), 1);
-        patch->next = def;
-        patch->addr = e + 1;
-        def = patch;
+        def = e;
         gen((int*)ast_NumVal(n));
         break;
     case Return:
@@ -3079,12 +3085,12 @@ static void gen(int* n) {
         label = (struct ident_s*)ast_NumVal(n);
         if (label->class != 0)
             fatal("duplicate label definition");
-        d = e + 1;
-        b = (uint16_t*)label->val;
-        while (b != 0) {
-            t = (uint16_t*)ast_Tk(b);
-            ast_Tk(b) = (int)d;
-            b = t;
+        d = e;
+        while (label->forward) {
+            struct patch_s* l = (struct patch_s*)label->forward;
+            patch_branch(l->addr, d);
+            label->forward = (uint16_t*)l->next;
+            sys_free(l);
         }
         label->val = (int)d;
         label->class = Label;
@@ -3576,7 +3582,7 @@ static void stmt(int ctx) {
         j = 0;
         if (cas)
             j = (int)cas;
-        cas = (struct patch_s*)i;
+        cas = (uint16_t*)i;
         next();
         if (tk != '(')
             fatal("open parenthesis expected");
@@ -3594,12 +3600,12 @@ static void stmt(int ctx) {
         b = n;
         ast_Switch((int)b, (int)a);
         if (j)
-            cas = (struct patch_s*)j;
+            cas = (uint16_t*)j;
         return;
     case Case:
         if (!swtc)
             fatal("case-statement outside of switch");
-        i = (int)cas->next;
+        i = (int)cas;
         next();
         expr(Or);
         a = n;
@@ -3607,7 +3613,7 @@ static void stmt(int ctx) {
             fatal("case label not a numeric literal");
         j = ast_NumVal(n);
         ast_NumVal(n) -= i;
-        cas->next = (struct patch_s*)j;
+        cas = (uint16_t*)j;
         ast_Single(';');
         if (tk != ':')
             fatal("colon expected");
