@@ -178,7 +178,7 @@ void tar(int ac, char* av[]) {
     root_len = strlen(path);
     int mode = LFS_O_RDONLY;
     if (op == CREATE_OP)
-        mode = LFS_O_WRONLY | LFS_O_CREAT;
+        mode = LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC;
     tar_fn = strdup(full_path(av[2]));
     if (!tar_fn) {
         printf("no memory");
@@ -211,7 +211,7 @@ void tar(int ac, char* av[]) {
                 if (!create_directories(hdr->name))
                     goto bail1;
                 lfs_file_t out_f;
-                if (fs_file_open(&out_f, full_path(hdr->name), LFS_O_WRONLY | LFS_O_CREAT) <
+                if (fs_file_open(&out_f, full_path(hdr->name), LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) <
                     LFS_ERR_OK) {
                     printf("could not create file %s\n", hdr->name);
                     goto bail1;

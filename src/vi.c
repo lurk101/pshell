@@ -2019,7 +2019,7 @@ static int file_write(char* fn, char* first, char* last) {
     // By popular request we do not open file with O_TRUNC,
     // but instead ftruncate() it _after_ successful write.
     // Might reduce amount of data lost on power fail etc.
-    if (fs_file_open(&fd, fn, LFS_O_WRONLY | LFS_O_CREAT) < 0)
+    if (fs_file_open(&fd, fn, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0)
         return -1;
     cnt = last - first + 1;
     charcnt = fs_file_write(&fd, first, cnt);

@@ -163,7 +163,7 @@ static void put_cmd(void) {
         return;
     if (check_name())
         return;
-    if (fs_file_open(&file, full_path(argv[1]), LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
+    if (fs_file_open(&file, full_path(argv[1]), LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
         strcpy(result, "Can't create file");
         return;
     }
@@ -273,7 +273,7 @@ static void cp_cmd(void) {
             break;
         }
         in_ok = true;
-        if (fs_file_open(&out, to, LFS_O_WRONLY | LFS_O_CREAT) < LFS_ERR_OK) {
+        if (fs_file_open(&out, to, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
             sprintf(result, "error opening %s", from);
             break;
         }
