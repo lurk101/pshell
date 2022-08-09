@@ -120,7 +120,7 @@ static int ty;                  // current expression type
                                 // bit 10:11 - ptr level
 static int rtf, rtt;            // return flag and return type for current function
 static int loc;                 // local variable offset
-static int line;                // current line number
+static int lineno;              // current line number
 static int src_opt;             // print source and assembly flag
 static int trc_opt;             // Trace instruction.
 static int* n;                  // current position in emitted abstract syntax tree
@@ -403,13 +403,13 @@ static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, 
     va_start(ap, fmt);
     vprintf(fmt, ap);
     va_end(ap);
-    if (line > 0) {
+    if (lineno > 0) {
         lp = src;
-        lne = line;
+        lne = lineno;
         while (--lne)
             lp = strchr(lp, '\n') + 1;
         p = strchr(lp, '\n');
-        printf("\n" VT_BOLD "%d:" VT_NORMAL " %.*s", line, p - lp, lp);
+        printf("\n" VT_BOLD "%d:" VT_NORMAL " %.*s", lineno, p - lp, lp);
     }
     printf("\n");
     longjmp(done_jmp, 1);
@@ -613,7 +613,7 @@ static void clear_globals(void) {
     lit = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
-    swtc = brkc = cntc = tnew = tk = ty = loc = line = src_opt = trc_opt = ld = pplev = pplevt =
+    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = src_opt = trc_opt = ld = pplev = pplevt =
         ir_count = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(ir_var, 0, sizeof(ir_var));
@@ -690,11 +690,10 @@ static void next() {
         }
         switch (tk) {
         case '\n':
-            if (src_opt) {
-                printf("%d: %.*s", line, p - lp, lp);
-            }
+            if (src_opt)
+                printf("%d: %.*s", lineno, p - lp, lp);
             lp = p;
-            ++line;
+            ++lineno;
         case ' ':
         case '\t':
         case '\v':
@@ -709,9 +708,9 @@ static void next() {
                 t = 0;
                 for (++p; (*p != 0) && (t == 0); ++p) {
                     pp = p + 1;
-                    if (*p == '\n')
-                        ++line;
-                    else if (*p == '*' && *pp == '/')
+                    if (*p == '\n') {
+                        ++lineno;
+                    } else if (*p == '*' && *pp == '/')
                         t = 1;
                 }
                 ++p;
@@ -1081,12 +1080,14 @@ static void ast_Oper(int oprnd, int op) {
     Oper_entry(n).tk = op;
     Oper_entry(n).oprnd = oprnd;
 }
+#define ast_Oper_words (sizeof(Oper_entry_t) / sizeof(int))
 
 static void ast_Num(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
     Double_entry(n).tk = Num;
     Double_entry(n).v1 = v1;
 }
+#define ast_Num_words (sizeof(Double_entry_t) / sizeof(int))
 
 static void ast_Label(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
@@ -1123,6 +1124,7 @@ static void ast_Load(int v1) {
     Double_entry(n).tk = Load;
     Double_entry(n).v1 = v1;
 }
+#define ast_Load_words (sizeof(Double_entry_t) / sizeof(int))
 
 typedef struct {
     int tk;
@@ -1488,7 +1490,7 @@ static void expr(int lev) {
         expr(Inc);
         if (ast_Tk(n) != Load)
             fatal("bad address-of");
-        n += 2;
+        n += ast_Load_words;
         ty += PTR;
         break;
     case '!': // "!x" is equivalent to "x == 0"
@@ -1500,7 +1502,7 @@ static void expr(int lev) {
             ast_NumVal(n) = !ast_NumVal(n);
         else {
             ast_Num(0);
-            ast_Oper((int)(n + 2), Eq);
+            ast_Oper((int)(n + ast_Num_words), Eq);
         }
         ty = INT;
         break;
@@ -1513,7 +1515,7 @@ static void expr(int lev) {
             ast_NumVal(n) = ~ast_NumVal(n);
         else {
             ast_Num(-1);
-            ast_Oper((int)(n + 2), Xor);
+            ast_Oper((int)(n + ast_Num_words), Xor);
         }
         ty = INT;
         break;
@@ -1534,10 +1536,10 @@ static void expr(int lev) {
             ast_NumVal(n) ^= 0x80000000;
         } else if (ty == FLOAT) {
             ast_NumF(0xbf800000);
-            ast_Oper((int)(n + 2), MulF);
+            ast_Oper((int)(n + ast_Oper_words), MulF);
         } else {
             ast_Num(-1);
-            ast_Oper((int)(n + 2), Mul);
+            ast_Oper((int)(n + ast_Oper_words), Mul);
         }
         if (ty != FLOAT)
             ty = INT;
@@ -1574,7 +1576,7 @@ static void expr(int lev) {
             if (ast_Tk(n) != Load)
                 fatal("bad lvalue in assignment");
             // get the value of the right part `expr` as the result of `a=expr`
-            n += 2;
+            n += ast_Load_words;
             b = n;
             next();
             expr(Assign);
@@ -1597,7 +1599,7 @@ static void expr(int lev) {
             if (ast_Tk(n) != Load)
                 fatal("bad lvalue in assignment");
             otk = tk;
-            n += 2;
+            n += ast_Oper_words;
             b = n;
             ast_Single(';');
             ast_Load(t);
@@ -1884,10 +1886,10 @@ static void expr(int lev) {
                             if (sz > 1) {
                                 if (is_power_of_2(sz)) { // 2^n
                                     ast_Num(__builtin_popcount(sz - 1));
-                                    ast_Oper((int)(n + 2), Shr);
+                                    ast_Oper((int)(n + ast_Oper_words), Shr);
                                 } else {
                                     ast_Num(sz);
-                                    ast_Oper((int)(n + 2), Div);
+                                    ast_Oper((int)(n + ast_Oper_words), Div);
                                 }
                             }
                         }
@@ -1905,10 +1907,10 @@ static void expr(int lev) {
                             if (sz > 1) {
                                 if (is_power_of_2(sz)) { // 2^n
                                     ast_Num(__builtin_popcount(sz - 1));
-                                    ast_Oper((int)(n + 2), Shl);
+                                    ast_Oper((int)(n + ast_Oper_words), Shl);
                                 } else {
                                     ast_Num(sz);
-                                    ast_Oper((int)(n + 2), Mul);
+                                    ast_Oper((int)(n + ast_Oper_words), Mul);
                                 }
                             }
                             ast_Oper((int)b, Sub);
@@ -2009,7 +2011,7 @@ static void expr(int lev) {
         case Dot:
             t += PTR;
             if (ast_Tk(n) == Load && ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR)
-                n += 2; // struct
+                n += ast_Load_words; // struct
         case Arrow:
             if (t <= PTR + ATOM_TYPE || t >= PTR2)
                 fatal("structure expected");
@@ -2023,7 +2025,7 @@ static void expr(int lev) {
                 fatal("structure member not found");
             if (m->offset) {
                 ast_Num(m->offset);
-                ast_Oper((int)(n + 2), Add);
+                ast_Oper((int)(n + ast_Oper_words), Add);
             }
             ty = m->type;
             next();
@@ -2070,7 +2072,7 @@ static void expr(int lev) {
                             ast_NumVal(b + 1) += factor * ast_NumVal(n) * sz;
                         else
                             sum += factor * ast_NumVal(n);
-                        n += sizeof(Double_entry_t) / sizeof(int); // delete the subscript constant
+                        n += ast_Num_words; // delete the subscript constant
                     } else {
                         // generate code to add a term
                         if (factor > 1) {
@@ -2101,7 +2103,7 @@ static void expr(int lev) {
                     ast_NumVal(n) *= sz;
                 else {
                     ast_Num(sz);
-                    ast_Oper((int)(n + 2), Mul);
+                    ast_Oper((int)(n + ast_Oper_words), Mul);
                 }
             }
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
@@ -2114,7 +2116,7 @@ static void expr(int lev) {
                 ast_Load(((ty = t) >= PTR) ? INT : ty);
             break;
         default:
-            fatal("%d: compiler error tk=%d\n", line, tk);
+            fatal("%d: compiler error tk=%d\n", lineno, tk);
         }
     }
 }
@@ -2180,7 +2182,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
                     off = strlen((char*)ast_NumVal(n)) + 1;
                     if (off > inc[0]) {
                         off = inc[0];
-                        printf("%d: string '%s' truncated to %d chars\n", line,
+                        printf("%d: string '%s' truncated to %d chars\n", lineno,
                                (char*)ast_NumVal(n), off);
                     }
                     memcpy((char*)vi + i, (char*)ast_NumVal(n), off);
@@ -2194,16 +2196,16 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
                     *((char*)vi + i) = ast_NumVal(n);
                     i += inc[0];
                 } else {
-                    *((float*)(n + 1)) = (float)ast_NumVal(n);
+                    *((float*)&ast_NumVal(n)) = (float)ast_NumVal(n);
                     vi[i++] = ast_NumVal(n);
                 }
             } else if (ty == FLOAT) {
                 if (match == INT) {
-                    vi[i++] = (int)*((float*)(n + 1));
+                    vi[i++] = (int)*((float*)(&ast_NumVal(n)));
                 } else
                     fatal("illegal char/string initializer");
             }
-            n += 2; // clean up AST
+            n += ast_Num_words; // clean up AST
             empty = 0;
         }
         if (tk == ',')
@@ -2247,7 +2249,7 @@ static void add_literal(uint16_t* addr, int val) {
 }
 
 static void emit_enter(int n) {
-    emit(0xb5c0);             // push {r6, r7, lr}
+    emit(0xb5c0);             // push {r6,r7,lr}
     emit(0x466f);             // mov  r7, sp
     if (n) {                  //
         if (n < 128)          //
@@ -2318,14 +2320,14 @@ static void emit_pop(int n) {
 }
 
 static void emit_store(int n) {
-    emit(0xbc40); // pop {r6}
+    emit_pop(1);
     switch (n) {
     case SC:
-        emit(0x7030); // strb r0, [r6, #0]
+        emit(0x7008); // strb r0, [r1, #0]
         break;
     case SI:
     case SF:
-        emit(0x6030); // str r0, [r6, #0]
+        emit(0x6008); // str r0, [r1, #0]
         break;
     default:
         fatal("unexpected compiler error");
@@ -2346,7 +2348,10 @@ static void emit_load(int n) {
     }
 }
 
-static void emit_forward_branch(void) { emit(0xe000); }
+static uint16_t* emit_forward_branch(void) {
+    emit(0xe000);
+    return e;
+}
 
 static void emit_branch(uint16_t* to, int cond, int comp) {
     int ofs = to - (e + 1);
@@ -2487,7 +2492,7 @@ static void emit_float_oper(int op) {
     case SUBF:
     case MULF:
     case DIVF:
-        emit(0x4601); // mov r1, r0
+        emit_pop(1);  // pop {r1}
         emit_pop(0);  // pop {r0}
         emit(0x4a00); // ldr r2, [pc, n]
         switch (op) {
@@ -2505,7 +2510,7 @@ static void emit_float_oper(int op) {
             break;
         }
         emit(0x4790); // blx r2
-
+        break;
     case EQF:
         emit_oper(EQ);
         break;
@@ -2517,7 +2522,7 @@ static void emit_float_oper(int op) {
     case LTF:
     case GTF:
     case LEF:
-        emit(0x4601); // mov r1, r0
+        emit_pop(1);  // pop {r1}
         emit_pop(0);  // pop {r0}
         emit(0x4a00); // ldr r2, [pc, n]
         switch (op) {
@@ -2691,8 +2696,7 @@ static void gen(int* n) {
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
         emit_branch(e + 2, BNZ, 1);
-        emit_forward_branch();
-        b = e;
+        b = emit_forward_branch();
         gen((int*)Cond_entry(n).if_part); // expression
         // Patch the jump address field pointed to by "b" to hold the address
         // of false branch. "+ 3" counts the "JMP" instruction added below.
@@ -2701,8 +2705,7 @@ static void gen(int* n) {
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
             patch_branch(b, e + 1);
-            emit_forward_branch();
-            b = e;
+            b = emit_forward_branch();
             gen((int*)Cond_entry(n).else_part);
         } // else statment
         // Patch the jump address field pointed to by "d" to hold the address
@@ -2720,16 +2723,14 @@ static void gen(int* n) {
     case Lor:
         gen((int*)ast_NumVal(n));
         emit_branch(e + 2, BZ, 1);
-        emit_forward_branch();
-        b = e;
+        b = emit_forward_branch();
         gen(n + 2);
         patch_branch(b, e);
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
         emit_branch(e + 2, BNZ, 1);
-        emit_forward_branch();
-        b = e;
+        b = emit_forward_branch();
         gen(n + 2);
         patch_branch(b, e);
         break;
@@ -2933,10 +2934,8 @@ static void gen(int* n) {
         break;
     case While:
     case DoWhile:
-        if (i == While) {
-            emit_forward_branch();
-            a = e;
-        }
+        if (i == While)
+            a = emit_forward_branch();
         b = (uint16_t*)brks;
         brks = 0;
         c = (uint16_t*)cnts;
@@ -2964,8 +2963,7 @@ static void gen(int* n) {
         break;
     case For:
         gen((int*)For_entry(n).init); // init
-        emit_forward_branch();
-        a = e;
+        a = emit_forward_branch();
         b = (uint16_t*)brks;
         brks = 0;
         c = (uint16_t*)cnts;
@@ -2998,8 +2996,7 @@ static void gen(int* n) {
     case Switch:
         gen((int*)Switch_entry(n).cond); // condition
         a = cas;
-        emit_forward_branch();
-        cas = e;
+        cas = emit_forward_branch();
         b = (uint16_t*)brks;
         d = def;
         def = 0;
@@ -3029,8 +3026,7 @@ static void gen(int* n) {
         emit_push(1);
         emit(0x4288); // cmp r0, r1
         emit_branch(e + 1, BZ, 0);
-        emit_forward_branch();
-        cas = e;
+        cas = emit_forward_branch();
         if (*((int*)Case_entry(n).expr) == Switch)
             a = (int16_t*)cas;
         gen((int*)Case_entry(n).expr); // expression
@@ -3038,25 +3034,22 @@ static void gen(int* n) {
             cas = a;
         break;
     case Break:
-        emit_forward_branch();
         patch = sys_malloc(sizeof(struct patch_s), 1);
-        patch->addr = e;
+        patch->addr = emit_forward_branch();
         patch->next = brks;
         brks = patch;
         break;
     case Continue:
-        emit_forward_branch();
         patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->next = cnts;
-        patch->addr = e;
+        patch->addr = emit_forward_branch();
         cnts = patch;
         break;
     case Goto:
         label = (struct ident_s*)ast_NumVal(n);
         if (label->class == 0) {
-            emit_forward_branch();
             struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
-            l->addr = e;
+            l->addr = emit_forward_branch();
             l->next = (struct patch_s*)label->forward;
             label->forward = (uint16_t*)l;
         } else
@@ -3093,7 +3086,7 @@ static void gen(int* n) {
         break;
     default:
         if (i != ';')
-            fatal("%d: compiler error gen=%08x\n", line, i);
+            fatal("%d: compiler error gen=%08x\n", lineno, i);
     }
 }
 
@@ -3376,8 +3369,7 @@ static void stmt(int ctx) {
                 uint16_t* se;
                 if (tk == ';') { // check for prototype
                     se = e;
-                    emit_forward_branch();
-                    dd->forward = e;
+                    dd->forward = emit_forward_branch();
                 } else { // function with body
                     if (tk != '{')
                         fatal("bad function definition");
@@ -3403,7 +3395,7 @@ static void stmt(int ctx) {
                     emit_literals();
                 }
                 if (src_opt) {
-                    printf("%d: %.*s\n", line, p - lp, lp);
+                    printf("%d: %.*s\n", lineno, p - lp, lp);
                     lp = p;
                     disasm_address(&state, (int)(se + 1));
                     while (state.address < (int)e) {
@@ -3426,7 +3418,7 @@ static void stmt(int ctx) {
                         id->val = 0;
                         id->type = 0;
                     } else if (id->class == 0 && id->type == -1)
-                        fatal("%d: label %.*s not defined\n", line, id->hash & 0x3f, id->name);
+                        fatal("%d: label %.*s not defined\n", lineno, id->hash & 0x3f, id->name);
                     id++;
                 }
             } else {
@@ -3499,7 +3491,7 @@ static void stmt(int ctx) {
                                 i = strlen((char*)ast_NumVal(n)) + 1;
                                 if (i > (dd->etype + 1)) {
                                     i = dd->etype + 1;
-                                    printf("%d: string truncated to width\n", line);
+                                    printf("%d: string truncated to width\n", lineno);
                                 }
                                 memcpy((char*)dd->val, (char*)ast_NumVal(n), i);
                             } else
@@ -3986,8 +3978,19 @@ int cc(int argc, char** argv) {
         goto done;
     }
 
-    if (src_opt)
+    if (src_opt) {
         disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
+        disasm_symbol(&state, "aeabi_idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_i2f", (uint32_t)__wrap___aeabi_i2f, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_f2iz", (uint32_t)__wrap___aeabi_f2iz, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_fadd", (uint32_t)__wrap___aeabi_fadd, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_fsub", (uint32_t)__wrap___aeabi_fsub, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_fmul", (uint32_t)__wrap___aeabi_fmul, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_fdiv", (uint32_t)__wrap___aeabi_fdiv, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_fcmple", (uint32_t)__wrap___aeabi_fcmple, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_fcmpgt", (uint32_t)__wrap___aeabi_fcmpgt, ARMMODE_THUMB);
+        disasm_symbol(&state, "aeabi_fcmplt", (uint32_t)__wrap___aeabi_fcmplt, ARMMODE_THUMB);
+    }
     add_defines(stdio_defines);
     add_defines(gpio_defines);
     add_defines(pwm_defines);
@@ -4028,7 +4031,6 @@ int cc(int argc, char** argv) {
     fd = NULL;
 
     // parse the program
-    line = 1;
     pplevt = -1;
     next();
     while (tk) {

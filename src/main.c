@@ -25,7 +25,7 @@
 #include "tar.h"
 #include "vi.h"
 #include "xmodem.h"
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(PSHELL_TESTS)
 #include "tests.h"
 #endif
 
@@ -580,7 +580,7 @@ static void tar_cmd(void) {
     tar(argc, argv);
 }
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(PSHELL_TESTS)
 static void tests_cmd(void) {
     if (check_mount(true))
         return;
@@ -649,7 +649,7 @@ cmd_t cmd_table[] = {
     {"rm",      rm_cmd,         "remove file or directory. -r for recursive"},
     {"status",  status_cmd,     "filesystem status"},
     {"tar",     tar_cmd,        "tar archiver"},
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(PSHELL_TESTS)
     {"tests",   tests_cmd,      "run all tests"},
 #endif
     {"unmount", unmount_cmd,    "unmount filesystem"},
