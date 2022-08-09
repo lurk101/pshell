@@ -2301,7 +2301,7 @@ static void emit_immediate(int n) {
 }
 
 static void emit_effective_addr(int n) {
-    if (n == 0) {
+    if (n == -1) {
         emit(0x4638); // mov r0, r7
         return;
     }
@@ -2603,14 +2603,10 @@ static void emit_syscall(int n, int np) {
         emit(0x47b0); // blx r6
     } else {
         int np = p->etype & ADJ_MASK;
-        if (np == 1)
-            emit(0xbc01); // pop {r0}
-        else if (np == 2)
-            emit(0xbc03); // pop {r0-r1}
-        else if (np == 3)
-            emit(0xbc07); // pop {r0-r2}
-        else if (np >= 4)
-            emit(0xbc0f); // pop {r0-r3}
+        if (np > 4)
+            np = 4;
+        while (np--)
+            emit_pop(np);
         emit(0x4e00);     // ldr r6, [pc, #0]
         add_literal(e, (int)p->extrn);
         emit(0x47b0); // blx r6
@@ -2704,7 +2700,7 @@ static void gen(int* n) {
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
-            patch_branch(b, e);
+            patch_branch(b, e + 1);
             emit_forward_branch();
             b = e;
             gen((int*)Cond_entry(n).else_part);
