@@ -1,4 +1,4 @@
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(PSHELL_TESTS)
 
 #include "stdio.h"
 

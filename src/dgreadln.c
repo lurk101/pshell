@@ -404,6 +404,7 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
     for (;;) {
         int c = getchar();
         if (c == '\t') {
+            eschp(hp), hp = 0, hi = 0;
             dotab();
         } else if ((twotabs = 0, ky = matchkey(c))) {
             if (ky < 0) {

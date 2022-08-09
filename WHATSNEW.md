@@ -1,3 +1,9 @@
+What's new in version 1.1.17
+
+- fix interaction between tab completion and the command history
+- make sure to truncate when replacing a file
+- wumpus example
+
 What's new in version 1.1.16
 
 - fix broken keyboard BREAK option

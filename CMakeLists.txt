@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 option(USB_CONSOLE "build for USB console, otherwise UART" ON)
+option(FORCE_TESTS "build release with tests cmd" OFF)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -34,6 +35,10 @@ add_compile_options("-DLFS_NO_ERROR")
 add_compile_options("-DLFS_NO_DEBUG")
 add_compile_options("-DLFS_NO_WARN")
 add_compile_options("-DPSHELL_VERSION=${PSHELL_VERSION}")
+if (FORCE_TESTS)
+add_compile_options("-DPSHELL_TESTS")
+endif()
+
 
 add_subdirectory(littlefs)
 add_subdirectory(disassembler)
