@@ -26,6 +26,8 @@ About the compiler, briefly…
 - Aggregate types: array, struct and union.
 - Flow control: for, while, if then else, break, continue and goto.
 - Memory, math and SDK functions. ([list of implemented functions])
+- Native code genration for the Pico's cm0+ core
+- Predefined stdio, stdlib, and SDK functions.
 
 Raspberry Pi Forums [thread].
 
@@ -36,7 +38,7 @@ Building from source.
 Edit the root folder CMakeLists.tx file to pick a console device, then:
 
 ```
-# NOTE: Requires sdk 1.3 or later
+# NOTE: Requires sdk 1.4 or later
 git clone https://github.com/lurk101/pshell.git
 cd pshell
 git submodule update --init
@@ -58,7 +60,6 @@ Git branches
 
 - master: stable release branch
 - dev: development and fix branch
-- cm0+ : pico native code compiler (wip)
 
 C source code [examples].
 
