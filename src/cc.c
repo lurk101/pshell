@@ -1307,8 +1307,11 @@ static void expr(int lev) {
             ty = d->type;
         }
         // enumeration, only enums have ->class == Num
-        else if ((d->class == Num) || (d->class == Func)) {
+        else if (d->class == Num) {
             ast_Num(d->val);
+            ty = INT;
+        } else if (d->class == Func) {
+            ast_Num(d->val | 1);
             ty = INT;
         } else {
             // Variable get offset
@@ -1317,7 +1320,6 @@ static void expr(int lev) {
             case Par:
                 ast_Loc(loc - d->val);
                 break;
-            case Func:
             case Glo:
                 ast_Num(d->val);
                 break;
