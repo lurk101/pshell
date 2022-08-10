@@ -18,8 +18,8 @@ project(${PSHELL} C CXX ASM)
 
 pico_sdk_init()
 
-if (PICO_SDK_VERSION_STRING VERSION_LESS "1.3.1")
-    message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.3.1 (or later) required.")
+if (PICO_SDK_VERSION_STRING VERSION_LESS "1.4.0")
+    message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.4.0 (or later) required.")
 endif()
 
 find_package(Git REQUIRED)
