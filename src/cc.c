@@ -43,7 +43,7 @@
 #define K 1024
 
 #define DATA_BYTES (16 * K)
-#define TEXT_BYTES (48 * K)
+#define TEXT_BYTES (32 * K)
 #define SYM_TBL_BYTES (16 * K)
 #define TS_TBL_BYTES (2 * K)
 #define AST_TBL_BYTES (16 * K)
@@ -96,7 +96,6 @@ static char* src;               //
 static int* base_sp;            // stack
 static uint16_t *e, *le, *text_base; // current position in emitted code
 static uint16_t* cas;                // case statement patch-up pointer
-static struct patch_s* lit;     // literal patch-up pointer
 static uint16_t* def;           // default statement patch-up pointer
 static struct patch_s* brks;    // break statement patch-up pointer
 static struct patch_s* cnts;    // continue statement patch-up pointer
@@ -153,11 +152,8 @@ struct ident_s {
 	uint8_t inserted : 1; // inserted in disassembler table
 };
 
-struct ident_s *id,  // currently parsed identifier
-    *sym,            // symbol table (simple list of identifiers)
-    *ir_var[MAX_IR]; // IR information for local vars and parameters
-
-static int ir_count;
+struct ident_s *id, // currently parsed identifier
+    *sym;           // symbol table (simple list of identifiers)
 
 struct member_s {
     struct member_s* next;
@@ -575,8 +571,9 @@ static float wrap_aeabi_fmul(float a, float b) { return a * b; }
 
 static float wrap_aeabi_fsub(float a, float b) { return a - b; }
 
-static int x_printf(int etype, int* sp);
-static int x_sprintf(int etype, int* sp);
+static int x_printf(int etype);
+static int x_sprintf(int etype);
+static char* x_strdup(char* s);
 
 struct externs_s {
     char* name;
@@ -610,13 +607,12 @@ static void clear_globals(void) {
     cas = def = e = le = text_base = NULL;
     base_sp = tsize = n = malloc_list =
         (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
-    lit = brks = cnts = NULL;
+    brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
     swtc = brkc = cntc = tnew = tk = ty = loc = lineno = src_opt = trc_opt = ld = pplev = pplevt =
-        ir_count = 0;
+        0;
     memset(&tkv, 0, sizeof(tkv));
-    memset(ir_var, 0, sizeof(ir_var));
     memset(&members, 0, sizeof(members));
     memset(&done_jmp, 0, sizeof(&done_jmp));
 }
@@ -1265,8 +1261,8 @@ static void expr(int lev) {
             }
 			if (src_opt && !d->inserted) {
 				d ->inserted;
-            	int namelen = d->hash & 0x3f;
-            	char ch = d->name[namelen];
+                int namelen = d->hash & 0x3f;
+                char ch = d->name[namelen];
             	d->name[namelen] = 0;
 				if (d->class == Func)
 					disasm_symbol(&state, d->name, d->val, ARMMODE_THUMB);
@@ -2214,7 +2210,7 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 }
 
 static void emit(uint16_t n) {
-    if (e >= text_base + (TEXT_BYTES / sizeof(*e)))
+    if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 1)
         fatal("code segment exceeded, program is too big");
     *++e = n;
 }
@@ -2223,29 +2219,27 @@ static void emit_word(uint32_t n) {
     if (((int)e & 2) == 0)
         fatal("mis-aligned word");
     ++e;
-    if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 1)
+    if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 2)
         fatal("code segment exceeded, program is too big");
     *((uint32_t*)e) = n;
     ++e;
 }
 
-static void add_literal(uint16_t* addr, int val) {
-    struct patch_s* l = lit;
-    while (l) {
-        if (val == l->val)
-            break;
-        l = l->next;
+static void emit_load_literal(int r, int val) {
+    if (val >= 0 && val < 256)         //
+        emit(0x2000 | val | (r << 8)); // movs rr, #n
+    else {                             //
+        if (-val >= 0 && -val < 256) {
+            emit(0x2000 | -val | (r << 8)); // movs rr, #n
+            emit(0x4240);                   // negs r0, r0
+        } else {
+            while ((((int)e / 2) & 3) != 3)
+                emit(0x46c0);        // nop
+            emit(0x4800 | (r << 8)); // ldr rr, [pc + 2]
+            emit(0xe001);            // b pc+2
+            emit_word(val);
+        }
     }
-    if (!l) {
-        l = sys_malloc(sizeof(struct patch_s), 1);
-        l->val = val;
-        l->next = lit;
-        lit = l;
-    }
-    struct patch_s* l2 = sys_malloc(sizeof(struct patch_s), 1);
-    l2->addr = addr;
-    l2->next = l->locs;
-    l->locs = l2;
 }
 
 static void emit_enter(int n) {
@@ -2255,9 +2249,8 @@ static void emit_enter(int n) {
         if (n < 128)          //
             emit(0xb080 | n); // sub  sp, #n
         else {                //
-            emit(0x4900);     // ldr r1, [pc, n]
+            emit_load_literal(1, loc - ld);
             emit(0x448d);     // add sp, r1
-            add_literal(e - 1, loc - ld);
         }
     }
 }
@@ -2269,25 +2262,6 @@ static void emit_leave(void) {
         emit(0x46c0);      // nop ; (mov r8, r8)
 }
 
-static void emit_literals(void) {
-    while (lit) {
-        struct patch_s* tlit;
-        emit_word(lit->val);
-        while (lit->locs) {
-            int v = ((int)e - ((int)lit->locs->addr & ~3)) / 4 - 1;
-            if (v >= 256)
-                fatal("pc relative too far");
-            *lit->locs->addr |= v;
-            tlit = lit->locs->next;
-            sys_free(lit->locs);
-            lit->locs = tlit;
-        }
-        tlit = lit->next;
-        sys_free(lit);
-        lit = tlit;
-    }
-}
-
 static void emit_immediate(int n) {
     if (n >= 0 && n < 256) //
         emit(0x2000 | n); // movs r0, #n
@@ -2295,10 +2269,8 @@ static void emit_immediate(int n) {
         if (-n >= 0 && -n < 256) {
             emit(0x2000 | -n); // movs r0, #n
             emit(0x4240);      // negs r0, r0
-        } else {
-            emit(0x4800); // ldr r0, [pc, n]
-            add_literal(e, n);
-        }
+        } else
+            emit_load_literal(0, n);
     }
 }
 
@@ -2475,8 +2447,7 @@ static void emit_oper(int op) {
     case MOD:
         emit(0x4601); // mov r1, r0
         emit_pop(0);  // pop {r0}
-        emit(0x4a00); // ldr r2, [pc, n]
-        add_literal(e, (int)__wrap___aeabi_idiv);
+        emit_load_literal(2, (int)__wrap___aeabi_idiv);
         emit(0x4790); // blx r2
         if (op == MOD)
             emit(0x4608); // mov r0,r1
@@ -2492,56 +2463,48 @@ static void emit_float_oper(int op) {
     case SUBF:
     case MULF:
     case DIVF:
-        emit_pop(1);  // pop {r1}
-        emit_pop(0);  // pop {r0}
-        emit(0x4a00); // ldr r2, [pc, n]
-        switch (op) {
-        case ADDF:
-            add_literal(e, (int)__wrap___aeabi_fadd);
-            break;
-        case SUBF:
-            add_literal(e, (int)__wrap___aeabi_fsub);
-            break;
-        case MULF:
-            add_literal(e, (int)__wrap___aeabi_fmul);
-            break;
-        case DIVF:
-            add_literal(e, (int)__wrap___aeabi_fdiv);
-            break;
-        }
-        emit(0x4790); // blx r2
-        break;
-    case EQF:
-        emit_oper(EQ);
-        break;
-    case NEF:
-        emit_oper(NE);
-        break;
-
     case GEF:
     case LTF:
     case GTF:
     case LEF:
-        emit_pop(1);  // pop {r1}
+        emit(0x4601); // mov r1, r0
         emit_pop(0);  // pop {r0}
-        emit(0x4a00); // ldr r2, [pc, n]
         switch (op) {
+        case ADDF:
+            emit_load_literal(2, (int)__wrap___aeabi_fadd);
+            break;
+        case SUBF:
+            emit_load_literal(2, (int)__wrap___aeabi_fsub);
+            break;
+        case MULF:
+            emit_load_literal(2, (int)__wrap___aeabi_fmul);
+            break;
+        case DIVF:
+            emit_load_literal(2, (int)__wrap___aeabi_fdiv);
+            break;
         case GEF:
-            add_literal(e, (int)__wrap___aeabi_fcmpge);
+            emit_load_literal(2, (int)__wrap___aeabi_fcmpge);
             break;
         case LTF:
-            add_literal(e, (int)__wrap___aeabi_fcmplt);
+            emit_load_literal(2, (int)__wrap___aeabi_fcmplt);
             break;
         case GTF:
-            add_literal(e, (int)__wrap___aeabi_fcmpgt);
+            emit_load_literal(2, (int)__wrap___aeabi_fcmpgt);
             break;
         case LEF:
-            add_literal(e, (int)__wrap___aeabi_fcmple);
+            emit_load_literal(2, (int)__wrap___aeabi_fcmple);
             break;
         default:
             fatal("unexpected compiler error");
         }
         emit(0x4790); // blx r2
+        break;
+
+    case EQF:
+        emit_oper(EQ);
+        break;
+    case NEF:
+        emit_oper(NE);
         break;
 
     default:
@@ -2550,13 +2513,13 @@ static void emit_float_oper(int op) {
 }
 
 static void emit_ftoi() {
-    emit(0x4a00); // ldr r2, [pc, n]
-    add_literal(e, (int)__wrap___aeabi_f2iz);
+    emit_load_literal(2, (int)__wrap___aeabi_f2iz);
+    emit(0x4790); // blx r2
 }
 
 static void emit_itof() {
-    emit(0x4a00); // ldr r2, [pc, n]
-    add_literal(e, (int)__wrap___aeabi_i2f);
+    emit_load_literal(2, (int)__wrap___aeabi_i2f);
+    emit(0x4790); // blx r2
 }
 
 static void emit_cast(int n) {
@@ -2595,16 +2558,12 @@ static void emit_call(int n) {
 static void emit_syscall(int n, int np) {
     const struct externs_s* p = externs + n;
     if (p->is_printf) {
-        emit(0x4669); // mov r1, sp
         emit_immediate(np);
-        emit(0x4e00); // ldr r6, [pc, #0]
-        add_literal(e, (int)x_printf);
+        emit_load_literal(6, (int)x_printf);
         emit(0x47b0); // blx r6
     } else if (p->is_sprintf) {
-        emit(0x4669); // mov r1, sp
         emit_immediate(np);
-        emit(0x4e00); // ldr r6, [pc, #0]
-        add_literal(e, (int)x_sprintf);
+        emit_load_literal(6, (int)x_sprintf);
         emit(0x47b0); // blx r6
     } else {
         int np = p->etype & ADJ_MASK;
@@ -2612,8 +2571,7 @@ static void emit_syscall(int n, int np) {
             np = 4;
         while (np--)
             emit_pop(np);
-        emit(0x4e00);     // ldr r6, [pc, #0]
-        add_literal(e, (int)p->extrn);
+        emit_load_literal(6, (int)p->extrn);
         emit(0x47b0); // blx r6
     }
 }
@@ -3198,7 +3156,6 @@ static void stmt(int ctx) {
             id->type = INT;
             id->class = ctx;
             id->val = ld++;
-            ir_var[ir_count++] = id;
             next();
         }
         return;
@@ -3343,7 +3300,7 @@ static void stmt(int ctx) {
                 dd->class = Func;       // type is function
                 dd->val = (int)(e + 1); // function Pointer? offset/address
                 next();
-                nf = ir_count = ld = 0; // "ld" is parameter's index.
+                nf = ld = 0; // "ld" is parameter's index.
                 while (tk != ')') {
                     stmt(Par);
                     ddetype = ddetype * 2;
@@ -3392,7 +3349,6 @@ static void stmt(int ctx) {
                     cas = 0;
                     se = e;
                     gen(n);
-                    emit_literals();
                 }
                 if (src_opt) {
                     printf("%d: %.*s\n", lineno, p - lp, lp);
@@ -3405,8 +3361,6 @@ static void stmt(int ctx) {
                     }
                 }
                 id = sym;
-                if (src_opt)
-                    memset(ir_var, 0, sizeof(struct ident_s*) * MAX_IR);
                 while (id->tk) { // unwind symbol table locals
                     if (id->class == Loc || id->class == Par) {
                         id->class = id->hclass;
@@ -3438,8 +3392,8 @@ static void stmt(int ctx) {
                 sz = (sz + 3) & -4;
                 if (ctx == Glo) {
 					if (src_opt && !dd->inserted) {
-						int len = dd->etype & ADJ_MASK;
-						char ch = dd->name[len];
+                        int len = dd->hash & 0x3f;
+                        char ch = dd->name[len];
 						dd->name[len] = 0;
 						disasm_symbol(&state, dd->name, (int)data, ARMMODE_THUMB);
 						dd->name[len] = ch;
@@ -3450,12 +3404,10 @@ static void stmt(int ctx) {
                     data += sz;
                 } else if (ctx == Loc) {
                     dd->val = (ld += sz / sizeof(int));
-                    ir_var[ir_count++] = dd;
                 } else if (ctx == Par) {
                     if (ty > ATOM_TYPE && ty < PTR) // local struct decl
                         fatal("struct parameters must be pointers");
                     dd->val = ld++;
-                    ir_var[ir_count++] = dd;
                 }
                 if (tk == Assign) {
                     next();
@@ -3791,9 +3743,26 @@ static int common_vfunc(int etype, int prntf, int* sp) {
     return r;
 }
 
-static int x_printf(int etype, int* sp) { common_vfunc(etype, 1, sp); }
+static char* x_strdup(char* s) {
+    int l = strlen(s);
+    char* c = sys_malloc(l + 1, 0);
+    strcpy(c, s);
+    return c;
+}
 
-static int x_sprintf(int etype, int* sp) { common_vfunc(etype, 0, sp); }
+static int x_printf(int etype) {
+    int* sp;
+    asm volatile("mov %0, sp \n" : "=r"(sp) : : "r0");
+    sp += 2;
+    common_vfunc(etype, 1, sp);
+}
+
+static int x_sprintf(int etype) {
+    int* sp;
+    asm volatile("mov %0, sp \n" : "=r"(sp) : : "r0");
+    sp += 2;
+    common_vfunc(etype, 0, sp);
+}
 
 static void show_defines(struct define_grp* grp) {
     if (grp->name == 0)

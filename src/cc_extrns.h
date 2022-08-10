@@ -203,7 +203,7 @@
     {"strchr", 2, string_defines, strchr, 0, 0, 0},
     {"strcmp", 2, string_defines, strcmp, 0, 0, 0},
     {"strcpy", 2, string_defines, strcpy, 0, 0, 0},
-    {"strdup", 1, string_defines, strdup, 0, 0, 0},
+    {"strdup", 1, string_defines, x_strdup, 0, 0, 0},
     {"strlen", 1, string_defines, strlen, 0, 0, 0},
     {"strncat", 3, string_defines, strncat, 0, 0, 0},
     {"strncmp", 3, string_defines, strncmp, 0, 0, 0},
