@@ -95,7 +95,8 @@ static char* data_base;         // data/bss pointer
 static char* src;               //
 static int* base_sp;            // stack
 static uint16_t *e, *le, *text_base; // current position in emitted code
-static uint16_t* cas;                // case statement patch-up pointer
+static uint16_t* ecas;               // case statement patch-up pointer
+static int* ncas;                    // case statement patch-up pointer
 static uint16_t* def;           // default statement patch-up pointer
 static struct patch_s* brks;    // break statement patch-up pointer
 static struct patch_s* cnts;    // continue statement patch-up pointer
@@ -604,7 +605,7 @@ static lfs_file_t* fd;
 static char* fp;
 
 static void clear_globals(void) {
-    cas = def = e = le = text_base = NULL;
+    ecas = def = e = le = text_base = NULL;
     base_sp = tsize = n = malloc_list =
         (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
     brks = cnts = NULL;
@@ -612,6 +613,7 @@ static void clear_globals(void) {
     file_list = NULL;
     swtc = brkc = cntc = tnew = tk = ty = loc = lineno = src_opt = trc_opt = ld = pplev = pplevt =
         0;
+    ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
     memset(&done_jmp, 0, sizeof(&done_jmp));
@@ -2955,15 +2957,16 @@ static void gen(int* n) {
         break;
     case Switch:
         gen((int*)Switch_entry(n).cond); // condition
-        a = cas;
-        cas = emit_forward_branch();
+        emit_push(0);
+        a = ecas;
+        ecas = emit_forward_branch();
         b = (uint16_t*)brks;
         d = def;
         def = 0;
         brks = 0;
         gen((int*)Switch_entry(n).cas); // case statment
         // deal with no default inside switch case
-        patch_branch(cas, def ? def : e);
+        patch_branch(ecas, def ? def : e);
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch((uint16_t*)(brks->addr), e);
@@ -2971,27 +2974,24 @@ static void gen(int* n) {
             brks = (struct patch_s*)t;
         }
         emit_adjust_stack(1);
-        cas = a;
         brks = (struct patch_s*)b;
         def = d;
         break;
     case Case:
         a = 0;
-        emit_push(0);
-        patch_branch(cas, e - 1);
+        patch_branch(ecas, e);
         gen((int*)ast_NumVal(n)); // condition
         // if (*(e - 1) != IMM) // ***FIX***
         //    fatal("case label not a numeric literal");
-        emit_pop(1);
-        emit_push(1);
+        emit(0x9900); // ldr r1, [sp, #0]
         emit(0x4288); // cmp r0, r1
         emit_branch(e + 1, BZ, 0);
-        cas = emit_forward_branch();
+        ecas = emit_forward_branch();
         if (*((int*)Case_entry(n).expr) == Switch)
-            a = (int16_t*)cas;
+            a = ecas;
         gen((int*)Case_entry(n).expr); // expression
         if (a != 0)
-            cas = a;
+            ecas = a;
         break;
     case Break:
         patch = sys_malloc(sizeof(struct patch_s), 1);
@@ -3348,7 +3348,7 @@ static void stmt(int ctx) {
                     if (rtf == 0 && rtt != -1)
                         fatal("expecting return value");
                     ast_Enter(ld - loc);
-                    cas = 0;
+                    ncas = 0;
                     se = e;
                     gen(n);
                 }
@@ -3521,10 +3521,8 @@ static void stmt(int ctx) {
         return;
     case Switch:
         i = 0;
-        j = 0;
-        if (cas)
-            j = (int)cas;
-        cas = (uint16_t*)i;
+        j = (int)ncas;
+        ncas = &i;
         next();
         if (tk != '(')
             fatal("open parenthesis expected");
@@ -3541,21 +3539,20 @@ static void stmt(int ctx) {
         --brkc;
         b = n;
         ast_Switch((int)b, (int)a);
-        if (j)
-            cas = (uint16_t*)j;
+        ncas = (int*)j;
         return;
     case Case:
         if (!swtc)
             fatal("case-statement outside of switch");
-        i = (int)cas;
+        i = *ncas;
         next();
         expr(Or);
         a = n;
         if (ast_Tk(n) != Num)
             fatal("case label not a numeric literal");
         j = ast_NumVal(n);
-        ast_NumVal(n) -= i;
-        cas = (uint16_t*)j;
+        // ast_NumVal(n);
+        *ncas = j;
         ast_Single(';');
         if (tk != ':')
             fatal("colon expected");
