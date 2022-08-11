@@ -133,6 +133,7 @@ static int ld;                  // local variable depth
 static int pplev, pplevt;       // preprocessor conditional level
 static int* ast;                // abstract syntax tree
 static ARMSTATE state;          // disassembler state
+static int exit_sp;
 
 // identifier
 #define MAX_IR 64 // maximum number of local variable or function parameters
@@ -575,6 +576,7 @@ static float wrap_aeabi_fsub(float a, float b) { return a - b; }
 static int x_printf(int etype);
 static int x_sprintf(int etype);
 static char* x_strdup(char* s);
+static void x_exit(int rc);
 
 struct externs_s {
     char* name;
@@ -3742,6 +3744,14 @@ static int common_vfunc(int etype, int prntf, int* sp) {
     return r;
 }
 
+static void x_exit(int rc) {
+    asm(" mov sp, %1 \n"
+        " mov r0, %0 \n"
+        " pop {r6, r7, pc} \n"
+        :
+        : "r"(rc), "r"(exit_sp - 12));
+}
+
 static char* x_strdup(char* s) {
     int l = strlen(s);
     char* c = sys_malloc(l + 1, 0);
@@ -4029,12 +4039,13 @@ int cc(int argc, char** argv) {
                  "mov  r0, %2 \n"
                  "push {r0}   \n"
                  "mov  r1, %3 \n"
-                 "blx  r1     \n"
+                 "mov  %0, sp \n"
+                 : "=r"(exit_sp)
+                 : "r"(argc), "r"(argv), "r"(idmain->val | 1));
+    asm volatile("blx  r1     \n"
                  "add  sp, #8 \n"
                  "mov  %0, r0 \n"
-                 : "=r"(rslt)
-                 : "r"(argc), "r"(argv), "r"(idmain->val | 1)
-                 : "r0", "r1");
+                 : "=r"(rslt));
     printf("\nCC = %d\n", rslt);
 done:
     if (src_opt)
