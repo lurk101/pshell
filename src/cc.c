@@ -2239,7 +2239,7 @@ static void emit_load_literal(int r, int val) {
             emit(0x2000 | -val | (r << 8)); // movs rr, #n
             emit(0x4240);                   // negs r0, r0
         } else {
-            while ((((int)e / 2) & 3) != 3)
+            while (!((int)e & 2))
                 emit(0x46c0);        // nop
             emit(0x4800 | (r << 8)); // ldr rr, [pc + 2]
             emit(0xe001);            // b pc+2
