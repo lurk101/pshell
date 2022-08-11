@@ -3995,7 +3995,8 @@ int cc(int argc, char** argv) {
 #ifdef NDEBUG
     text_base = le = sys_malloc(TEXT_BYTES, 1);
 #else
-    text_base = le = (uint16_t*)((int)dummy & ~1);
+    text_base = le = sys_malloc(TEXT_BYTES, 1);
+    // text_base = le = (uint16_t*)((int)dummy & ~1);
 #endif
     e = text_base - 1;
     members = sys_malloc(MEMBER_DICT_BYTES, 1);
