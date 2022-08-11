@@ -26,7 +26,7 @@ About the compiler, briefly…
 - Aggregate types: array, struct and union.
 - Flow control: for, while, if then else, break, continue and goto.
 - Memory, math and SDK functions. ([list of implemented functions])
-- Native code genration for the Pico's cm0+ core
+- Native code generation for the Pico's cm0+ core
 - Predefined stdio, stdlib, and SDK functions.
 
 Raspberry Pi Forums [thread].
@@ -60,6 +60,12 @@ Git branches
 
 - master: stable release branch
 - dev: development and fix branch
+- vm: legacy virtual machine branch (no longer under active development)
+
+If you want to build the dev or vm branch you can switch to it with
+```
+git checkout branch-name
+```
 
 C source code [examples].
 
