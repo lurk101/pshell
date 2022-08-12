@@ -100,6 +100,9 @@ static int* ncas;                    // case statement patch-up pointer
 static uint16_t* def;           // default statement patch-up pointer
 static struct patch_s* brks;    // break statement patch-up pointer
 static struct patch_s* cnts;    // continue statement patch-up pointer
+static struct patch_s* pcrel;   // pc relative address patch-up pointer
+static uint16_t* pcrel_1st;     // first relative load address in group
+static int pcrel_count;         // first relative load address in group
 static int swtc;                // !0 -> in a switch-stmt context
 static int brkc;                // !0 -> in a break-stmt context
 static int cntc;                // !0 -> in a continue-stmt context
@@ -136,8 +139,6 @@ static ARMSTATE state;          // disassembler state
 static int exit_sp;
 
 // identifier
-#define MAX_IR 64 // maximum number of local variable or function parameters
-
 struct ident_s {
     int tk; // type-id or keyword
     int hash;
@@ -607,14 +608,14 @@ static lfs_file_t* fd;
 static char* fp;
 
 static void clear_globals(void) {
-    ecas = def = e = le = text_base = NULL;
+    pcrel_1st = ecas = def = e = le = text_base = NULL;
     base_sp = tsize = n = malloc_list =
         (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
-    brks = cnts = NULL;
+    pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
     swtc = brkc = cntc = tnew = tk = ty = loc = lineno = src_opt = trc_opt = ld = pplev = pplevt =
-        0;
+        pcrel_count = 0;
     ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
@@ -1200,6 +1201,8 @@ static void bitopcheck(int tl, int tr) {
 
 static bool is_power_of_2(int n) { return ((n - 1) & n) == 0; }
 
+static void check_pc_relative(void);
+
 /* expression parsing
  * lev represents an operator.
  * because each operator `token` is arranged in order of priority,
@@ -1236,6 +1239,8 @@ static void expr(int lev) {
     int otk, memsub = 0;
     struct ident_s* d;
     struct member_s* m;
+
+    check_pc_relative();
 
     switch (tk) {
     case Id:
@@ -2221,6 +2226,8 @@ static void emit(uint16_t n) {
     *++e = n;
 }
 
+static void emit_branch(uint16_t* to, int cond, int comp);
+
 static void emit_word(uint32_t n) {
     if (((int)e & 2) == 0)
         fatal("mis-aligned word");
@@ -2231,21 +2238,89 @@ static void emit_word(uint32_t n) {
     ++e;
 }
 
-static void emit_load_literal(int r, int val) {
-    if (val >= 0 && val < 256)         //
+static void patch_pc_relative(int brnch) {
+    int rel_count = pcrel_count;
+    pcrel_count = 0;
+    if (brnch) {
+        if (!((int)e & 2))
+            emit_branch(e + 2 * rel_count, B, 0);
+        else {
+            emit(0x46c0); // nop ; (mov r8, r8)
+            emit_branch(e + 2 * rel_count, B, 0);
+        }
+    } else {
+        if (!((int)e & 2))
+            emit(0x46c0); // nop ; (mov r8, r8)
+    }
+    while (pcrel) {
+        struct patch_s* p = pcrel;
+        while (p->locs) {
+            struct patch_s* pl = p->locs;
+            if ((*pl->addr & 0x4800) != 0x4800)
+                fatal("unexpected compiler error");
+            int te = (int)e + 2;
+            int ta = (int)pl->addr + 2;
+            if (ta & 2)
+                ++ta;
+            int ofs = (te - ta) / 4;
+            if (ofs > 255)
+                fatal("unexpected compiler error");
+            *pl->addr |= ofs;
+            p->locs = pl->next;
+            sys_free(pl);
+        }
+        emit_word(p->val);
+        pcrel = p->next;
+        sys_free(p);
+    }
+    pcrel_1st = 0;
+}
+
+static void check_pc_relative(void) {
+    if (pcrel_1st == 0)
+        return;
+    int te = (int)e + 4 * pcrel_count;
+    int ta = (int)pcrel_1st;
+    if ((te - ta) > 1000)
+        patch_pc_relative(1);
+}
+
+static void emit_load_immediate(int r, int val) {
+    if (val >= 0 && val < 256) {       //
         emit(0x2000 | val | (r << 8)); // movs rr, #n
-    else {                             //
-        if (-val >= 0 && -val < 256) {
-            emit(0x2000 | -val | (r << 8)); // movs rr, #n
-            emit(0x4240);                   // negs r0, r0
-        } else {
-            if (!((int)e & 2))
-                emit(0x46c0);        // nop
-            emit(0x4800 | (r << 8)); // ldr rr, [pc + 2]
-            emit(0xe001);            // b pc+2
-            emit_word(val);
+        return;
+    }
+    if (-val >= 0 && -val < 256) {
+        emit(0x2000 | -val | (r << 8)); // movs rr, #n
+        emit(0x4240);                   // negs r0, r0
+        return;
+    }
+    emit(0x4800 | (r << 8)); // ldr rr,[pc + offset n]
+    struct patch_s* p = pcrel;
+    while (p) {
+        if (p->val == val)
+            break;
+        p = p->next;
+    }
+    if (!p) {
+        ++pcrel_count;
+        if (pcrel_1st == 0)
+            pcrel_1st = e;
+        p = sys_malloc(sizeof(struct patch_s), 1);
+        p->val = val;
+        if (pcrel == 0)
+            pcrel = p;
+        else {
+            struct patch_s* p2 = pcrel;
+            while (p2->next)
+                p2 = p2->next;
+            p2->next = p;
         }
     }
+    struct patch_s* pl = sys_malloc(sizeof(struct patch_s), 1);
+    pl->addr = e;
+    pl->next = p->locs;
+    p->locs = pl;
 }
 
 static void emit_enter(int n) {
@@ -2255,7 +2330,7 @@ static void emit_enter(int n) {
         if (n < 128)          //
             emit(0xb080 | n); // sub  sp, #n
         else {                //
-            emit_load_literal(1, loc - ld);
+            emit_load_immediate(1, loc - ld);
             emit(0x448d);     // add sp, r1
         }
     }
@@ -2268,24 +2343,12 @@ static void emit_leave(void) {
         emit(0x46c0);      // nop ; (mov r8, r8)
 }
 
-static void emit_immediate(int n) {
-    if (n >= 0 && n < 256) //
-        emit(0x2000 | n); // movs r0, #n
-    else {                //
-        if (-n >= 0 && -n < 256) {
-            emit(0x2000 | -n); // movs r0, #n
-            emit(0x4240);      // negs r0, r0
-        } else
-            emit_load_literal(0, n);
-    }
-}
-
 static void emit_effective_addr(int n) {
     if (n == -1) {
         emit(0x4638); // mov r0, r7
         return;
     }
-    emit_immediate((n + 1) * 4);
+    emit_load_immediate(0, (n + 1) * 4);
     emit(0x4438); // add r0, r7
 }
 
@@ -2327,16 +2390,17 @@ static void emit_load(int n) {
 }
 
 static uint16_t* emit_forward_branch(void) {
-    emit(0xe000);
-    return e;
+    emit(0x7800);
+    emit(0x6800);
+    return e - 1;
 }
+
+static void emit_call(int n);
 
 static void emit_branch(uint16_t* to, int cond, int comp) {
     int ofs = to - (e + 1);
     if (cond == B) {
-        if (ofs >= -128 && ofs < 128 && to != 0)
-            emit(0xe700 | (ofs & 0xff));
-        else if (ofs >= -1024 && ofs < 1024)
+        if (ofs >= -1024 && ofs < 1024)
             emit(0xe000 | (ofs & 0x7ff)); // JMP n
         else
             fatal("jmp too far from %08x to %08x", to, e);
@@ -2359,21 +2423,32 @@ static void emit_branch(uint16_t* to, int cond, int comp) {
         }
         return;
     }
+    if (ofs >= -1024 && ofs < 1023) {
+        switch (cond) {
+        case BZ:
+            emit(0xd100); // bne *+2
+            break;
+        case BNZ:
+            emit(0xd000); // be *+2
+            break;
+        default:
+            fatal("unexpected compiler error");
+        }
+        --ofs;
+        emit(0xe000 | (ofs & 0x7ff)); // JMP to
+        return;
+    }
     switch (cond) {
     case BZ:
-        emit(0xd100); // bne *+2
+        emit(0xd101); // bne *+3
         break;
     case BNZ:
-        emit(0xd000); // be *+2
+        emit(0xd001); // be *+3
         break;
     default:
         fatal("unexpected compiler error");
     }
-    --ofs;
-    if (ofs >= -1024 && ofs < 1024) {
-        emit(0xe000 | (ofs & 0x7ff)); // JMP to
-    } else
-        fatal("jmp too far from %08x to %08x", to, e);
+    emit_call((int)(to + 1)); // JMP to
 }
 
 static void emit_oper(int op) {
@@ -2453,7 +2528,7 @@ static void emit_oper(int op) {
     case MOD:
         emit(0x4601); // mov r1, r0
         emit_pop(0);  // pop {r0}
-        emit_load_literal(2, (int)__wrap___aeabi_idiv);
+        emit_load_immediate(2, (int)__wrap___aeabi_idiv);
         emit(0x4790); // blx r2
         if (op == MOD)
             emit(0x4608); // mov r0,r1
@@ -2477,28 +2552,28 @@ static void emit_float_oper(int op) {
         emit_pop(0);  // pop {r0}
         switch (op) {
         case ADDF:
-            emit_load_literal(2, (int)__wrap___aeabi_fadd);
+            emit_load_immediate(2, (int)__wrap___aeabi_fadd);
             break;
         case SUBF:
-            emit_load_literal(2, (int)__wrap___aeabi_fsub);
+            emit_load_immediate(2, (int)__wrap___aeabi_fsub);
             break;
         case MULF:
-            emit_load_literal(2, (int)__wrap___aeabi_fmul);
+            emit_load_immediate(2, (int)__wrap___aeabi_fmul);
             break;
         case DIVF:
-            emit_load_literal(2, (int)__wrap___aeabi_fdiv);
+            emit_load_immediate(2, (int)__wrap___aeabi_fdiv);
             break;
         case GEF:
-            emit_load_literal(2, (int)__wrap___aeabi_fcmpge);
+            emit_load_immediate(2, (int)__wrap___aeabi_fcmpge);
             break;
         case LTF:
-            emit_load_literal(2, (int)__wrap___aeabi_fcmplt);
+            emit_load_immediate(2, (int)__wrap___aeabi_fcmplt);
             break;
         case GTF:
-            emit_load_literal(2, (int)__wrap___aeabi_fcmpgt);
+            emit_load_immediate(2, (int)__wrap___aeabi_fcmpgt);
             break;
         case LEF:
-            emit_load_literal(2, (int)__wrap___aeabi_fcmple);
+            emit_load_immediate(2, (int)__wrap___aeabi_fcmple);
             break;
         default:
             fatal("unexpected compiler error");
@@ -2519,12 +2594,12 @@ static void emit_float_oper(int op) {
 }
 
 static void emit_ftoi() {
-    emit_load_literal(2, (int)__wrap___aeabi_f2iz);
+    emit_load_immediate(2, (int)__wrap___aeabi_f2iz);
     emit(0x4790); // blx r2
 }
 
 static void emit_itof() {
-    emit_load_literal(2, (int)__wrap___aeabi_i2f);
+    emit_load_immediate(2, (int)__wrap___aeabi_i2f);
     emit(0x4790); // blx r2
 }
 
@@ -2564,12 +2639,12 @@ static void emit_call(int n) {
 static void emit_syscall(int n, int np) {
     const struct externs_s* p = externs + n;
     if (p->is_printf) {
-        emit_immediate(np);
-        emit_load_literal(6, (int)x_printf);
+        emit_load_immediate(0, np);
+        emit_load_immediate(6, (int)x_printf);
         emit(0x47b0); // blx r6
     } else if (p->is_sprintf) {
-        emit_immediate(np);
-        emit_load_literal(6, (int)x_sprintf);
+        emit_load_immediate(0, np);
+        emit_load_immediate(6, (int)x_sprintf);
         emit(0x47b0); // blx r6
     } else {
         int np = p->etype & ADJ_MASK;
@@ -2577,7 +2652,7 @@ static void emit_syscall(int n, int np) {
             np = 4;
         while (np--)
             emit_pop(np);
-        emit_load_literal(6, (int)p->extrn);
+        emit_load_immediate(6, (int)p->extrn);
         emit(0x47b0); // blx r6
     }
 }
@@ -2594,6 +2669,12 @@ static void patch_branch(uint16_t* from, uint16_t* to) {
         if (ofs < -1024 || ofs > 1023)
             fatal("jmp too far");
         ofs &= 0x7ff;
+    } else if (*from == 0x7800 && *(from + 1) == 0x6800) {
+        uint16_t* se = e;
+        e = from - 1;
+        emit_call((int)to + 2);
+        e = se;
+        return;
     } else
         fatal("unexpected compiler error");
     *from |= ofs;
@@ -2608,13 +2689,13 @@ static void gen(int* n) {
     struct ident_s* label;
     struct patch_s* patch;
 
+    check_pc_relative();
+
     switch (i) {
     case Num:
-        emit_immediate(ast_NumVal(n));
-        break; // int value
     case NumF:
-        emit_immediate(ast_NumVal(n));
-        break; // float value
+        emit_load_immediate(0, ast_NumVal(n));
+        break; // int or float value
     case Load:
         gen(n + 2);                                           // load the value
         if (ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR) // unreachable?
@@ -2649,9 +2730,10 @@ static void gen(int* n) {
         emit_push(0);
         emit_load((ast_NumVal(n) == CHAR) ? LC : LI);
         emit_push(0);
-        emit_immediate((ast_NumVal(n) >= PTR2)
-                           ? sizeof(int)
-                           : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1));
+        emit_load_immediate(0,
+                            (ast_NumVal(n) >= PTR2)
+                                ? sizeof(int)
+                                : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1));
         emit_oper((i == Inc) ? ADD : SUB);
         emit_store((ast_NumVal(n) == CHAR) ? SC : SI);
         break;
@@ -2659,7 +2741,7 @@ static void gen(int* n) {
         gen((int*)Cond_entry(n).cond_part); // condition
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
-        emit_branch(e + 2, BNZ, 1);
+        emit_branch(e + 3, BNZ, 1);
         b = emit_forward_branch();
         gen((int*)Cond_entry(n).if_part); // expression
         // Patch the jump address field pointed to by "b" to hold the address
@@ -2668,7 +2750,7 @@ static void gen(int* n) {
         // Add "JMP" instruction after true branch to jump over false branch.
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
-            patch_branch(b, e + 1);
+            patch_branch(b, e + 2);
             b = emit_forward_branch();
             gen((int*)Cond_entry(n).else_part);
         } // else statment
@@ -2686,17 +2768,17 @@ static void gen(int* n) {
      */
     case Lor:
         gen((int*)ast_NumVal(n));
-        emit_branch(e + 2, BZ, 1);
+        emit_branch(e + 3, BZ, 1);
         b = emit_forward_branch();
         gen(n + 2);
-        patch_branch(b, e);
+        patch_branch(b, e + 1);
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
-        emit_branch(e + 2, BNZ, 1);
+        emit_branch(e + 3, BNZ, 1);
         b = emit_forward_branch();
         gen(n + 2);
-        patch_branch(b, e);
+        patch_branch(b, e + 1);
         break;
     /* If current token is bitwise OR operator:
      * Add "PSH" instruction to push LHS value in register to stack.
@@ -2946,9 +3028,9 @@ static void gen(int* n) {
         patch_branch(a, e);
         if (For_entry(n).cond) {
             gen((int*)For_entry(n).cond); // condition
-            emit_branch(a - 1, BNZ, 1);
+            emit_branch(a, BNZ, 1);
         } else
-            emit_branch(a - 1, B, 1);
+            emit_branch(a, B, 1);
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch(brks->addr, e);
@@ -2987,7 +3069,7 @@ static void gen(int* n) {
         //    fatal("case label not a numeric literal");
         emit(0x9900); // ldr r1, [sp, #0]
         emit(0x4288); // cmp r0, r1
-        emit_branch(e + 1, BZ, 0);
+        emit_branch(e + 2, BZ, 0);
         ecas = emit_forward_branch();
         if (*((int*)Case_entry(n).expr) == Switch)
             a = ecas;
@@ -3031,6 +3113,7 @@ static void gen(int* n) {
         gen(n + 2);
         // if (*(e - 1) != 0x46bd && *e != 0xbdf0)
         emit_leave(); // don't issue it again if already emitted by return stmt
+        patch_pc_relative(0);
         break;
     case Label: // target of goto
         label = (struct ident_s*)ast_NumVal(n);
