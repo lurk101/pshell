@@ -2403,7 +2403,7 @@ static void emit_branch(uint16_t* to, int cond, int comp) {
         if (ofs >= -1024 && ofs < 1024)
             emit(0xe000 | (ofs & 0x7ff)); // JMP n
         else
-            fatal("jmp too far from %08x to %08x", to, e);
+            emit_call((int)to | 1);
         return;
     }
     if (comp) {       // TEST
