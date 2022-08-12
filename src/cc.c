@@ -2390,8 +2390,8 @@ static void emit_load(int n) {
 }
 
 static uint16_t* emit_forward_branch(void) {
-    emit(0x7800);
-    emit(0x6800);
+    emit(0);
+    emit(0);
     return e - 1;
 }
 
@@ -2668,7 +2668,7 @@ static void patch_branch(uint16_t* from, uint16_t* to) {
         if (ofs < -1024 || ofs > 1023)
             fatal("jmp too far");
         ofs &= 0x7ff;
-    } else if (*from == 0x7800 && *(from + 1) == 0x6800) {
+    } else if (*from == 0 && *(from + 1) == 0) {
         uint16_t* se = e;
         e = from - 1;
         emit_call((int)to + 2);
