@@ -1,3 +1,7 @@
+What's new in version 1.2.1
+
+- remove compiler branch distance restriction
+
 What's new in version 1.2.0
 
 - C compiler now generates native arm code
