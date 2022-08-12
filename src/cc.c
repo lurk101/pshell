@@ -252,13 +252,14 @@ static struct define_grp stdio_defines[] = {
     {"O_RDONLY", LFS_O_RDONLY},
     {"O_WRONLY", LFS_O_WRONLY},
     {"O_RDWR", LFS_O_RDWR},
-    {"O_CREAT", LFS_O_CREAT},   // Create a file if it does not exist
-    {"O_EXCL", LFS_O_EXCL},     // Fail if a file already exists
-    {"O_TRUNC", LFS_O_TRUNC},   // Truncate the existing file to zero size
-    {"O_APPEND", LFS_O_APPEND}, // Move to end of file on every write
-    {"SEEK_SET", LFS_SEEK_SET}, //
-    {"SEEK_CUR", LFS_SEEK_CUR}, //
-    {"SEEK_END", LFS_SEEK_END}, //
+    {"O_CREAT", LFS_O_CREAT},                   // Create a file if it does not exist
+    {"O_EXCL", LFS_O_EXCL},                     // Fail if a file already exists
+    {"O_TRUNC", LFS_O_TRUNC},                   // Truncate the existing file to zero size
+    {"O_APPEND", LFS_O_APPEND},                 // Move to end of file on every write
+    {"SEEK_SET", LFS_SEEK_SET},                 //
+    {"SEEK_CUR", LFS_SEEK_CUR},                 //
+    {"SEEK_END", LFS_SEEK_END},                 //
+    {"PICO_ERROR_TIMEOUT", PICO_ERROR_TIMEOUT}, //
     {0}};
 
 static struct define_grp gpio_defines[] = {
