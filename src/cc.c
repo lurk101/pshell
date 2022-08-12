@@ -2406,7 +2406,7 @@ static void emit_branch(uint16_t* to, int cond, int comp) {
             fatal("jmp too far from %08x to %08x", to, e);
         return;
     }
-    if (comp) {
+    if (comp) {       // TEST
         emit(0x2800); // cmp r0,#0
         --ofs;
     }
@@ -2423,7 +2423,7 @@ static void emit_branch(uint16_t* to, int cond, int comp) {
         }
         return;
     }
-    if (ofs >= -1024 && ofs < 1023) {
+    if (ofs >= -1023 && ofs < 1024) {
         switch (cond) {
         case BZ:
             emit(0xd100); // bne *+2
@@ -2496,7 +2496,6 @@ static void emit_oper(int op) {
     case LE:
         emit_pop(1);
         emit(0x4281); // cmp r1, r0
-        uint16_t i;
         switch (op) {
         case EQ:
             emit(0xd001); // beq * + 2
@@ -2970,7 +2969,7 @@ static void gen(int* n) {
         }
         if (i == Syscall)
             emit_syscall(Func_entry(n).addr, Func_entry(n).parm_types);
-        if (i == Func)
+        else if (i == Func)
             emit_call(Func_entry(n).addr);
         int np = Func_entry(n).n_parms;
         if (i == Syscall)
@@ -3405,19 +3404,27 @@ static void stmt(int ctx) {
                 ddetype = (ddetype << 10) + (nf << 5) + ld; // prm info
                 if (dd->forward && (ddetype != dd->etype))
                     fatal("parameters don't match prototype");
-                if (dd->forward) { // patch the forward jump
-                    *(dd->forward) = dd->val;
-                    dd->forward = 0;
-                }
                 dd->etype = ddetype;
                 uint16_t* se;
                 if (tk == ';') { // check for prototype
-                    se = e;
-                    dd->forward = emit_forward_branch();
+                    if (!((int)e & 2))
+                        emit(0x46c0); // nop
+                    emit(0x4800);     // ldr r0, [pc, #0]
+                    emit(0xe001);     // b.n 1
+                    dd->forward = e;
+                    emit_word(0);
+                    emit(0x4700); // bx  r0
                 } else { // function with body
                     if (tk != '{')
                         fatal("bad function definition");
                     loc = ++ld;
+                    if (dd->forward) {
+                        uint16_t* te = e;
+                        e = dd->forward;
+                        emit_word(dd->val | 1);
+                        e = te;
+                        dd->forward = 0;
+                    }
                     next();
                     // Not declaration and must not be function, analyze inner block.
                     // e represents the address which will store pc
