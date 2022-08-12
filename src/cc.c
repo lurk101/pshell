@@ -2389,13 +2389,7 @@ static void emit_load(int n) {
     }
 }
 
-static uint16_t* emit_forward_branch(void) {
-    emit(0);
-    emit(0);
-    return e - 1;
-}
-
-static void emit_call(int n);
+static uint16_t* emit_call(int n);
 
 static void emit_branch(uint16_t* to, int cond, int comp) {
     int ofs = to - (e + 1);
@@ -2619,7 +2613,12 @@ static void emit_adjust_stack(int n) {
     emit(0xb000 | n); // add sp, #n*4
 }
 
-static void emit_call(int n) {
+static uint16_t* emit_call(int n) {
+    if (n == 0) {
+        emit(0);
+        emit(0);
+        return e - 1;
+    }
     int ofs = (n - (int)e) / 2 - 3;
     if (ofs < -8388608 || ofs > 8388607)
         fatal("subroutine call too far");
@@ -2633,6 +2632,7 @@ static void emit_call(int n) {
     int i10 = (ofs >> 11) & ((1 << 10) - 1);
     emit(0xf000 | (s << 10) | i10);
     emit(0xd000 | (j1 << 13) | (j2 << 11) | i11);
+    return e - 1;
 }
 
 static void emit_syscall(int n, int np) {
@@ -2741,7 +2741,7 @@ static void gen(int* n) {
         // Add jump-if-zero instruction "BZ" to jump to false branch.
         // Point "b" to the jump address field to be patched later.
         emit_branch(e + 3, BNZ, 1);
-        b = emit_forward_branch();
+        b = emit_call(0);
         gen((int*)Cond_entry(n).if_part); // expression
         // Patch the jump address field pointed to by "b" to hold the address
         // of false branch. "+ 3" counts the "JMP" instruction added below.
@@ -2750,7 +2750,7 @@ static void gen(int* n) {
         // Point "b" to the jump address field to be patched later.
         if (Cond_entry(n).else_part) {
             patch_branch(b, e + 2);
-            b = emit_forward_branch();
+            b = emit_call(0);
             gen((int*)Cond_entry(n).else_part);
         } // else statment
         // Patch the jump address field pointed to by "d" to hold the address
@@ -2768,14 +2768,14 @@ static void gen(int* n) {
     case Lor:
         gen((int*)ast_NumVal(n));
         emit_branch(e + 3, BZ, 1);
-        b = emit_forward_branch();
+        b = emit_call(0);
         gen(n + 2);
         patch_branch(b, e + 1);
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
         emit_branch(e + 3, BNZ, 1);
-        b = emit_forward_branch();
+        b = emit_call(0);
         gen(n + 2);
         patch_branch(b, e + 1);
         break;
@@ -2980,7 +2980,7 @@ static void gen(int* n) {
     case While:
     case DoWhile:
         if (i == While)
-            a = emit_forward_branch();
+            a = emit_call(0);
         b = (uint16_t*)brks;
         brks = 0;
         c = (uint16_t*)cnts;
@@ -3008,7 +3008,7 @@ static void gen(int* n) {
         break;
     case For:
         gen((int*)For_entry(n).init); // init
-        a = emit_forward_branch();
+        a = emit_call(0);
         b = (uint16_t*)brks;
         brks = 0;
         c = (uint16_t*)cnts;
@@ -3042,7 +3042,7 @@ static void gen(int* n) {
         gen((int*)Switch_entry(n).cond); // condition
         emit_push(0);
         a = ecas;
-        ecas = emit_forward_branch();
+        ecas = emit_call(0);
         b = (uint16_t*)brks;
         d = def;
         def = 0;
@@ -3069,7 +3069,7 @@ static void gen(int* n) {
         emit(0x9900); // ldr r1, [sp, #0]
         emit(0x4288); // cmp r0, r1
         emit_branch(e + 2, BZ, 0);
-        ecas = emit_forward_branch();
+        ecas = emit_call(0);
         if (*((int*)Case_entry(n).expr) == Switch)
             a = ecas;
         gen((int*)Case_entry(n).expr); // expression
@@ -3078,21 +3078,21 @@ static void gen(int* n) {
         break;
     case Break:
         patch = sys_malloc(sizeof(struct patch_s), 1);
-        patch->addr = emit_forward_branch();
+        patch->addr = emit_call(0);
         patch->next = brks;
         brks = patch;
         break;
     case Continue:
         patch = sys_malloc(sizeof(struct patch_s), 1);
         patch->next = cnts;
-        patch->addr = emit_forward_branch();
+        patch->addr = emit_call(0);
         cnts = patch;
         break;
     case Goto:
         label = (struct ident_s*)ast_NumVal(n);
         if (label->class == 0) {
             struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
-            l->addr = emit_forward_branch();
+            l->addr = emit_call(0);
             l->next = (struct patch_s*)label->forward;
             label->forward = (uint16_t*)l;
         } else
