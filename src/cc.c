@@ -3094,7 +3094,7 @@ static void gen(int* n) {
             l->next = (struct patch_s*)label->forward;
             label->forward = (uint16_t*)l;
         } else
-            emit_branch((uint16_t*)label->val, B, 1);
+            emit_branch((uint16_t*)label->val - 1, B, 1);
         break;
     case Default:
         def = e;
