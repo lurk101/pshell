@@ -3332,7 +3332,7 @@ static void stmt(int ctx) {
                 if (atk != Union)
                     tsize[bt >> 2] = i;
             } else if (!members[bt >> 2])
-                fatal("undefined struct or union %.*s", id->hash & ADJ_MASK, id->name);
+                fatal("undefined struct or union for variable %.*s", id->hash & ADJ_MASK, id->name);
             break;
         }
         /* parse statement such as 'int a, b, c;'
