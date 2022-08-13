@@ -1,3 +1,9 @@
+What's new in version 1.2.2
+
+- consisent use of long branch to avoid "too far" errors
+- predefine PICO_ERROR_TIMEOUT
+- detect undefined struct and union
+
 What's new in version 1.2.1
 
 - remove compiler branch distance restriction
