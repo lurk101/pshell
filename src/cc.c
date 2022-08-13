@@ -2768,14 +2768,14 @@ static void gen(int* n) {
         emit_branch(e + 3, BZ, 1);
         b = emit_call(0);
         gen(n + 2);
-        patch_branch(b, e + 1);
+        patch_branch(b, e);
         break;
     case Lan:
         gen((int*)ast_NumVal(n));
         emit_branch(e + 3, BNZ, 1);
         b = emit_call(0);
         gen(n + 2);
-        patch_branch(b, e + 1);
+        patch_branch(b, e);
         break;
     /* If current token is bitwise OR operator:
      * Add "PSH" instruction to push LHS value in register to stack.
