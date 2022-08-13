@@ -2397,8 +2397,6 @@ static void emit_enter(int n) {
 static void emit_leave(void) {
     emit(0x46bd);          // mov sp, r7
     emit(0xbdc0);          // pop {r6, r7, pc}
-    if (((int)e & 2) == 0) //
-        emit(0x46c0);      // nop ; (mov r8, r8)
 }
 
 static void emit_load_addr(int n) {
