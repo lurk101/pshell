@@ -406,9 +406,9 @@ static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, 
     if (lineno > 0) {
         lp = src;
         lne = lineno;
-        while (--lne)
+        while (lne--)
             lp = strchr(lp, '\n') + 1;
-        p = strchr(lp, '\n');
+        char* p2 = p = strchr(lp, '\n');
         printf("\n" VT_BOLD "%d:" VT_NORMAL " %.*s", lineno, p - lp, lp);
     }
     printf("\n");
@@ -3369,8 +3369,7 @@ static void stmt(int ctx) {
                 next();
                 if (atk != Union)
                     tsize[bt >> 2] = i;
-            } else if (!members[bt >> 2])
-                fatal("undefined struct or union for variable %.*s", id->hash & ADJ_MASK, id->name);
+            }
             break;
         }
         /* parse statement such as 'int a, b, c;'
@@ -3507,6 +3506,8 @@ static void stmt(int ctx) {
                     id++;
                 }
             } else {
+                if (ty > ATOM_TYPE && ty < PTR && tsize[bt >> 2] == 0)
+                    fatal("struct/union forward declaration is unsupported");
                 dd->hclass = dd->class;
                 dd->class = ctx;
                 dd->htype = dd->type;
