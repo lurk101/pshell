@@ -2221,10 +2221,48 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
     } while (1);
 }
 
+static uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc02};
+static uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
+static uint16_t rep0[] = {0x4639, 0x2000};
+
+static const struct segs {
+    uint8_t n_pats;
+    uint8_t n_reps;
+    uint8_t before;
+    int8_t after;
+    uint16_t* pat;
+    uint16_t* msk;
+    uint16_t* rep;
+} segments[] = {{numof(pat0), numof(rep0), 2, 0, pat0, msk0, rep0}};
+
+static int peep_hole(const struct segs* s) {
+    uint16_t rslt[16];
+    int l = s->n_pats;
+    uint16_t* pe = e - l + 1;
+    for (int i = 0; i < l; i++) {
+        rslt[i] = pe[i] & ~s->msk[i];
+        if ((pe[i] & s->msk[i]) != s->pat[i])
+            return 0;
+    }
+    e -= l;
+    l = s->n_reps;
+    for (int i = 0; i < l; i++)
+        *++e = s->rep[i];
+    *(e + s->after) |= rslt[s->before];
+    return 1;
+}
+
+static void peep(void) {
+    for (int i = 0; i < numof(segments); i++)
+        if (peep_hole(&segments[i]))
+            return;
+}
+
 static void emit(uint16_t n) {
     if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 1)
         fatal("code segment exceeded, program is too big");
     *++e = n;
+    peep();
 }
 
 static void emit_branch(uint16_t* to, int cond, int comp);
