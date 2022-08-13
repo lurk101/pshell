@@ -2344,7 +2344,7 @@ static void emit_leave(void) {
         emit(0x46c0);      // nop ; (mov r8, r8)
 }
 
-static void emit_effective_addr(int n) {
+static void emit_load_addr(int n) {
     if (n == -1) {
         emit(0x4638); // mov r0, r7
         return;
@@ -2700,7 +2700,7 @@ static void gen(int* n) {
         emit_load((ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2));
         break;
     case Loc:
-        emit_effective_addr(ast_NumVal(n));
+        emit_load_addr(ast_NumVal(n));
         break; // get address of variable
     case '{':
         gen((int*)ast_NumVal(n));
