@@ -2624,7 +2624,6 @@ static uint16_t* emit_call(int n) {
     if (ofs < -8388608 || ofs > 8388607)
         fatal("subroutine call too far");
     int s = (ofs >> 31) & 1;
-    // I1 = NOT(J1 EOR S); I2 = NOT(J2 EOR S); imm32 = SignExtend(S:I1:I2:imm10:imm11:’0’, 32);
     int i1 = ((ofs >> 22) & 1) ^ 1;
     int i2 = ((ofs >> 21) & 1) ^ 1;
     int j1 = s ^ i1;
@@ -2641,11 +2640,9 @@ static void emit_syscall(int n, int np) {
     if (p->is_printf) {
         emit_load_immediate(0, np);
         emit_load_immediate(6, (int)x_printf);
-        emit(0x47b0); // blx r6
     } else if (p->is_sprintf) {
         emit_load_immediate(0, np);
         emit_load_immediate(6, (int)x_sprintf);
-        emit(0x47b0); // blx r6
     } else {
         int np = p->etype & ADJ_MASK;
         if (np > 4)
@@ -2653,8 +2650,8 @@ static void emit_syscall(int n, int np) {
         while (np--)
             emit_pop(np);
         emit_load_immediate(6, (int)p->extrn);
-        emit(0x47b0); // blx r6
     }
+    emit(0x47b0); // blx r6
 }
 
 static void patch_branch(uint16_t* from, uint16_t* to) {
@@ -3334,7 +3331,8 @@ static void stmt(int ctx) {
                 next();
                 if (atk != Union)
                     tsize[bt >> 2] = i;
-            }
+            } else if (!members[bt >> 2])
+                fatal("undefined struct or union %.*s", id->hash & ADJ_MASK, id->name);
             break;
         }
         /* parse statement such as 'int a, b, c;'
