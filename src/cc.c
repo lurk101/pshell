@@ -2224,16 +2224,31 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 static uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc02};
 static uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
 static uint16_t rep0[] = {0x4639, 0x2000};
+static uint16_t pat1[] = {0x6800, 0xb401, 0x2000, 0xbc02};
+static uint16_t msk1[] = {0xffff, 0xffff, 0xff00, 0xffff};
+static uint16_t rep1[] = {0x6801, 0x2000};
 
 static const struct segs {
     uint8_t n_pats;
     uint8_t n_reps;
     uint8_t before;
     int8_t after;
+    int8_t shft;
     uint16_t* pat;
     uint16_t* msk;
     uint16_t* rep;
-} segments[] = {{numof(pat0), numof(rep0), 2, 0, pat0, msk0, rep0}};
+} segments[] = {
+    // FROM:		   	  TO:
+    // mov  r0, r7		  mov  r1,r7
+    // push {r0}		  movs r0,#n
+    // movs r0,#n
+    // pop  {r1}
+    {numof(pat0), numof(rep0), 2, 0, 0, pat0, msk0, rep0},
+    // ldr  r0, [r0, #0]  ldr  r1,[r0,#0]
+    // push {r0}		  movs r0,#n
+    // movs r0, #1
+    // pop  {r1}
+    {numof(pat1), numof(rep1), 2, 0, 0, pat1, msk1, rep1}};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[16];
@@ -2248,6 +2263,10 @@ static int peep_hole(const struct segs* s) {
     l = s->n_reps;
     for (int i = 0; i < l; i++)
         *++e = s->rep[i];
+    if (s->shft > 0)
+        rslt[s->before] >>= s->shft;
+    if (s->shft < 0)
+        rslt[s->before] <<= s->shft;
     *(e + s->after) |= rslt[s->before];
     return 1;
 }
