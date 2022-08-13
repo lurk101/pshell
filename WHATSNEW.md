@@ -1,3 +1,9 @@
+What's new in version 1.2.3
+
+- rudimentary peep-hole optimization
+- display correct line in error message
+- fix boolean expression shortcut
+
 What's new in version 1.2.2
 
 - consisent use of long branch to avoid "too far" errors
