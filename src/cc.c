@@ -46,7 +46,7 @@
 #define TEXT_BYTES (32 * K)
 #define SYM_TBL_BYTES (16 * K)
 #define TS_TBL_BYTES (2 * K)
-#define AST_TBL_BYTES (16 * K)
+#define AST_TBL_BYTES (32 * K)
 #define MEMBER_DICT_BYTES (4 * K)
 
 #define CTLC 3
@@ -2224,9 +2224,38 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 static uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc02};
 static uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
 static uint16_t rep0[] = {0x4639, 0x2000};
+
 static uint16_t pat1[] = {0x6800, 0xb401, 0x2000, 0xbc02};
 static uint16_t msk1[] = {0xffff, 0xffff, 0xff00, 0xffff};
 static uint16_t rep1[] = {0x6801, 0x2000};
+
+static uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
+static uint16_t msk2[] = {0xff00, 0xffff, 0xffff};
+static uint16_t rep2[] = {0x4638, 0x3800};
+
+static uint16_t pat3[] = {0x4281, 0xdb01, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
+static uint16_t msk3[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep3[] = {0x4281, 0xdb00};
+
+static uint16_t pat4[] = {0x4281, 0xdd01, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
+static uint16_t msk4[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep4[] = {0x4281, 0xdd00};
+
+static uint16_t pat5[] = {0x4281, 0xdc01, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
+static uint16_t msk5[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep5[] = {0x4281, 0xdc00};
+
+static uint16_t pat6[] = {0x4281, 0xda01, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
+static uint16_t msk6[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep6[] = {0x4281, 0xda00};
+
+static uint16_t pat7[] = {0x4281, 0xd001, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
+static uint16_t msk7[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep7[] = {0x4281, 0xd000};
+
+static uint16_t pat8[] = {0x4281, 0xd101, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
+static uint16_t msk8[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep8[] = {0x4281, 0xd100};
 
 static const struct segs {
     uint8_t n_pats;
@@ -2238,17 +2267,81 @@ static const struct segs {
     uint16_t* msk;
     uint16_t* rep;
 } segments[] = {
+
     // FROM:		   	  TO:
     // mov  r0, r7		  mov  r1,r7
     // push {r0}		  movs r0,#n
     // movs r0,#n
     // pop  {r1}
     {numof(pat0), numof(rep0), 2, 0, 0, pat0, msk0, rep0},
+
     // ldr  r0, [r0, #0]  ldr  r1,[r0,#0]
     // push {r0}		  movs r0,#n
     // movs r0, #1
     // pop  {r1}
-    {numof(pat1), numof(rep1), 2, 0, 0, pat1, msk1, rep1}};
+    {numof(pat1), numof(rep1), 2, 0, 0, pat1, msk1, rep1},
+
+    // movs r0,#n         mov  r0,r7
+    // rsbs r0,r0		  subs r0,#n
+    // add  r0,r7
+    {numof(pat2), numof(rep2), 0, 0, 0, pat2, msk2, rep2},
+
+/*
+	// cmp  r1,r0         cmp r1,r0
+	// blt  *+3           ble *+2                                                 
+	// movs r0,#0                                                              
+	// b    *+2 
+	// movs r0,#1                                                              
+	// cmp  r0,#0                                                              
+	// beq  *+2 
+    {numof(pat3), numof(rep3), 0, 1, 0, pat3, msk3, rep3},
+
+	// cmp  r1,r0         cmp r1,r0
+	// blt  *+3           ble *+2                                                 
+	// movs r0,#0                                                              
+	// b    *+2 
+	// movs r0,#1                                                              
+	// cmp  r0,#0                                                              
+	// beq  *+2 
+    {numof(pat4), numof(rep4), 0, 1, 0, pat4, msk4, rep4},
+
+	// cmp  r1,r0         cmp r1,r0
+	// blt  *+3           ble *+2                                                 
+	// movs r0,#0                                                              
+	// b    *+2 
+	// movs r0,#1                                                              
+	// cmp  r0,#0                                                              
+	// beq  *+2 
+    {numof(pat5), numof(rep5), 0, 1, 0, pat5, msk5, rep5},
+
+	// cmp  r1,r0         cmp r1,r0
+	// blt  *+3           ble *+2                                                 
+	// movs r0,#0                                                              
+	// b    *+2 
+	// movs r0,#1                                                              
+	// cmp  r0,#0                                                              
+	// beq  *+2 
+    {numof(pat6), numof(rep6), 0, 1, 0, pat6, msk6, rep6},
+
+	// cmp  r1,r0         cmp r1,r0
+	// blt  *+3           ble *+2                                                 
+	// movs r0,#0                                                              
+	// b    *+2 
+	// movs r0,#1                                                              
+	// cmp  r0,#0                                                              
+	// beq  *+2 
+    {numof(pat7), numof(rep7), 0, 1, 0, pat7, msk7, rep7},
+
+	// cmp  r1,r0         cmp r1,r0
+	// blt  *+3           ble *+2                                                 
+	// movs r0,#0                                                              
+	// b    *+2 
+	// movs r0,#1                                                              
+	// cmp  r0,#0                                                              
+	// beq  *+2 
+    {numof(pat8), numof(rep8), 0, 1, 0, pat8, msk8, rep8}
+*/
+};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[16];
@@ -2267,7 +2360,8 @@ static int peep_hole(const struct segs* s) {
         rslt[s->before] >>= s->shft;
     if (s->shft < 0)
         rslt[s->before] <<= s->shft;
-    *(e + s->after) |= rslt[s->before];
+	if (s->after <= 0)
+    	*(e + s->after) |= rslt[s->before];
     return 1;
 }
 
@@ -4010,7 +4104,7 @@ static void add_defines(struct define_grp* d) {
     }
 }
 
-#ifndef NDEBUG 
+#ifndef NDEBUG
 void __no_inline_not_in_flash_func(dummy)(void) {
 #include "cc_nops.h"
 }
