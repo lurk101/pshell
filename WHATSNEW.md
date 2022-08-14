@@ -3,7 +3,7 @@ What's new in version 1.2.4
 - fix parameter mismatch crash
 - check for AST overflow
 - increase AST to 32K
-- remove a few redundant redundant instructions
+- remove a few redundant instructions
 
 What's new in version 1.2.3
 
