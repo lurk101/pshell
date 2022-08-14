@@ -154,7 +154,8 @@ struct ident_s {
 };
 
 struct ident_s *id, // currently parsed identifier
-    *sym;           // symbol table (simple list of identifiers)
+    *sym,           // symbol table (simple list of identifiers)
+	*sym_base;
 
 struct member_s {
     struct member_s* next;
@@ -605,7 +606,7 @@ static void clear_globals(void) {
     pcrel_1st = ecas = def = e = le = text_base = NULL;
     base_sp = tsize = n = malloc_list = NULL;
     data_base = data = p = lp = fp = sym_text = sym_text_base = NULL;
-    id = sym = NULL;
+    id = sym = sym_base = NULL;
     pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
@@ -625,6 +626,8 @@ static void get_line(void) {
 next_ch:
     if (fs_file_read(fd, &ch, 1) <= 0) {
         *cp++ = 0;
+		if ((cp - line) >= sizeof(line))
+			fatal("line buffer overflow");
         lp = p = line;
         line_len = 0;
         return;
@@ -685,6 +688,8 @@ static void next() {
             /* At this point, existing symbol name is not found.
              * "id" points to the first unused symbol table entry.
              */
+			if ((id + 1) > (sym_base + (SYM_TBL_BYTES / sizeof(*id))))
+				fatal("symbol table overflow");
             int nl = p - pp;
             if (sym_text + nl >= sym_text_base + SYM_TEXT_SIZE)
                 fatal("symbol table overflow");
@@ -4107,7 +4112,7 @@ int cc(int argc, char** argv) {
     if (setjmp(done_jmp))
         goto done;
 
-    sym = sys_malloc(SYM_TBL_BYTES, 1);
+    sym_base = sym = sys_malloc(SYM_TBL_BYTES, 1);
     sym_text_base = sym_text = sys_malloc(SYM_TEXT_SIZE, 1);
 
     // Register keywords in symbol stack. Must match the sequence of enum
@@ -4245,8 +4250,8 @@ int cc(int argc, char** argv) {
     fd = NULL;
     sys_free(ast);
     ast = NULL;
-    sys_free(sym);
-    sym = NULL;
+    sys_free(sym_base);
+    sym_base = NULL;
     sys_free(sym_text_base);
     sym_text_base = NULL;
     sys_free(tsize);
