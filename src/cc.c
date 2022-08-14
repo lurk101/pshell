@@ -941,6 +941,8 @@ typedef struct {
 
 static void ast_Func(int parm_types, int n_parms, int addr, int next, int tk) {
     n -= sizeof(Func_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Func_entry(n).parm_types = parm_types;
     Func_entry(n).n_parms = n_parms;
     Func_entry(n).addr = addr;
@@ -959,6 +961,8 @@ typedef struct {
 
 static void ast_For(int init, int body, int incr, int cond) {
     n -= sizeof(For_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     For_entry(n).init = init;
     For_entry(n).body = body;
     For_entry(n).incr = incr;
@@ -976,6 +980,8 @@ typedef struct {
 
 static void ast_Cond(int else_part, int if_part, int cond_part) {
     n -= sizeof(Cond_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Cond_entry(n).else_part = else_part;
     Cond_entry(n).if_part = if_part;
     Cond_entry(n).cond_part = cond_part;
@@ -991,6 +997,8 @@ typedef struct {
 
 static void ast_Assign(int right_part, int type) {
     n -= sizeof(Assign_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Assign_entry(n).right_part = right_part;
     Assign_entry(n).type = type;
     Assign_entry(n).tk = Assign;
@@ -1005,6 +1013,8 @@ typedef struct {
 
 static void ast_While(int cond, int body, int tk) {
     n -= sizeof(While_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     While_entry(n).cond = cond;
     While_entry(n).body = body;
     While_entry(n).tk = tk;
@@ -1019,6 +1029,8 @@ typedef struct {
 
 static void ast_Switch(int cas, int cond) {
     n -= sizeof(Switch_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Switch_entry(n).cas = cas;
     Switch_entry(n).cond = cond;
     Switch_entry(n).tk = Switch;
@@ -1033,6 +1045,8 @@ typedef struct {
 
 static void ast_Case(int expr, int next) {
     n -= sizeof(Case_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Case_entry(n).expr = expr;
     Case_entry(n).next = next;
     Case_entry(n).tk = Case;
@@ -1047,6 +1061,8 @@ typedef struct {
 
 static void ast_CastF(int way, int val) {
     n -= sizeof(CastF_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     CastF_entry(n).tk = CastF;
     CastF_entry(n).val = val;
     CastF_entry(n).way = way;
@@ -1060,6 +1076,8 @@ typedef struct {
 
 static uint16_t* ast_Enter(int val) {
     n -= sizeof(Enter_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Enter_entry(n).tk = Enter;
     Enter_entry(n).val = val;
 }
@@ -1067,6 +1085,8 @@ static uint16_t* ast_Enter(int val) {
 // two word entries
 static void ast_Return(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = Return;
     Double_entry(n).v1 = v1;
 }
@@ -1079,6 +1099,8 @@ typedef struct {
 
 static void ast_Oper(int oprnd, int op) {
     n -= sizeof(Oper_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Oper_entry(n).tk = op;
     Oper_entry(n).oprnd = oprnd;
 }
@@ -1086,6 +1108,8 @@ static void ast_Oper(int oprnd, int op) {
 
 static void ast_Num(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = Num;
     Double_entry(n).v1 = v1;
 }
@@ -1093,36 +1117,48 @@ static void ast_Num(int v1) {
 
 static void ast_Label(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = Label;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Goto(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = Goto;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Default(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = Default;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_NumF(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = NumF;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Loc(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = Loc;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Load(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = Load;
     Double_entry(n).v1 = v1;
 }
@@ -1136,6 +1172,8 @@ typedef struct {
 
 static void ast_Begin(int v1) {
     n -= sizeof(Begin_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Begin_entry(n).tk = '{';
     Begin_entry(n).addr = v1;
 }
@@ -1152,6 +1190,8 @@ typedef struct {
 
 static void ast_Single(int k) {
     n -= sizeof(Single_entry_t) / sizeof(int);
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
     Single_entry(n).tk = k;
 }
 
@@ -2233,30 +2273,6 @@ static uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
 static uint16_t msk2[] = {0xff00, 0xffff, 0xffff};
 static uint16_t rep2[] = {0x4638, 0x3800};
 
-static uint16_t pat3[] = {0x4281, 0xdb01, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
-static uint16_t msk3[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep3[] = {0x4281, 0xdb00};
-
-static uint16_t pat4[] = {0x4281, 0xdd01, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
-static uint16_t msk4[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep4[] = {0x4281, 0xdd00};
-
-static uint16_t pat5[] = {0x4281, 0xdc01, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
-static uint16_t msk5[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep5[] = {0x4281, 0xdc00};
-
-static uint16_t pat6[] = {0x4281, 0xda01, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
-static uint16_t msk6[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep6[] = {0x4281, 0xda00};
-
-static uint16_t pat7[] = {0x4281, 0xd001, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
-static uint16_t msk7[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep7[] = {0x4281, 0xd000};
-
-static uint16_t pat8[] = {0x4281, 0xd101, 0x2000, 0xe000, 0x2001, 0x2800, 0xd000};
-static uint16_t msk8[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep8[] = {0x4281, 0xd100};
-
 static const struct segs {
     uint8_t n_pats;
     uint8_t n_reps;
@@ -2284,64 +2300,7 @@ static const struct segs {
     // movs r0,#n         mov  r0,r7
     // rsbs r0,r0		  subs r0,#n
     // add  r0,r7
-    {numof(pat2), numof(rep2), 0, 0, 0, pat2, msk2, rep2},
-
-/*
-	// cmp  r1,r0         cmp r1,r0
-	// blt  *+3           ble *+2                                                 
-	// movs r0,#0                                                              
-	// b    *+2 
-	// movs r0,#1                                                              
-	// cmp  r0,#0                                                              
-	// beq  *+2 
-    {numof(pat3), numof(rep3), 0, 1, 0, pat3, msk3, rep3},
-
-	// cmp  r1,r0         cmp r1,r0
-	// blt  *+3           ble *+2                                                 
-	// movs r0,#0                                                              
-	// b    *+2 
-	// movs r0,#1                                                              
-	// cmp  r0,#0                                                              
-	// beq  *+2 
-    {numof(pat4), numof(rep4), 0, 1, 0, pat4, msk4, rep4},
-
-	// cmp  r1,r0         cmp r1,r0
-	// blt  *+3           ble *+2                                                 
-	// movs r0,#0                                                              
-	// b    *+2 
-	// movs r0,#1                                                              
-	// cmp  r0,#0                                                              
-	// beq  *+2 
-    {numof(pat5), numof(rep5), 0, 1, 0, pat5, msk5, rep5},
-
-	// cmp  r1,r0         cmp r1,r0
-	// blt  *+3           ble *+2                                                 
-	// movs r0,#0                                                              
-	// b    *+2 
-	// movs r0,#1                                                              
-	// cmp  r0,#0                                                              
-	// beq  *+2 
-    {numof(pat6), numof(rep6), 0, 1, 0, pat6, msk6, rep6},
-
-	// cmp  r1,r0         cmp r1,r0
-	// blt  *+3           ble *+2                                                 
-	// movs r0,#0                                                              
-	// b    *+2 
-	// movs r0,#1                                                              
-	// cmp  r0,#0                                                              
-	// beq  *+2 
-    {numof(pat7), numof(rep7), 0, 1, 0, pat7, msk7, rep7},
-
-	// cmp  r1,r0         cmp r1,r0
-	// blt  *+3           ble *+2                                                 
-	// movs r0,#0                                                              
-	// b    *+2 
-	// movs r0,#1                                                              
-	// cmp  r0,#0                                                              
-	// beq  *+2 
-    {numof(pat8), numof(rep8), 0, 1, 0, pat8, msk8, rep8}
-*/
-};
+    {numof(pat2), numof(rep2), 0, 0, 0, pat2, msk2, rep2}};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[16];
