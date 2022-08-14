@@ -1349,8 +1349,13 @@ static void expr(int lev) {
             if (t > ADJ_MASK)
                 fatal("maximum of %d function parameters", ADJ_MASK);
             tt = (tt << 10) + (nf << 5) + t; // func etype not like other etype
-            if (d->etype != tt && !externs[d->val].is_printf && !externs[d->val].is_sprintf)
-                fatal("argument type mismatch");
+            if (d->etype != tt) {
+                if (d->class == Func)
+                    fatal("argument type mismatch");
+                if (d->class == Syscall && !externs[d->val].is_printf &&
+                    !externs[d->val].is_sprintf)
+                    fatal("argument type mismatch");
+            }
             next();
             // function or system call id
             ast_Func(tt, t, d->val, (int)b, d->class);
