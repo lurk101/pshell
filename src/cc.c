@@ -34,17 +34,12 @@
 #include "cc.h"
 #include "fs.h"
 
-#ifdef NDEBUG
-#define Inline inline
-#else
-#define Inline
-#endif
-
 #define K 1024
 
 #define DATA_BYTES (16 * K)
 #define TEXT_BYTES (32 * K)
 #define SYM_TBL_BYTES (16 * K)
+#define SYM_TEXT_SIZE (4 * K)
 #define TS_TBL_BYTES (2 * K)
 #define AST_TBL_BYTES (32 * K)
 #define MEMBER_DICT_BYTES (4 * K)
@@ -92,7 +87,6 @@ struct patch_s {
 static char *p, *lp;            // current position in source code
 static char* data;              // data/bss pointer
 static char* data_base;         // data/bss pointer
-static char* src;               //
 static int* base_sp;            // stack
 static uint16_t *e, *le, *text_base; // current position in emitted code
 static uint16_t* ecas;               // case statement patch-up pointer
@@ -137,6 +131,10 @@ static int pplev, pplevt;       // preprocessor conditional level
 static int* ast;                // abstract syntax tree
 static ARMSTATE state;          // disassembler state
 static int exit_sp;
+static char* sym_text;
+static char* sym_text_base;
+static char line[128];
+static int line_len;
 
 // identifier
 struct ident_s {
@@ -404,14 +402,9 @@ static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, 
     vprintf(fmt, ap);
     va_end(ap);
     if (lineno > 0) {
-        lp = src;
-        lne = lineno;
-        while (lne--)
-            lp = strchr(lp, '\n') + 1;
-        char* p2 = p = strchr(lp, '\n');
-        printf("\n" VT_BOLD "%d:" VT_NORMAL " %.*s", lineno, p - lp, lp);
+        line[line_len] = 0;
+        printf("\n" VT_BOLD "%d:" VT_NORMAL " %s\n", lineno, line);
     }
-    printf("\n");
     longjmp(done_jmp, 1);
 }
 
@@ -610,8 +603,9 @@ static char* fp;
 
 static void clear_globals(void) {
     pcrel_1st = ecas = def = e = le = text_base = NULL;
-    base_sp = tsize = n = malloc_list =
-        (int*)(data_base = data = src = p = lp = fp = (char*)(id = sym = NULL));
+    base_sp = tsize = n = malloc_list = NULL;
+    data_base = data = p = lp = fp = sym_text = sym_text_base = NULL;
+    id = sym = NULL;
     pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
@@ -624,6 +618,25 @@ static void clear_globals(void) {
 }
 
 #define numof(a) (sizeof(a) / sizeof(a[0]))
+
+static void get_line(void) {
+    char* cp = line;
+    char ch;
+next_ch:
+    if (fs_file_read(fd, &ch, 1) <= 0) {
+        *cp++ = 0;
+        lp = p = line;
+        line_len = 0;
+        return;
+    }
+    if (ch != '\n') {
+        *cp++ = ch;
+        goto next_ch;
+    }
+    *cp++ = '\n';
+    line_len = cp - line;
+    lp = p = line;
+}
 
 static int extern_search(char* name) // get cache index of external function
 {
@@ -672,7 +685,12 @@ static void next() {
             /* At this point, existing symbol name is not found.
              * "id" points to the first unused symbol table entry.
              */
-            id->name = pp;
+            int nl = p - pp;
+            if (sym_text + nl >= sym_text_base + SYM_TEXT_SIZE)
+                fatal("symbol table overflow");
+            id->name = sym_text;
+            memcpy(sym_text, pp, nl);
+            sym_text += nl;
             id->hash = tk;
             id->forward = 0;
             id->inserted = 0;
@@ -693,8 +711,8 @@ static void next() {
         switch (tk) {
         case '\n':
             if (src_opt)
-                printf("%d: %.*s", lineno, p - lp, lp);
-            lp = p;
+                printf("%d: %.*s", lineno, p - lp, line);
+            get_line();
             ++lineno;
         case ' ':
         case '\t':
@@ -706,16 +724,20 @@ static void next() {
             if (*p == '/') { // comment
                 while (*p != 0 && *p != '\n')
                     ++p;
+                if (*p)
+                    get_line();
             } else if (*p == '*') { // C-style multiline comments
                 t = 0;
                 for (++p; (*p != 0) && (t == 0); ++p) {
                     pp = p + 1;
                     if (*p == '\n') {
+                        get_line();
                         ++lineno;
                     } else if (*p == '*' && *pp == '/')
                         t = 1;
                 }
-                ++p;
+                if (*p)
+                    ++p;
             } else {
                 if (*p == '=') {
                     ++p;
@@ -748,6 +770,8 @@ static void next() {
                     pplevt = pplev - 1;
                     while (*p != 0 && *p != '\n')
                         ++p; // discard until end-of-line
+                    if (*p)
+                        get_line();
                     do
                         next();
                     while (pplev != pplevt);
@@ -764,6 +788,8 @@ static void next() {
             }
             while (*p != 0 && *p != '\n')
                 ++p; // discard until end-of-line
+            if (*p)
+                get_line();
             break;
         case '\'': // quotes start with character (string)
         case '"':
@@ -1352,8 +1378,7 @@ static void expr(int lev) {
             if (d->etype != tt) {
                 if (d->class == Func)
                     fatal("argument type mismatch");
-                if (d->class == Syscall && !externs[d->val].is_printf &&
-                    !externs[d->val].is_sprintf)
+                else if (!externs[d->val].is_printf && !externs[d->val].is_sprintf)
                     fatal("argument type mismatch");
             }
             next();
@@ -3904,7 +3929,7 @@ static void stmt(int ctx) {
     }
 }
 
-static Inline float i_as_f(int i) {
+static float i_as_f(int i) {
     union {
         int i;
         float f;
@@ -3913,7 +3938,7 @@ static Inline float i_as_f(int i) {
     return u.f;
 }
 
-static Inline int f_as_i(float f) {
+static int f_as_i(float f) {
     union {
         int i;
         float f;
@@ -4083,6 +4108,7 @@ int cc(int argc, char** argv) {
         goto done;
 
     sym = sys_malloc(SYM_TBL_BYTES, 1);
+    sym_text_base = sym_text = sys_malloc(SYM_TEXT_SIZE, 1);
 
     // Register keywords in symbol stack. Must match the sequence of enum
     p = "enum char int float struct union sizeof return goto break continue "
@@ -4192,9 +4218,6 @@ int cc(int argc, char** argv) {
     }
     sys_free(fn);
 
-    int siz = fs_file_seek(fd, 0, LFS_SEEK_END);
-    fs_file_rewind(fd);
-
 #ifdef NDEBUG
     text_base = le = sys_malloc(TEXT_BYTES, 1);
 #else
@@ -4204,13 +4227,7 @@ int cc(int argc, char** argv) {
     e = text_base - 1;
     members = sys_malloc(MEMBER_DICT_BYTES, 1);
 
-    src = lp = p = sys_malloc(siz + 1, 1);
-    if (fs_file_read(fd, p, siz) < LFS_ERR_OK)
-        fatal("unable to read from source file");
-    p[siz] = 0;
-    fs_file_close(fd);
-    sys_free(fd);
-    fd = NULL;
+    get_line();
 
     // parse the program
     pplevt = -1;
@@ -4223,12 +4240,15 @@ int cc(int argc, char** argv) {
     for (struct ident_s* scan = sym; scan->tk; ++scan)
         if (scan->class == Func && scan->forward)
             fatal("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
+    fs_file_close(fd);
+    sys_free(fd);
+    fd = NULL;
     sys_free(ast);
     ast = NULL;
-    sys_free(src);
-    src = NULL;
     sys_free(sym);
     sym = NULL;
+    sys_free(sym_text_base);
+    sym_text_base = NULL;
     sys_free(tsize);
     tsize = NULL;
     if (!idmain->val)
