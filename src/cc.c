@@ -155,7 +155,7 @@ struct ident_s {
 
 struct ident_s *id, // currently parsed identifier
     *sym,           // symbol table (simple list of identifiers)
-	*sym_base;
+    *sym_base;
 
 struct member_s {
     struct member_s* next;
@@ -626,8 +626,8 @@ static void get_line(void) {
 next_ch:
     if (fs_file_read(fd, &ch, 1) <= 0) {
         *cp++ = 0;
-		if ((cp - line) >= sizeof(line))
-			fatal("line buffer overflow");
+        if ((cp - line) >= sizeof(line))
+            fatal("line buffer overflow");
         lp = p = line;
         line_len = 0;
         return;
@@ -639,6 +639,7 @@ next_ch:
     *cp++ = '\n';
     line_len = cp - line;
     lp = p = line;
+    // printf("%.*s", line_len, line);
 }
 
 static int extern_search(char* name) // get cache index of external function
@@ -688,8 +689,8 @@ static void next() {
             /* At this point, existing symbol name is not found.
              * "id" points to the first unused symbol table entry.
              */
-			if ((id + 1) > (sym_base + (SYM_TBL_BYTES / sizeof(*id))))
-				fatal("symbol table overflow");
+            if ((id + 1) > (sym_base + (SYM_TBL_BYTES / sizeof(*id))))
+                fatal("symbol table overflow");
             int nl = p - pp;
             if (sym_text + nl >= sym_text_base + SYM_TEXT_SIZE)
                 fatal("symbol table overflow");
@@ -732,14 +733,16 @@ static void next() {
                 if (*p)
                     get_line();
             } else if (*p == '*') { // C-style multiline comments
-                t = 0;
-                for (++p; (*p != 0) && (t == 0); ++p) {
+                for (++p; (*p != 0); ++p) {
                     pp = p + 1;
                     if (*p == '\n') {
                         get_line();
                         ++lineno;
-                    } else if (*p == '*' && *pp == '/')
-                        t = 1;
+                        p = line - 1;
+                    } else if (*p == '*' && *pp == '/') {
+                        p += 1;
+                        break;
+                    }
                 }
                 if (*p)
                     ++p;
