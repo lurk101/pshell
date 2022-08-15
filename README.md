@@ -138,9 +138,10 @@ changed to /src
 
 CC=0
 
-/src/: cc -s sine.c 
+/src/: cc -s sine.c
+
 0: /* Math function test. Display a sine wave */
-1: 
+1:
 2: int main() {
 3:     int angle, incr;
 4:     for (incr = 16, angle = 0; angle <= 360; angle += incr) {
@@ -154,147 +155,133 @@ CC=0
 12:     }
 13:     return 0;
 14: }
-200163c0    b5c0        push    {r6, r7, lr}
-200163c2    466f        mov     r7, sp
-200163c4    b084        sub     sp, #16         ; 0x10
-200163c6    2004        movs    r0, #4
-200163c8    4240        rsbs    r0, r0
-200163ca    4438        add     r0, r7                                                              
-200163cc    b401        push    {r0}                                                                
-200163ce    2010        movs    r0, #16         ; 0x10                                              
-200163d0    bc02        pop     {r1}                                                                
-200163d2    6008        str     r0, [r1, #0]                                                        
-200163d4    4638        mov     r0, r7                                                              
-200163d6    b401        push    {r0}                                                                
-200163d8    2000        movs    r0, #0                                                              
-200163da    bc02        pop     {r1}                                                                
-200163dc    6008        str     r0, [r1, #0]                                                        
-200163de    f000 f85f   bl      200164a0                                                            
-200163e2    2008        movs    r0, #8                                                              
-200163e4    4240        rsbs    r0, r0                                                              
-200163e6    4438        add     r0, r7                                                              
-200163e8    b401        push    {r0}                                                                
-200163ea    4638        mov     r0, r7                                                              
-200163ec    6800        ldr     r0, [r0, #0]                                                        
-200163ee    4a35        ldr     r2, [pc, #212]  ; 0x200164c4                                        
-200163f0    4790        blx     r2                                                                  
-200163f2    b401        push    {r0}                                                                
-200163f4    4834        ldr     r0, [pc, #208]  ; 0x200164c8                                        
-200163f6    4601        mov     r1, r0                                                              
-200163f8    bc01        pop     {r0}                                                                
-200163fa    4a34        ldr     r2, [pc, #208]  ; 0x200164cc                                        
-200163fc    4790        blx     r2                                                                  
-200163fe    bc02        pop     {r1}                                                                
-20016400    6008        str     r0, [r1, #0]                                                        
-20016402    200c        movs    r0, #12         ; 0xc                                               
-20016404    4240        rsbs    r0, r0                                                              
-20016406    4438        add     r0, r7                                                              
-20016408    b401        push    {r0}                                                                
-2001640a    201e        movs    r0, #30         ; 0x1e                                              
-2001640c    b401        push    {r0}                                                                
-2001640e    2008        movs    r0, #8                                                              
-20016410    4240        rsbs    r0, r0                                                              
-20016412    4438        add     r0, r7                                                              
-20016414    6800        ldr     r0, [r0, #0]                                                        
-20016416    b401        push    {r0}                                                                
-20016418    bc01        pop     {r0}                                                                
-2001641a    4e2d        ldr     r6, [pc, #180]  ; 0x200164d0                                        
-2001641c    47b0        blx     r6                                                                  
-2001641e    b401        push    {r0}                                                                
-20016420    482c        ldr     r0, [pc, #176]  ; 0x200164d4                                        
-20016422    4601        mov     r1, r0                                                              
-20016424    bc01        pop     {r0}                                                                
-20016426    4a29        ldr     r2, [pc, #164]  ; 0x200164cc                                        
-20016428    4790        blx     r2                                                                  
-2001642a    4a2b        ldr     r2, [pc, #172]  ; 0x200164d8                                        
-2001642c    4790        blx     r2                                                                  
-2001642e    bc02        pop     {r1}                                                                
-20016430    1840        adds    r0, r0, r1                                                          
-20016432    bc02        pop     {r1}                                                                
-20016434    6008        str     r0, [r1, #0]                                                        
-20016436    f000 f814   bl      20016462                                                            
-2001643a    4828        ldr     r0, [pc, #160]  ; 0x200164dc                                        
-2001643c    b401        push    {r0}                                                                
-2001643e    2001        movs    r0, #1                                                              
-20016440    4e27        ldr     r6, [pc, #156]  ; 0x200164e0                                        
-20016442    47b0        blx     r6                                                                  
-20016444    200c        movs    r0, #12         ; 0xc                                               
-20016446    4240        rsbs    r0, r0                                                              
-20016448    4438        add     r0, r7                                                              
-2001644a    b401        push    {r0}                                                                
-2001644c    6800        ldr     r0, [r0, #0]                                                        
-2001644e    b401        push    {r0}                                                                
-20016450    2001        movs    r0, #1                                                              
-20016452    bc02        pop     {r1}                                                                
-20016454    1a08        subs    r0, r1, r0                                                          
-20016456    bc02        pop     {r1}                                                                
-20016458    6008        str     r0, [r1, #0]                                                        
-2001645a    b401        push    {r0}                                                                
-2001645c    2001        movs    r0, #1                                                              
-2001645e    bc02        pop     {r1}                                                                
-20016460    1840        adds    r0, r0, r1                                                          
-20016462    200c        movs    r0, #12         ; 0xc                                               
-20016464    4240        rsbs    r0, r0                                                              
-20016466    4438        add     r0, r7                                                              
-20016468    6800        ldr     r0, [r0, #0]                                                        
-2001646a    b401        push    {r0}                                                                
-2001646c    2000        movs    r0, #0                                                              
-2001646e    bc02        pop     {r1}                                                                
-20016470    4281        cmp     r1, r0                                                              
-20016472    dc01        bgt     20016478                                                            
-20016474    2000        movs    r0, #0                                                              
-20016476    e000        b       2001647a                                                            
-20016478    2001        movs    r0, #1                                                              
-2001647a    2800        cmp     r0, #0                                                              
-2001647c    d1dd        bne     2001643a                                                            
-2001647e    4819        ldr     r0, [pc, #100]  ; 0x200164e4                                        
-20016480    b401        push    {r0}                                                                
-20016482    2001        movs    r0, #1                                                              
-20016484    4e16        ldr     r6, [pc, #88]   ; 0x200164e0                                        
-20016486    47b0        blx     r6                                                                  
-20016488    4638        mov     r0, r7                                                              
-2001648a    b401        push    {r0}                                                                
-2001648c    6800        ldr     r0, [r0, #0]                                                        
-2001648e    b401        push    {r0}                                                                
-20016490    2004        movs    r0, #4                                                              
-20016492    4240        rsbs    r0, r0                                                              
-20016494    4438        add     r0, r7                                                              
-20016496    6800        ldr     r0, [r0, #0]                                                        
-20016498    bc02        pop     {r1}                                                                
-2001649a    1840        adds    r0, r0, r1                                                          
-2001649c    bc02        pop     {r1}                                                                
-2001649e    6008        str     r0, [r1, #0]                                                        
-200164a0    4638        mov     r0, r7                                                              
-200164a2    6800        ldr     r0, [r0, #0]                                                        
-200164a4    b401        push    {r0}                                                                
-200164a6    4810        ldr     r0, [pc, #64]   ; 0x200164e8                                        
-200164a8    bc02        pop     {r1}                                                                
-200164aa    4281        cmp     r1, r0                                                              
-200164ac    dd01        ble     200164b2                                                            
-200164ae    2000        movs    r0, #0                                                              
-200164b0    e000        b       200164b4                                                            
-200164b2    2001        movs    r0, #1                                                              
-200164b4    2800        cmp     r0, #0                                                              
-200164b6    d194        bne     200163e2                                                            
-200164b8    2000        movs    r0, #0                                                              
-200164ba    46bd        mov     sp, r7                                                              
-200164bc    bdc0        pop     {r6, r7, pc}                                                        
-200164be    46c0        mov     r8, r8                                                              
-200164c0    46bd        mov     sp, r7                                                              
-200164c2    bdc0        pop     {r6, r7, pc}                                                        
-200164c4    1002 24e1   .word   0x100224e1      ; aeabi_i2f                                         
-200164c8    3c8e fa35   .word   0x3c8efa35                                                          
-200164cc    1002 241b   .word   0x1002241b      ; aeabi_fmul                                        
-200164d0    1002 25f9   .word   0x100225f9      ; sinf                                              
-200164d4    41c8 0000   .word   0x41c80000                                                          
-200164d8    1002 2525   .word   0x10022525      ; aeabi_f2iz                                        
-200164dc    2000 d4e8   .word   0x2000d4e8                                                          
-200164e0    1000 b125   .word   0x1000b125      ; printf                                            
-200164e4    2000 d4ec   .word   0x2000d4ec                                                          
-200164e8    0000 0168   .word   0x00000168                                                          
-200164ec    0000 0000   .word   0x00000000      ; "\0\0\0\0"                                        
-14:                                                                                                 
-                                                                                                    
+2001b4a0    b5c0        push    {r6, r7, lr}
+2001b4a2    466f        mov     r7, sp
+2001b4a4    b084        sub     sp, #16         ; 0x10
+2001b4a6    4638        mov     r0, r7
+2001b4a8    3804        subs    r0, #4
+2001b4aa    b401        push    {r0}
+2001b4ac    2010        movs    r0, #16         ; 0x10
+2001b4ae    bc02        pop     {r1}
+2001b4b0    6008        str     r0, [r1, #0]
+2001b4b2    4639        mov     r1, r7
+2001b4b4    2000        movs    r0, #0
+2001b4b6    6008        str     r0, [r1, #0]
+2001b4b8    f000 f855   bl      2001b566
+2001b4bc    4638        mov     r0, r7
+2001b4be    3808        subs    r0, #8
+2001b4c0    b401        push    {r0}
+2001b4c2    4638        mov     r0, r7
+2001b4c4    6800        ldr     r0, [r0, #0]
+2001b4c6    4a30        ldr     r2, [pc, #192]  ; 0x2001b588
+2001b4c8    4790        blx     r2
+2001b4ca    b401        push    {r0}
+2001b4cc    482f        ldr     r0, [pc, #188]  ; 0x2001b58c
+2001b4ce    4601        mov     r1, r0
+2001b4d0    bc01        pop     {r0}
+2001b4d2    4a2f        ldr     r2, [pc, #188]  ; 0x2001b590
+2001b4d4    4790        blx     r2
+2001b4d6    bc02        pop     {r1}
+2001b4d8    6008        str     r0, [r1, #0]
+2001b4da    4638        mov     r0, r7
+2001b4dc    380c        subs    r0, #12         ; 0xc
+2001b4de    b401        push    {r0}
+2001b4e0    201e        movs    r0, #30         ; 0x1e
+2001b4e2    b401        push    {r0}
+2001b4e4    4638        mov     r0, r7
+2001b4e6    3808        subs    r0, #8
+2001b4e8    6800        ldr     r0, [r0, #0]
+2001b4ea    b401        push    {r0}
+2001b4ec    bc01        pop     {r0}
+2001b4ee    4e29        ldr     r6, [pc, #164]  ; 0x2001b594
+2001b4f0    47b0        blx     r6
+2001b4f2    b401        push    {r0}
+2001b4f4    4828        ldr     r0, [pc, #160]  ; 0x2001b598
+2001b4f6    4601        mov     r1, r0
+2001b4f8    bc01        pop     {r0}
+2001b4fa    4a25        ldr     r2, [pc, #148]  ; 0x2001b590
+2001b4fc    4790        blx     r2
+2001b4fe    4a27        ldr     r2, [pc, #156]  ; 0x2001b59c
+2001b500    4790        blx     r2
+2001b502    bc02        pop     {r1}
+2001b504    1840        adds    r0, r0, r1
+2001b506    bc02        pop     {r1}
+2001b508    6008        str     r0, [r1, #0]
+2001b50a    f000 f811   bl      2001b530
+2001b50e    4824        ldr     r0, [pc, #144]  ; 0x2001b5a0
+2001b510    b401        push    {r0}
+2001b512    2001        movs    r0, #1
+2001b514    4e23        ldr     r6, [pc, #140]  ; 0x2001b5a4
+2001b516    47b0        blx     r6
+2001b518    4638        mov     r0, r7
+2001b51a    380c        subs    r0, #12         ; 0xc
+2001b51c    b401        push    {r0}
+2001b51e    6801        ldr     r1, [r0, #0]
+2001b520    2001        movs    r0, #1
+2001b522    1a08        subs    r0, r1, r0
+2001b524    bc02        pop     {r1}
+2001b526    6008        str     r0, [r1, #0]
+2001b528    b401        push    {r0}
+2001b52a    2001        movs    r0, #1
+2001b52c    bc02        pop     {r1}
+2001b52e    1840        adds    r0, r0, r1
+2001b530    4638        mov     r0, r7
+2001b532    380c        subs    r0, #12         ; 0xc
+2001b534    6801        ldr     r1, [r0, #0]
+2001b536    2000        movs    r0, #0
+2001b538    4281        cmp     r1, r0
+2001b53a    dc01        bgt     2001b540
+2001b53c    2000        movs    r0, #0
+2001b53e    e000        b       2001b542
+2001b540    2001        movs    r0, #1
+2001b542    2800        cmp     r0, #0
+2001b544    d1e3        bne     2001b50e
+2001b546    4818        ldr     r0, [pc, #96]   ; 0x2001b5a8
+2001b548    b401        push    {r0}
+2001b54a    2001        movs    r0, #1
+2001b54c    4e15        ldr     r6, [pc, #84]   ; 0x2001b5a4
+2001b54e    47b0        blx     r6
+2001b550    4638        mov     r0, r7
+2001b552    b401        push    {r0}
+2001b554    6800        ldr     r0, [r0, #0]
+2001b556    b401        push    {r0}
+2001b558    4638        mov     r0, r7
+2001b55a    3804        subs    r0, #4
+2001b55c    6800        ldr     r0, [r0, #0]
+2001b55e    bc02        pop     {r1}
+2001b560    1840        adds    r0, r0, r1
+2001b562    bc02        pop     {r1}
+2001b564    6008        str     r0, [r1, #0]
+2001b566    4638        mov     r0, r7
+2001b568    6800        ldr     r0, [r0, #0]
+2001b56a    b401        push    {r0}
+2001b56c    480f        ldr     r0, [pc, #60]   ; 0x2001b5ac
+2001b56e    bc02        pop     {r1}
+2001b570    4281        cmp     r1, r0
+2001b572    dd01        ble     2001b578
+2001b574    2000        movs    r0, #0
+2001b576    e000        b       2001b57a
+2001b578    2001        movs    r0, #1
+2001b57a    2800        cmp     r0, #0
+2001b57c    d19e        bne     2001b4bc
+2001b57e    2000        movs    r0, #0
+2001b580    46bd        mov     sp, r7
+2001b582    bdc0        pop     {r6, r7, pc}
+2001b584    46bd        mov     sp, r7
+2001b586    bdc0        pop     {r6, r7, pc}
+2001b588    1002 2451   .word   0x10022451      ; aeabi_i2f
+2001b58c    3c8e fa35   .word   0x3c8efa35
+2001b590    1002 238b   .word   0x1002238b      ; aeabi_fmul
+2001b594    1002 2569   .word   0x10022569      ; sinf
+2001b598    41c8 0000   .word   0x41c80000
+2001b59c    1002 2495   .word   0x10022495      ; aeabi_f2iz
+2001b5a0    2000 e5c8   .word   0x2000e5c8
+2001b5a4    1000 b5d5   .word   0x1000b5d5      ; printf
+2001b5a8    2000 e5cc   .word   0x2000e5cc
+2001b5ac    0000 0168   .word   0x00000168
+2001b5b0    0000 0000   .word   0x00000000      ; "\0\0\0\0"
+14: }
+
 /src/:
 
     cat - display text file
