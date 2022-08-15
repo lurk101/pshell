@@ -35,15 +35,6 @@
 #define SDK14 0
 #endif
 
-#if LIB_PICO_STDIO_USB
-#if SDK14
-#define CONS_CONNECTED stdio_usb_connected()
-#else
-#include "tusb.h"
-#define CONS_CONNECTED tud_cdc_connected()
-#endif
-#endif
-
 #define COPYRIGHT "\u00a9" // for UTF8
 //#define COPYRIGHT "(c)" // for ASCII
 
@@ -498,10 +489,10 @@ static void status_cmd(void) {
     printf("\ntext size 0x%x, bss size 0x%x (%d)", stat.text_size, stat.bss_size, stat.bss_size);
 #endif
     sprintf(result,
-            "\nflash base 0x%x, blocks %d, block size %d, used %d, total %u bytes (%dK), %1.1f%c "
+            "\ntotal blocks %d, block size %d, used %d (%dK), %1.1f%c "
             "used.\n",
-            fs_flash_base(), (int)stat.block_count, (int)stat.block_size, (int)stat.blocks_used,
-            total_size, total_size / 1024, stat.blocks_used * 100.0 / stat.block_count, percent);
+            (int)stat.block_count, (int)stat.block_size, (int)stat.blocks_used, total_size / 1024,
+            stat.blocks_used * 100.0 / stat.block_count, percent);
 }
 
 static void ls_cmd(void) {
@@ -706,30 +697,30 @@ static void resize_cmd(void) { screen_size(); }
 
 // clang-format off
 cmd_t cmd_table[] = {
-    {"cat",     cat_cmd,        "display text file"},
-    {"cc",      cc_cmd,         "run C source file. cc -h for compiler help"},
+    {"cat",     cat_cmd,        "display a text file"},
+    {"cc",      cc_cmd,         "compile & run C source file. cc -h for help"},
     {"cd",      cd_cmd,         "change directory"},
     {"clear",   clear_cmd,      "clear the screen"},
     {"cp",      cp_cmd,         "copy a file"},
     {"format",  format_cmd,     "format the filesystem"},
-    {"ls",      ls_cmd,         "list directory"},
-    {"mkdir",   mkdir_cmd,      "create directory"},
-    {"mount",   mount_cmd,      "mount filesystem"},
-    {"mv",      mv_cmd,         "rename file or directory"},
-    {"quit",    quit_cmd,       "shutdown system"},
-    {"reboot",  reboot_cmd,     "Restart system"},
+    {"ls",      ls_cmd,         "list a directory"},
+    {"mkdir",   mkdir_cmd,      "create a directory"},
+    {"mount",   mount_cmd,      "mount the filesystem"},
+    {"mv",      mv_cmd,         "rename a file or directory"},
+    {"quit",    quit_cmd,       "shutdown the system"},
+    {"reboot",  reboot_cmd,     "Restart the system"},
     {"resize",  resize_cmd,     "establish screen dimensions"},
-    {"rm",      rm_cmd,         "remove file or directory. -r for recursive"},
-    {"status",  status_cmd,     "filesystem status"},
-    {"tar",     tar_cmd,        "tar archiver"},
+    {"rm",      rm_cmd,         "remove a file or directory. -r for recursive"},
+    {"status",  status_cmd,     "display the filesystem status"},
+    {"tar",     tar_cmd,        "manage tar archives"},
 #if !defined(NDEBUG) || defined(PSHELL_TESTS)
     {"tests",   tests_cmd,      "run all tests"},
 #endif
-    {"unmount", unmount_cmd,    "unmount filesystem"},
-	{"version", version_cmd,    "display pshel version"},
-    {"vi",      vi_cmd,         "editor"},
-    {"xget",    get_cmd,        "get file (xmodem)"},
-    {"xput",    put_cmd,        "put file (xmodem)"},
+    {"unmount", unmount_cmd,    "unmount the filesystem"},
+	{"version", version_cmd,    "display pico shell's version"},
+    {"vi",      vi_cmd,         "edit file(s) with vi"},
+    {"xget",    get_cmd,        "get a file (xmodem)"},
+    {"xput",    put_cmd,        "put a file (xmodem)"},
 	{0}
 };
 // clang-format on
@@ -774,7 +765,7 @@ int main(void) {
     stdio_init_all();
     bool uart = true;
 #if LIB_PICO_STDIO_USB
-    while (!CONS_CONNECTED)
+    while (!stdio_usb_connected())
         sleep_ms(1000);
     uart = false;
 #endif
