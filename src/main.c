@@ -758,19 +758,22 @@ int main(void) {
     ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
     getchar_timeout_us(1000);
     bool detected = screen_size();
-    printf(VT_CLEAR "\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright " COPYRIGHT
-                    " 1883 Thomas Edison\n"
-                    "This program comes with ABSOLUTELY NO WARRANTY.\n"
-                    "This is free software, and you are welcome to redistribute it\n"
-                    "under certain conditions. See LICENSE file for details.\n");
-    version_cmd();
-    printf("\nconsole on %s [%u X %u]\n\n"
-           "enter command or hit ENTER for help\n\n",
-           uart ? "UART" : "USB", screen_x, screen_y);
-    if (!detected) {
-        printf("\nYour terminal does not respond to standard VT100 escape sequences"
-               "\nsequences. The editor will likely not work at all!");
-        fflush(stdout);
+    printf(VT_CLEAR);
+    fflush(stdout);
+    if (!watchdog_caused_reboot()) {
+        printf("\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright " COPYRIGHT " 1883 Thomas Edison\n"
+               "This program comes with ABSOLUTELY NO WARRANTY.\n"
+               "This is free software, and you are welcome to redistribute it\n"
+               "under certain conditions. See LICENSE file for details.\n");
+        version_cmd();
+        printf("\nconsole on %s [%u X %u]\n\n"
+               "enter command or hit ENTER for help\n\n",
+               uart ? "UART" : "USB", screen_x, screen_y);
+        if (!detected) {
+            printf("\nYour terminal does not respond to standard VT100 escape sequences"
+                   "\nsequences. The editor will likely not work at all!");
+            fflush(stdout);
+        }
     }
 
     if (fs_mount() != LFS_ERR_OK) {
@@ -796,7 +799,8 @@ int main(void) {
                 }
             }
     } else {
-        printf("file system automatically mounted\n");
+        if (!watchdog_caused_reboot())
+            printf("file system automatically mounted\n");
         mounted = true;
     }
     while (run) {
