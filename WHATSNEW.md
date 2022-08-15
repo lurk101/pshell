@@ -1,3 +1,10 @@
+What's new in version 1.2.5
+
+- internal cleanup of branching logic
+- fix c-style multi line comment crash
+- check for line buffer and symbol table overflow
+- source file no longer needs to be memory resident for compilation.
+
 What's new in version 1.2.4
 
 - fix parameter mismatch crash
