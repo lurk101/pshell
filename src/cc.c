@@ -663,7 +663,7 @@ static int extern_search(char* name) // get cache index of external function
  */
 static void next() {
     char* pp;
-    int t;
+    int t, t2;
 
     /* using loop to ignore whitespace characters, but characters that
      * cannot be recognized by the lexical analyzer are considered blank
@@ -821,7 +821,39 @@ static void next() {
                         tkv.i = '\r';
                         break; // carriage return
                     case '0':
-                        tkv.i = '\0';
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                        t = tkv.i - '0';
+                        t2 = 1;
+                        while (*p >= '0' & *p <= '7') {
+                            if (++t2 > 3)
+                                break;
+                            t = (t << 3) + *p++ - '0';
+                        }
+                        if (t > 255)
+                            fatal("bad octal character in string");
+                        tkv.i = t; // octal representation
+                        break;
+                    case 'x':
+                    case 'X':
+                        t = 0;
+                        while ((*p >= '0' & *p <= '9') || (*p >= 'a' & *p <= 'f') ||
+                               (*p >= 'A' & *p <= 'F')) {
+                            if (*p >= '0' & *p <= '9')
+                                t = (t << 4) + *p++ - '0';
+                            else if (*p >= 'A' & *p <= 'F')
+                                t = (t << 4) + *p++ - 'A' + 10;
+                            else
+                                t = (t << 4) + *p++ - 'a' + 10;
+                        }
+                        if (t > 255)
+                            fatal("bad hexadecimal character in string");
+                        tkv.i = t; // hexadecimal representation
                         break; // an int with value 0
                     }
                 }
