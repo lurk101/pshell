@@ -2442,7 +2442,7 @@ static void emit_load_immediate(int r, int val) {
     }
     if (-val >= 0 && -val < 256) {
         emit(0x2000 | -val | (r << 8)); // movs rr, #n
-        emit(0x4240);                   // negs r0, r0
+        emit(0x4240 | (r << 3) | r);    // negs rr, rr
         return;
     }
     emit(0x4800 | (r << 8)); // ldr rr,[pc + offset n]

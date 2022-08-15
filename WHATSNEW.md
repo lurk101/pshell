@@ -1,3 +1,7 @@
+What's new in version 1.2.6
+
+- fix bug loading small negative constants.
+
 What's new in version 1.2.5
 
 - internal cleanup of branching logic
