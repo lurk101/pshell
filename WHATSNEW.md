@@ -2,7 +2,7 @@ What's new in version 1.2.6
 
 - fix bug loading small negative constants.
 - support octal and hexadecimal character representations in strings and char constants
-- only display banner on 1st boot
+- revert banner update and add size detect command
 
 What's new in version 1.2.5
 

@@ -595,8 +595,6 @@ static void vi_cmd(void) {
 }
 
 static void clear_cmd(void) {
-    printf(VT_CLEAR);
-    fflush(stdout);
     strcpy(result, VT_CLEAR "\n");
 }
 
@@ -632,56 +630,12 @@ static void version_cmd(void) {
            PICO_SDK_VERSION_REVISION);
 }
 
-// clang-format off
-cmd_t cmd_table[] = {
-    {"cat",     cat_cmd,        "display text file"},
-    {"cc",      cc_cmd,         "run C source file. cc -h for compiler help"},
-    {"cd",      cd_cmd,         "change directory"},
-    {"clear",   clear_cmd,      "clear the screen"},
-    {"cp",      cp_cmd,         "copy a file"},
-    {"format",  format_cmd,     "format the filesystem"},
-    {"ls",      ls_cmd,         "list directory"},
-    {"mkdir",   mkdir_cmd,      "create directory"},
-    {"mount",   mount_cmd,      "mount filesystem"},
-    {"mv",      mv_cmd,         "rename file or directory"},
-    {"quit",    quit_cmd,       "shutdown system"},
-    {"reboot",  reboot_cmd,     "Restart system"},
-    {"rm",      rm_cmd,         "remove file or directory. -r for recursive"},
-    {"status",  status_cmd,     "filesystem status"},
-    {"tar",     tar_cmd,        "tar archiver"},
-#if !defined(NDEBUG) || defined(PSHELL_TESTS)
-    {"tests",   tests_cmd,      "run all tests"},
-#endif
-    {"unmount", unmount_cmd,    "unmount filesystem"},
-	{"version", version_cmd,    "display pshel version"},
-    {"vi",      vi_cmd,         "editor"},
-    {"xget",    get_cmd,        "get file (xmodem)"},
-    {"xput",    put_cmd,        "put file (xmodem)"},
-	{0}
-};
-// clang-format on
-
-static const char* search_cmds(int len) {
-    if (len == 0)
-        return NULL;
-    int i, last_i, count = 0;
-    for (i = 0; cmd_table[i].name; i++)
-        if (strncmp(cmd_buffer, cmd_table[i].name, len) == 0) {
-            last_i = i;
-            count++;
-        }
-    if (count != 1)
-        return NULL;
-    return cmd_table[last_i].name + len;
-}
-
-static bool screen_size(void) {
+static bool cursor_pos(uint32_t* x, uint32_t* y) {
     int rc = false;
-    screen_x = 80;
-    screen_y = 24;
+    *x = 80;
+    *y = 24;
     do {
-        set_translate_crlf(false);
-        printf(VT_ESC "[999;999H" VT_ESC "[6n");
+        printf(VT_ESC "[6n");
         fflush(stdout);
         int k = getchar_timeout_us(100000);
         if (k == PICO_ERROR_TIMEOUT)
@@ -695,7 +649,6 @@ static bool screen_size(void) {
         }
         if (cp == cmd_buffer)
             break;
-        set_translate_crlf(true);
         if (cmd_buffer[0] != '[')
             break;
         *cp = 0;
@@ -718,17 +671,87 @@ static bool screen_size(void) {
             break;
         if (row < 1 || col < 1 || (row | col) > 0x7fff)
             break;
-        screen_x = col;
-        screen_y = row;
+        *x = col;
+        *y = row;
         rc = true;
     } while (false);
     return rc;
 }
 
+static bool screen_size(void) {
+    int rc = false;
+    screen_x = 80;
+    screen_y = 24;
+    uint32_t cur_x, cur_y;
+    do {
+        set_translate_crlf(false);
+        if (!cursor_pos(&cur_x, &cur_y))
+            break;
+        printf(VT_ESC "[999;999H");
+        if (!cursor_pos(&screen_x, &screen_y))
+            break;
+        if (cur_x > screen_x)
+            cur_x = screen_x;
+        if (cur_y > screen_y)
+            cur_y = screen_y;
+        printf("\033[%d;%dH", cur_y, cur_x);
+        fflush(stdout);
+        rc = true;
+    } while (false);
+    set_translate_crlf(true);
+    return rc;
+}
+
+static void resize_cmd(void) { screen_size(); }
+
+// clang-format off
+cmd_t cmd_table[] = {
+    {"cat",     cat_cmd,        "display text file"},
+    {"cc",      cc_cmd,         "run C source file. cc -h for compiler help"},
+    {"cd",      cd_cmd,         "change directory"},
+    {"clear",   clear_cmd,      "clear the screen"},
+    {"cp",      cp_cmd,         "copy a file"},
+    {"format",  format_cmd,     "format the filesystem"},
+    {"ls",      ls_cmd,         "list directory"},
+    {"mkdir",   mkdir_cmd,      "create directory"},
+    {"mount",   mount_cmd,      "mount filesystem"},
+    {"mv",      mv_cmd,         "rename file or directory"},
+    {"quit",    quit_cmd,       "shutdown system"},
+    {"reboot",  reboot_cmd,     "Restart system"},
+    {"resize",  resize_cmd,     "establish screen dimensions"},
+    {"rm",      rm_cmd,         "remove file or directory. -r for recursive"},
+    {"status",  status_cmd,     "filesystem status"},
+    {"tar",     tar_cmd,        "tar archiver"},
+#if !defined(NDEBUG) || defined(PSHELL_TESTS)
+    {"tests",   tests_cmd,      "run all tests"},
+#endif
+    {"unmount", unmount_cmd,    "unmount filesystem"},
+	{"version", version_cmd,    "display pshel version"},
+    {"vi",      vi_cmd,         "editor"},
+    {"xget",    get_cmd,        "get file (xmodem)"},
+    {"xput",    put_cmd,        "put file (xmodem)"},
+	{0}
+};
+// clang-format on
+
 static void help(void) {
     printf("\n");
     for (int i = 0; cmd_table[i].name; i++)
         printf("%7s - %s\n", cmd_table[i].name, cmd_table[i].descr);
+}
+
+static const char* search_cmds(int len) {
+    if (len == 0)
+        return NULL;
+    int i, last_i, count = 0;
+    for (i = 0; cmd_table[i].name; i++)
+        if (strncmp(cmd_buffer, cmd_table[i].name, len) == 0) {
+            last_i = i;
+            count++;
+        }
+    if (count != 1)
+        return NULL;
+    return cmd_table[last_i].name + len;
 }
 
 static void HardFault_Handler(void) {
@@ -760,20 +783,18 @@ int main(void) {
     bool detected = screen_size();
     printf(VT_CLEAR);
     fflush(stdout);
-    if (!watchdog_caused_reboot()) {
-        printf("\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright " COPYRIGHT " 1883 Thomas Edison\n"
-               "This program comes with ABSOLUTELY NO WARRANTY.\n"
-               "This is free software, and you are welcome to redistribute it\n"
-               "under certain conditions. See LICENSE file for details.\n");
-        version_cmd();
-        printf("\nconsole on %s [%u X %u]\n\n"
-               "enter command or hit ENTER for help\n\n",
-               uart ? "UART" : "USB", screen_x, screen_y);
-        if (!detected) {
-            printf("\nYour terminal does not respond to standard VT100 escape sequences"
-                   "\nsequences. The editor will likely not work at all!");
-            fflush(stdout);
-        }
+    printf("\n" VT_BOLD "Pico Shell" VT_NORMAL " - Copyright " COPYRIGHT " 1883 Thomas Edison\n"
+           "This program comes with ABSOLUTELY NO WARRANTY.\n"
+           "This is free software, and you are welcome to redistribute it\n"
+           "under certain conditions. See LICENSE file for details.\n");
+    version_cmd();
+    printf("\nconsole on %s [%u X %u]\n\n"
+           "enter command or hit ENTER for help\n\n",
+           uart ? "UART" : "USB", screen_x, screen_y);
+    if (!detected) {
+        printf("\nYour terminal does not respond to standard VT100 escape sequences"
+               "\nsequences. The editor will likely not work at all!");
+        fflush(stdout);
     }
 
     if (fs_mount() != LFS_ERR_OK) {
@@ -799,8 +820,7 @@ int main(void) {
                 }
             }
     } else {
-        if (!watchdog_caused_reboot())
-            printf("file system automatically mounted\n");
+        printf("file system automatically mounted\n");
         mounted = true;
     }
     while (run) {
