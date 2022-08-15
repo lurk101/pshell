@@ -2544,7 +2544,7 @@ static void emit_branch(uint16_t* to) {
     if (ofs >= -1024 && ofs < 1024)
         emit(0xe000 | (ofs & 0x7ff)); // JMP n
     else
-        emit_call((int)to);
+        emit_call((int)(to + 2));
 }
 
 static void emit_cond_branch(uint16_t* to, int cond) {
