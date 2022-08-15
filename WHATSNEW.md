@@ -4,6 +4,7 @@ What's new in version 1.2.5
 - fix c-style multi line comment crash
 - check for line buffer and symbol table overflow
 - source file no longer needs to be memory resident for compilation.
+- fix bad branch at bootom of long for loops
 
 What's new in version 1.2.4
 
