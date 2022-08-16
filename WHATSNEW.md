@@ -1,3 +1,8 @@
+What's new in version 1.2.7
+
+- for compatibility use Unix values for O_RDONLY, O_WRONLY, etc, and translate them automatically to LFS mode values.
+- char type now defaults to signed, use -u option for unsigned chars
+
 What's new in version 1.2.6
 
 - fix bug loading small negative constants.
