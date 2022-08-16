@@ -11,6 +11,7 @@
  * Further modifications by lurk101 for RP Pico
  */
 
+#include <fcntl.h>
 #include <limits.h>
 #include <math.h>
 #include <setjmp.h>
@@ -248,13 +249,13 @@ static struct define_grp stdio_defines[] = {
     {"true", 1},
     {"FALSE", 0},
     {"false", 0},
-    {"O_RDONLY", LFS_O_RDONLY},
-    {"O_WRONLY", LFS_O_WRONLY},
-    {"O_RDWR", LFS_O_RDWR},
-    {"O_CREAT", LFS_O_CREAT},                   // Create a file if it does not exist
-    {"O_EXCL", LFS_O_EXCL},                     // Fail if a file already exists
-    {"O_TRUNC", LFS_O_TRUNC},                   // Truncate the existing file to zero size
-    {"O_APPEND", LFS_O_APPEND},                 // Move to end of file on every write
+    {"O_RDONLY", O_RDONLY},
+    {"O_WRONLY", O_WRONLY},
+    {"O_RDWR", O_RDWR},
+    {"O_CREAT", O_CREAT},                       // Create a file if it does not exist
+    {"O_EXCL", O_EXCL},                         // Fail if a file already exists
+    {"O_TRUNC", O_TRUNC},                       // Truncate the existing file to zero size
+    {"O_APPEND", O_APPEND},                     // Move to end of file on every write
     {"SEEK_SET", LFS_SEEK_SET},                 //
     {"SEEK_CUR", LFS_SEEK_CUR},                 //
     {"SEEK_END", LFS_SEEK_END},                 //
@@ -466,7 +467,16 @@ static struct file_handle {
 static int wrap_open(char* name, int mode) {
     struct file_handle* h = sys_malloc(sizeof(struct file_handle), 1);
     h->is_dir = false;
-    if (fs_file_open(&h->u.file, full_path(name), mode) < LFS_ERR_OK) {
+    int lfs_mode = (mode & 0xf) + 1;
+    if (mode & O_CREAT)
+        lfs_mode |= LFS_O_CREAT;
+    if (mode & O_EXCL)
+        lfs_mode |= LFS_O_EXCL;
+    if (mode & O_TRUNC)
+        lfs_mode |= LFS_O_TRUNC;
+    if (mode & O_APPEND)
+        lfs_mode |= LFS_O_APPEND;
+    if (fs_file_open(&h->u.file, full_path(name), lfs_mode) < LFS_ERR_OK) {
         sys_free(h);
         return 0;
     }
