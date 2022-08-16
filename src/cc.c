@@ -119,7 +119,7 @@ static int rtf, rtt;            // return flag and return type for current funct
 static int loc;                 // local variable offset
 static int lineno;              // current line number
 static int src_opt;             // print source and assembly flag
-static int trc_opt;             // Trace instruction.
+static int uchar_opt;           // use unsigned character variables
 static int* n;                  // current position in emitted abstract syntax tree
                                 // With an AST, the compiler is not limited to generate
                                 // code on the fly with parsing.
@@ -610,8 +610,8 @@ static void clear_globals(void) {
     pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
-    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = src_opt = trc_opt = ld = pplev = pplevt =
-        pcrel_count = 0;
+    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = trc_opt = ld =
+        pplev = pplevt = pcrel_count = 0;
     ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
@@ -2558,7 +2558,11 @@ static void emit_store(int n) {
 static void emit_load(int n) {
     switch (n) {
     case LC:
-        emit(0x7800); // ldrb    r0, [r0, #0]
+        emit(0x7800); // ldrb r0,[r0,#0]
+        if (!uchar_opt) {
+            emit(0x0600); // lsls r0,r0,#24
+            emit(0x1600); // asrs r0,r0,#24
+        }
         break;
     case LI:
     case LF:
@@ -2669,22 +2673,22 @@ static void emit_oper(int op) {
         emit(0x4281); // cmp r1, r0
         switch (op) {
         case EQ:
-            emit(0xd001); // beq * + 2
+            emit(0xd001); // beq * + 3
             break;
         case NE:
-            emit(0xd101); // bne * + 2
+            emit(0xd101); // bne * + 3
             break;
         case GE:
-            emit(0xda01); // bge * + 2
+            emit(0xda01); // bge * + 3
             break;
         case LT:
-            emit(0xdb01); // blt * + 2
+            emit(0xdb01); // blt * + 3
             break;
         case GT:
-            emit(0xdc01); // bgt * + 2
+            emit(0xdc01); // bgt * + 3
             break;
         case LE:
-            emit(0xdd01); // ble * + 2
+            emit(0xdd01); // ble * + 3
             break;
         default:
             fatal("unexpected compiler error");
@@ -4082,11 +4086,11 @@ static void show_externals(int i) {
 static void help(char* lib) {
     if (!lib) {
         printf("\n"
-               "usage: cc [-s] [-t[i]] [-h [lib]] [-D [symbol[ = value]]] [-o filename] filename\n"
+               "usage: cc [-s] [-u] [-h [lib]] [-D [symbol[ = value]]] filename\n"
                "    -s      display disassembly and quit.\n"
-               "    -t,-ti  trace execution. i enables single step.\n"
+               "    -u      treat char type as unsigned\n"
                "    -D symbol [= value]\n"
-               "            define symbol for limited pre-processor.\n"
+               "            define symbol for limited pre-processor, can repeat\n"
                "    -h      Compiler help. lib lists externals.\n"
                "    filename\n"
                "            C source file name.\n"
@@ -4183,8 +4187,8 @@ int cc(int argc, char** argv) {
             goto done;
         } else if ((*argv)[1] == 's') {
             src_opt = 1;
-        } else if ((*argv)[1] == 't') {
-            trc_opt = ((*argv)[2] == 'i') ? 2 : 1;
+        } else if ((*argv)[1] == 'u') {
+            uchar_opt = 1;
         } else if ((*argv)[1] == 'D') {
             p = &(*argv)[2];
             next();
