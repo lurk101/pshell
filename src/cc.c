@@ -610,7 +610,7 @@ static void clear_globals(void) {
     pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
-    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = trc_opt = ld =
+    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld =
         pplev = pplevt = pcrel_count = 0;
     ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
