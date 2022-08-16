@@ -4227,16 +4227,17 @@ int cc(int argc, char** argv) {
 
     if (src_opt) {
         disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
-        disasm_symbol(&state, "aeabi_idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_i2f", (uint32_t)__wrap___aeabi_i2f, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_f2iz", (uint32_t)__wrap___aeabi_f2iz, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_fadd", (uint32_t)__wrap___aeabi_fadd, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_fsub", (uint32_t)__wrap___aeabi_fsub, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_fmul", (uint32_t)__wrap___aeabi_fmul, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_fdiv", (uint32_t)__wrap___aeabi_fdiv, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_fcmple", (uint32_t)__wrap___aeabi_fcmple, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_fcmpgt", (uint32_t)__wrap___aeabi_fcmpgt, ARMMODE_THUMB);
-        disasm_symbol(&state, "aeabi_fcmplt", (uint32_t)__wrap___aeabi_fcmplt, ARMMODE_THUMB);
+        disasm_symbol(&state, "idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
+        disasm_symbol(&state, "i2f", (uint32_t)__wrap___aeabi_i2f, ARMMODE_THUMB);
+        disasm_symbol(&state, "f2i", (uint32_t)__wrap___aeabi_f2iz, ARMMODE_THUMB);
+        disasm_symbol(&state, "fadd", (uint32_t)__wrap___aeabi_fadd, ARMMODE_THUMB);
+        disasm_symbol(&state, "fsub", (uint32_t)__wrap___aeabi_fsub, ARMMODE_THUMB);
+        disasm_symbol(&state, "fmul", (uint32_t)__wrap___aeabi_fmul, ARMMODE_THUMB);
+        disasm_symbol(&state, "fdiv", (uint32_t)__wrap___aeabi_fdiv, ARMMODE_THUMB);
+        disasm_symbol(&state, "fcmple", (uint32_t)__wrap___aeabi_fcmple, ARMMODE_THUMB);
+        disasm_symbol(&state, "fcmpge", (uint32_t)__wrap___aeabi_fcmpge, ARMMODE_THUMB);
+        disasm_symbol(&state, "fcmpgt", (uint32_t)__wrap___aeabi_fcmpgt, ARMMODE_THUMB);
+        disasm_symbol(&state, "fcmplt", (uint32_t)__wrap___aeabi_fcmplt, ARMMODE_THUMB);
     }
     add_defines(stdio_defines);
     add_defines(gpio_defines);
