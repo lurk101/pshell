@@ -2345,9 +2345,9 @@ static uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc02};
 static uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
 static uint16_t rep0[] = {0x4639, 0x2000};
 
-static uint16_t pat1[] = {0x6800, 0xb401, 0x2000, 0xbc02};
-static uint16_t msk1[] = {0xffff, 0xffff, 0xff00, 0xffff};
-static uint16_t rep1[] = {0x6801, 0x2000};
+static uint16_t pat1[] = {0x4800, 0xb401, 0x2000, 0xbc02};
+static uint16_t msk1[] = {0xff00, 0xffff, 0xff00, 0xffff};
+static uint16_t rep1[] = {0x4900, 0x2000};
 
 static uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
 static uint16_t msk2[] = {0xff00, 0xffff, 0xffff};
@@ -2356,12 +2356,10 @@ static uint16_t rep2[] = {0x4638, 0x3800};
 static const struct segs {
     uint8_t n_pats;
     uint8_t n_reps;
-    uint8_t before;
-    int8_t after;
-    int8_t shft;
     uint16_t* pat;
     uint16_t* msk;
     uint16_t* rep;
+    int8_t xmap[4];
 } segments[] = {
 
     // FROM:		   	  TO:
@@ -2369,23 +2367,25 @@ static const struct segs {
     // push {r0}		  movs r0,#n
     // movs r0,#n
     // pop  {r1}
-    {numof(pat0), numof(rep0), 2, 0, 0, pat0, msk0, rep0},
+    {numof(pat0), numof(rep0), pat0, msk0, rep0, {2, 1, -1, -1}},
 
-    // ldr  r0, [r0, #0]  ldr  r1,[r0,#0]
-    // push {r0}		  movs r0,#n
-    // movs r0, #1
+    // ldr  r0,[r0,#n0]   ldr  r1,[r0,#n0]
+    // push {r0}		  movs r0,#n1
+    // movs r0, #n1
     // pop  {r1}
-    {numof(pat1), numof(rep1), 2, 0, 0, pat1, msk1, rep1},
+    {numof(pat1), numof(rep1), pat1, msk1, rep1, {0, 0, 2, 1}},
 
     // movs r0,#n         mov  r0,r7
     // rsbs r0,r0		  subs r0,#n
     // add  r0,r7
-    {numof(pat2), numof(rep2), 0, 0, 0, pat2, msk2, rep2}};
+    {numof(pat2), numof(rep2), pat2, msk2, rep2, {0, 1, -1, -1}}};
 
 static int peep_hole(const struct segs* s) {
-    uint16_t rslt[16];
+    uint16_t rslt[8];
     int l = s->n_pats;
-    uint16_t* pe = e - l + 1;
+    uint16_t* pe = (e - l) + 1;
+    if (pe < text_base)
+        return 0;
     for (int i = 0; i < l; i++) {
         rslt[i] = pe[i] & ~s->msk[i];
         if ((pe[i] & s->msk[i]) != s->pat[i])
@@ -2394,13 +2394,13 @@ static int peep_hole(const struct segs* s) {
     e -= l;
     l = s->n_reps;
     for (int i = 0; i < l; i++)
-        *++e = s->rep[i];
-    if (s->shft > 0)
-        rslt[s->before] >>= s->shft;
-    if (s->shft < 0)
-        rslt[s->before] <<= s->shft;
-	if (s->after <= 0)
-    	*(e + s->after) |= rslt[s->before];
+        pe[i] = s->rep[i];
+    for (int i = 0; i < 4; i += 2) {
+        if (s->xmap[i] < 0)
+            break;
+        pe[s->xmap[i + 1]] |= rslt[s->xmap[i]];
+    }
+    e += l;
     return 1;
 }
 
@@ -2569,10 +2569,8 @@ static void emit_load(int n) {
     switch (n) {
     case LC:
         emit(0x7800); // ldrb r0,[r0,#0]
-        if (!uchar_opt) {
-            emit(0x0600); // lsls r0,r0,#24
-            emit(0x1600); // asrs r0,r0,#24
-        }
+        if (!uchar_opt)
+            emit(0xb240); // sxtb r0,r0
         break;
     case LI:
     case LF:
@@ -2853,9 +2851,8 @@ static void patch_branch(uint16_t* from, uint16_t* to) {
     e = se;
 }
 
-// AST parsing for IR generatiion
-// With a modular code generator, new targets can be easily supported such as
-// native Arm machine code.
+// AST parsing for Thumb code generatiion
+
 static void gen(int* n) {
     int i = ast_Tk(n), j, k, l;
     uint16_t *a, *b, *c, *d, *t;
