@@ -175,29 +175,9 @@ enum {
 };
 
 // opcodes
-/* The instruction set is designed for building intermediate representation.
- * Expression 10 + 20 will be translated into the following instructions:
- *    i = 0;
- *    text[i++] = IMM;
- *    text[i++] = 10;
- *    text[i++] = PSH;
- *    text[i++] = IMM;
- *    text[i++] = 20;
- *    text[i++] = ADD;
- *    text[i++] = PSH;
- *    text[i++] = EXIT;
- *    pc = text;
- */
 enum {
 #include "cc_ops.h"
 };
-
-static const char* instr_str[] = {
-    "LEA", "IMM",  "IMMF", "JMP", "JSR",  "BZ",   "BNZ",  "ENT",  "ADJ",    "LEV",
-    "PSH", "PSHF", "LC",   "LI",  "LF",   "SC",   "SI",   "SF",   "OR",     "XOR",
-    "AND", "EQ",   "NE",   "GE",  "LT",   "GT",   "LE",   "SHL",  "SHR",    "ADD",
-    "SUB", "MUL",  "DIV",  "MOD", "ADDF", "SUBF", "MULF", "DIVF", "FTOI",   "ITOF",
-    "EQF", "NEF",  "GEF",  "LTF", "GTF",  "LEF",  "SYSC", "EXIT", "INVALID"};
 
 // types -- 4 scalar types, 1020 aggregate types, 4 tensor ranks, 8 ptr levels
 // bits 0-1 = tensor rank, 2-11 = type id, 12-14 = ptr level
@@ -207,153 +187,11 @@ enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000
 // (library) external functions
 
 struct define_grp {
-    char* name;
-    int val;
+    const char* name;
+    const int val;
 };
 
-static struct define_grp stdio_defines[] = {
-    // OPEN
-    {"TRUE", 1},
-    {"true", 1},
-    {"FALSE", 0},
-    {"false", 0},
-    {"O_RDONLY", O_RDONLY},
-    {"O_WRONLY", O_WRONLY},
-    {"O_RDWR", O_RDWR},
-    {"O_CREAT", O_CREAT},                       // Create a file if it does not exist
-    {"O_EXCL", O_EXCL},                         // Fail if a file already exists
-    {"O_TRUNC", O_TRUNC},                       // Truncate the existing file to zero size
-    {"O_APPEND", O_APPEND},                     // Move to end of file on every write
-    {"SEEK_SET", LFS_SEEK_SET},                 //
-    {"SEEK_CUR", LFS_SEEK_CUR},                 //
-    {"SEEK_END", LFS_SEEK_END},                 //
-    {"PICO_ERROR_TIMEOUT", PICO_ERROR_TIMEOUT}, //
-    {0}};
-
-static struct define_grp gpio_defines[] = {
-    // GPIO
-    {"GPIO_FUNC_XIP", GPIO_FUNC_XIP},
-    {"GPIO_FUNC_SPI", GPIO_FUNC_SPI},
-    {"GPIO_FUNC_UART", GPIO_FUNC_UART},
-    {"GPIO_FUNC_I2C", GPIO_FUNC_I2C},
-    {"GPIO_FUNC_PWM", GPIO_FUNC_PWM},
-    {"GPIO_FUNC_SIO", GPIO_FUNC_SIO},
-    {"GPIO_FUNC_PIO0", GPIO_FUNC_PIO0},
-    {"GPIO_FUNC_PIO1", GPIO_FUNC_PIO1},
-    {"GPIO_FUNC_GPCK", GPIO_FUNC_GPCK},
-    {"GPIO_FUNC_USB", GPIO_FUNC_USB},
-    {"GPIO_FUNC_NULL", GPIO_FUNC_NULL},
-    {"GPIO_OUT", GPIO_OUT},
-    {"GPIO_IN", GPIO_IN},
-    {"GPIO_IRQ_LEVEL_LOW", GPIO_IRQ_LEVEL_LOW},
-    {"GPIO_IRQ_LEVEL_HIGH", GPIO_IRQ_LEVEL_HIGH},
-    {"GPIO_IRQ_EDGE_FALL", GPIO_IRQ_EDGE_FALL},
-    {"GPIO_IRQ_EDGE_RISE", GPIO_IRQ_EDGE_RISE},
-    {"GPIO_OVERRIDE_NORMAL", GPIO_OVERRIDE_NORMAL},
-    {"GPIO_OVERRIDE_INVERT", GPIO_OVERRIDE_INVERT},
-    {"GPIO_OVERRIDE_LOW", GPIO_OVERRIDE_LOW},
-    {"GPIO_OVERRIDE_HIGH", GPIO_OVERRIDE_HIGH},
-    {"GPIO_SLEW_RATE_SLOW", GPIO_SLEW_RATE_SLOW},
-    {"GPIO_SLEW_RATE_FAST", GPIO_SLEW_RATE_FAST},
-    {"GPIO_DRIVE_STRENGTH_2MA", GPIO_DRIVE_STRENGTH_2MA},
-    {"GPIO_DRIVE_STRENGTH_4MA", GPIO_DRIVE_STRENGTH_4MA},
-    {"GPIO_DRIVE_STRENGTH_8MA", GPIO_DRIVE_STRENGTH_8MA},
-    {"GPIO_DRIVE_STRENGTH_12MA", GPIO_DRIVE_STRENGTH_12MA},
-    // LED
-    {"PICO_DEFAULT_LED_PIN", PICO_DEFAULT_LED_PIN},
-    {0}};
-
-static struct define_grp pwm_defines[] = {
-    // PWM
-    {"PWM_DIV_FREE_RUNNING", PWM_DIV_FREE_RUNNING},
-    {"PWM_DIV_B_HIGH", PWM_DIV_B_HIGH},
-    {"PWM_DIV_B_RISING", PWM_DIV_B_RISING},
-    {"PWM_DIV_B_FALLING", PWM_DIV_B_FALLING},
-    {"PWM_CHAN_A", PWM_CHAN_A},
-    {"PWM_CHAN_B", PWM_CHAN_B},
-    {0}};
-
-static struct define_grp clk_defines[] = {
-    // CLOCKS
-    {"KHZ", KHZ},
-    {"MHZ", MHZ},
-    {"clk_gpout0", clk_gpout0},
-    {"clk_gpout1", clk_gpout1},
-    {"clk_gpout2", clk_gpout2},
-    {"clk_gpout3", clk_gpout3},
-    {"clk_ref", clk_ref},
-    {"clk_sys", clk_sys},
-    {"clk_peri", clk_peri},
-    {"clk_usb", clk_usb},
-    {"clk_adc", clk_adc},
-    {"clk_rtc", clk_rtc},
-    {"CLK_COUNT", CLK_COUNT},
-    {0}};
-
-static struct define_grp i2c_defines[] = {
-    // I2C
-    {"i2c0", (int)&i2c0_inst},
-    {"i2c1", (int)&i2c1_inst},
-    {"i2c_default", (int)PICO_DEFAULT_I2C_INSTANCE},
-    {0}};
-
-static struct define_grp spi_defines[] = {
-    // SPI
-    {"spi0", (int)spi0_hw},
-    {"spi1", (int)spi1_hw},
-    {"spi_default", (int)PICO_DEFAULT_SPI_INSTANCE},
-    {0}};
-
-static struct define_grp math_defines[] = {{0}};
-
-static struct define_grp adc_defines[] = {{0}};
-
-static struct define_grp stdlib_defines[] = {{0}};
-
-static struct define_grp string_defines[] = {{0}};
-
-static struct define_grp time_defines[] = {{0}};
-
-static struct define_grp sync_defines[] = {{0}};
-
-static struct define_grp irq_defines[] = {
-    // IRQ
-    {"TIMER_IRQ_0", TIMER_IRQ_0},
-    {"TIMER_IRQ_1", TIMER_IRQ_1},
-    {"TIMER_IRQ_2", TIMER_IRQ_2},
-    {"TIMER_IRQ_3", TIMER_IRQ_3},
-    {"PWM_IRQ_WRAP", PWM_IRQ_WRAP},
-    {"USBCTRL_IRQ", USBCTRL_IRQ},
-    {"XIP_IRQ", XIP_IRQ},
-    {"PIO0_IRQ_0", PIO0_IRQ_0},
-    {"PIO0_IRQ_1", PIO0_IRQ_1},
-    {"PIO1_IRQ_0", PIO1_IRQ_0},
-    {"PIO1_IRQ_1", PIO1_IRQ_1},
-    {"DMA_IRQ_0", DMA_IRQ_0},
-    {"DMA_IRQ_1", DMA_IRQ_1},
-    {"IO_IRQ_BANK0", IO_IRQ_BANK0},
-    {"IO_IRQ_QSPI", IO_IRQ_QSPI},
-    {"SIO_IRQ_PROC0", SIO_IRQ_PROC0},
-    {"SIO_IRQ_PROC1", SIO_IRQ_PROC1},
-    {"CLOCKS_IRQ", CLOCKS_IRQ},
-    {"SPI0_IRQ", SPI0_IRQ},
-    {"SPI1_IRQ", SPI1_IRQ},
-    {"UART0_IRQ", UART0_IRQ},
-    {"UART1_IRQ", UART1_IRQ},
-    {"ADC_IRQ_FIFO", ADC_IRQ_FIFO},
-    {"I2C0_IRQ", I2C0_IRQ},
-    {"I2C1_IRQ", I2C1_IRQ},
-    {"RTC_IRQ", RTC_IRQ},
-    {"PICO_DEFAULT_IRQ_PRIORITY", PICO_DEFAULT_IRQ_PRIORITY},
-    {"PICO_LOWEST_IRQ_PRIORITY", PICO_LOWEST_IRQ_PRIORITY},
-    {"PICO_HIGHEST_IRQ_PRIORITY", PICO_HIGHEST_IRQ_PRIORITY},
-    {"PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY",
-     PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY},
-    {"PICO_SHARED_IRQ_HANDLER_HIGHEST_ORDER_PRIORITY",
-     PICO_SHARED_IRQ_HANDLER_HIGHEST_ORDER_PRIORITY},
-    {"PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY",
-     PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY},
-    {0}};
+#include "cc_defs.h"
 
 static jmp_buf done_jmp;
 static int* malloc_list;
@@ -539,36 +377,28 @@ static int wrap_screen_width(void) {
 
 static void wrap_wfi(void) { __wfi(); };
 
-static float wrap_aeabi_fadd(float a, float b) { return a + b; }
-
-static float wrap_aeabi_fdiv(float a, float b) { return a / b; }
-
-static float wrap_aeabi_fmul(float a, float b) { return a * b; }
-
-static float wrap_aeabi_fsub(float a, float b) { return a - b; }
-
 static int x_printf(int etype);
 static int x_sprintf(int etype);
 static char* x_strdup(char* s);
 static void x_exit(int rc);
 
 struct externs_s {
-    char* name;
-    int etype;
-    struct define_grp* grp;
-    void* extrn;
-    int ret_float : 1;
-    int is_printf : 1;
-    int is_sprintf : 1;
+    const char* name;
+    const int etype;
+    const struct define_grp* grp;
+    const void* extrn;
+    const int ret_float : 1;
+    const int is_printf : 1;
+    const int is_sprintf : 1;
 };
 
-static struct externs_s externs[] = {
+static const struct externs_s externs[] = {
 #include "cc_extrns.h"
 };
 
-static struct {
-    char* name;
-    struct define_grp* grp;
+static const struct {
+    const char* name;
+    const struct define_grp* grp;
 } includes[] = {{"stdio", stdio_defines},   {"stdlib", stdlib_defines},
                 {"string", string_defines}, {"math", math_defines},
                 {"sync", sync_defines},     {"time", time_defines},
@@ -4013,7 +3843,7 @@ static int x_sprintf(int etype) {
     common_vfunc(etype, 0, sp);
 }
 
-static void show_defines(struct define_grp* grp) {
+static void show_defines(const struct define_grp* grp) {
     if (grp->name == 0)
         return;
     printf("\nPredefined symbols:\n\n");
@@ -4095,9 +3925,9 @@ static void help(char* lib) {
     return;
 }
 
-static void add_defines(struct define_grp* d) {
+static void add_defines(const struct define_grp* d) {
     for (; d->name; d++) {
-        p = d->name;
+        p = (char*)d->name;
         next();
         id->class = Num;
         id->type = INT;
