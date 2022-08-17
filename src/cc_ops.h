@@ -1,4 +1,16 @@
 // clang-format off
+    LEA, /*  0 */
+/* LEA addressed the problem how to fetch arguments inside sub-function.
+ * Let's check out what a calling frame looks like before learning how
+ * to fetch arguments (Note that arguments are pushed in its calling
+ * order):
+ *
+ * If we need to refer to arg1, we need to fetch new_bp + 4, which can not
+ * be achieved by restricted ADD instruction. Thus another special
+ * instrcution is introduced to do this: LEA <offset>.
+ * Together with JSR, ENT, ADJ, LEV, and LEA instruction, we are able to
+ * make function calls.
+ */
     IMM, //  1
     /* IMM <num> to put immediate <num> into R0 */
     IMMF, // 2

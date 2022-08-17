@@ -217,9 +217,5 @@
     {"user_irq_is_claimed", 1, irq_defines, user_irq_is_claimed, 0, 0, 0},
     {"user_irq_unclaim", 1, irq_defines, user_irq_unclaim, 0, 0, 0},
     {"wfi", 0, sync_defines, wrap_wfi, 0, 0, 0},
-    {"wrap_aeabi_fadd", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fadd, 1, 0, 0},
-    {"wrap_aeabi_fdiv", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fdiv, 1, 0, 0},
-    {"wrap_aeabi_fmul", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fmul, 1, 0, 0},
-    {"wrap_aeabi_fsub", 2 | (2 << 5) | (0b11 << 10), 0, wrap_aeabi_fsub, 1, 0, 0},
     {"write", 3, stdio_defines, wrap_write, 0, 0, 0}
 // clang-format on

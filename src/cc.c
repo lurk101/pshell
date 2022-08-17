@@ -189,38 +189,6 @@ enum {
  *    pc = text;
  */
 enum {
-    LEA, /*  0 */
-/* LEA addressed the problem how to fetch arguments inside sub-function.
- * Let's check out what a calling frame looks like before learning how
- * to fetch arguments (Note that arguments are pushed in its calling
- * order):
- *
- *     sub_function(arg1, arg2, arg3);
- *
- *     |    ....       | high address
- *     +---------------+
- *     | arg: 1        |    new_bp + 4
- *     +---------------+
- *     | arg: 2        |    new_bp + 3
- *     +---------------+
- *     | arg: 3        |    new_bp + 2
- *     +---------------+
- *     |return address |    new_bp + 1
- *     +---------------+
- *     | old BP        | <- new BP
- *     +---------------+
- *     | local var 1   |    new_bp - 1
- *     +---------------+
- *     | local var 2   |    new_bp - 2
- *     +---------------+
- *     |    ....       |  low address
- *
- * If we need to refer to arg1, we need to fetch new_bp + 4, which can not
- * be achieved by restricted ADD instruction. Thus another special
- * instrcution is introduced to do this: LEA <offset>.
- * Together with JSR, ENT, ADJ, LEV, and LEA instruction, we are able to
- * make function calls.
- */
 #include "cc_ops.h"
 };
 
@@ -613,16 +581,16 @@ static lfs_file_t* fd;
 static char* fp;
 
 static void clear_globals(void) {
+    ncas = NULL;
     pcrel_1st = ecas = def = e = le = text_base = NULL;
     base_sp = tsize = n = malloc_list = NULL;
-    data_base = data = p = lp = fp = sym_text = sym_text_base = NULL;
+    sym_text_base = data_base = data = p = lp = fp = sym_text = NULL;
     id = sym = sym_base = NULL;
     pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
     swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld =
         pplev = pplevt = pcrel_count = 0;
-    ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
     memset(&done_jmp, 0, sizeof(&done_jmp));
@@ -2730,8 +2698,12 @@ static void emit_float_oper(int op) {
     case LTF:
     case GTF:
     case LEF:
-        emit(0x4601); // mov r1, r0
-        emit_pop(0);  // pop {r0}
+        if (op == ADDF || op == MULF)
+            emit_pop(1); // pop {r1}
+        else {
+            emit(0x4601); // mov r1, r0
+            emit_pop(0);  // pop {r0}
+        }
         switch (op) {
         case ADDF:
             emit_load_immediate(2, (int)__wrap___aeabi_fadd);
