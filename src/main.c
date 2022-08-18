@@ -620,8 +620,9 @@ static void quit_cmd(void) {
     exit(0);
 }
 
+const char* pshell_version = STRINGIZE_VALUE_OF(PSHELL_VERSION);
+
 static void version_cmd(void) {
-    const char* pshell_version = STRINGIZE_VALUE_OF(PSHELL_VERSION);
     printf("\nPico Shell %s, LittleFS v%d.%d, Vi " VI_VER ", SDK v%d.%d.%d\n", pshell_version,
            LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR, PICO_SDK_VERSION_MINOR,
            PICO_SDK_VERSION_REVISION);
@@ -766,6 +767,8 @@ static void HardFault_Handler(void) {
         __wfi();
 }
 
+static bool run_as_cmd(void) { return false; }
+
 // application entry point
 int main(void) {
     // initialize the pico SDK
@@ -839,8 +842,10 @@ int main(void) {
                     found = true;
                     break;
                 }
-            if (!found)
-                printf("\nunknown command '%s'. hit ENTER for help\n", argv[0]);
+            if (!found) {
+                if (!run_as_cmd())
+                    printf("\nunknown command '%s'. hit ENTER for help\n", argv[0]);
+            }
         } else
             help();
     }

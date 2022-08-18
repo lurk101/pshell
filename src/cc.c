@@ -62,7 +62,7 @@ extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int prnt);
 extern void get_screen_xy(int* x, int* y);
 
-extern char __StackLimit;
+extern char __StackLimit[TEXT_BYTES + DATA_BYTES];
 
 extern void __wrap___aeabi_idiv();
 extern void __wrap___aeabi_i2f();
@@ -3948,6 +3948,7 @@ void __no_inline_not_in_flash_func(dummy)(void) {
 #endif
 
 struct exe_s {
+    char pvers[16];
     int entry;
     int tsize;
     int dsize;
@@ -3956,7 +3957,7 @@ struct exe_s {
 int cc(int mode, int argc, char** argv) {
 
     clear_globals();
-
+    extern const char* pshell_version;
     int rslt = -1;
     struct exe_s exe;
 
@@ -3987,8 +3988,8 @@ int cc(int mode, int argc, char** argv) {
         struct ident_s* idmain = id;
         id->class = Main; // keep track of main
 
-        data_base = data = &__StackLimit + TEXT_BYTES;
-        memset(&__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
+        data_base = data = __StackLimit + TEXT_BYTES;
+        memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
         tsize = sys_malloc(TS_TBL_BYTES, 1);
         ast = sys_malloc(AST_TBL_BYTES, 1);
         n = ast + (AST_TBL_BYTES / 4) - 1;
@@ -4082,12 +4083,9 @@ int cc(int mode, int argc, char** argv) {
         }
         sys_free(fn);
 
-#ifdef NDEBUG
-        text_base = le = (uint16_t*)&__StackLimit;
-#else
-        text_base = le = (uint16_t*)&__StackLimit;
-#endif
+        text_base = le = (uint16_t*)__StackLimit;
         e = text_base - 1;
+
         members = sys_malloc(MEMBER_DICT_BYTES, 1);
 
         get_line();
@@ -4125,6 +4123,8 @@ int cc(int mode, int argc, char** argv) {
                 fd = NULL;
                 fatal("could not create %s\n", full_path(ofn));
             }
+            strncpy(exe.pvers, pshell_version, sizeof(exe.pvers) - 1);
+            exe.pvers[sizeof(exe.pvers) - 1] = 0;
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
             exe.dsize = data - data_base;
             if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
@@ -4145,7 +4145,7 @@ int cc(int mode, int argc, char** argv) {
             if (fs_setattr(full_path(ofn), 1, "exe", 4) < LFS_ERR_OK)
                 fatal("unable to set executable attribute");
             printf("\ntext  %06x\ndata  %06x\nentry %06x\n", exe.tsize, exe.dsize,
-                   exe.entry - (int)&__StackLimit);
+                   exe.entry - (int)__StackLimit);
             goto done;
         }
         if (src_opt)
@@ -4168,17 +4168,22 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
-        if (fs_file_read(fd, &__StackLimit, exe.tsize) != exe.tsize) {
+        if (strcmp(exe.pvers, pshell_version)) {
             fs_file_close(fd);
-            fatal("error reading %s", ofn);
+            fd = NULL;
+            fatal("version mismatch, please recompile %s", ofn);
         }
-        if (fs_file_read(fd, &__StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
+        if (fs_file_read(fd, &__StackLimit, exe.tsize) != exe.tsize ||
+            fs_file_read(fd, &__StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
             fs_file_close(fd);
+            fd = NULL;
             fatal("error reading %s", ofn);
         }
         fs_file_close(fd);
         sys_free(fd);
         fd = NULL;
+        argc--;
+        argv++;
     }
 
     printf("\n");
