@@ -4151,11 +4151,9 @@ int cc(int mode, int argc, char** argv) {
         if (src_opt)
             goto done;
     } else {
-        argc--;
-        argc++;
-        if (argc < 2)
+        if (argc < 1)
             fatal("specify executable file name");
-        ofn = full_path(argv[1]);
+        ofn = full_path(argv[0]);
         char buf[4];
         if (fs_getattr(ofn, 1, buf, sizeof(buf)) != 4)
             fatal("file %s not found or not executable", ofn);

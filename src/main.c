@@ -565,12 +565,6 @@ static void cc_cmd(void) {
     cc(0, argc, argv);
 }
 
-static void run_cmd(void) {
-    if (check_mount(true))
-        return;
-    cc(1, argc, argv);
-}
-
 static void tar_cmd(void) {
     if (check_mount(true))
         return;
@@ -718,7 +712,6 @@ cmd_t cmd_table[] = {
     {"reboot",  reboot_cmd,     "Restart the system"},
     {"resize",  resize_cmd,     "establish screen dimensions"},
     {"rm",      rm_cmd,         "remove a file or directory. -r for recursive"},
-    {"run",     run_cmd,        "run a compiled file"},
     {"status",  status_cmd,     "display the filesystem status"},
     {"tar",     tar_cmd,        "manage tar archives"},
 #if !defined(NDEBUG) || defined(PSHELL_TESTS)
@@ -767,7 +760,25 @@ static void HardFault_Handler(void) {
         __wfi();
 }
 
-static bool run_as_cmd(void) { return false; }
+static bool run_as_cmd(const char* dir) {
+    char* tfn = full_path(argv[0]);
+    char* fn = malloc(strlen(tfn) + 6);
+    strcpy(fn, dir);
+    strcat(fn, tfn);
+    char buf[4];
+    if (fs_getattr(fn, 1, buf, sizeof(buf)) != 4) {
+        free(fn);
+        return false;
+    }
+    if (memcmp(buf, "exe", 4)) {
+        free(fn);
+        return false;
+    }
+    argv[0] = fn;
+    cc(1, argc, argv);
+    free(fn);
+    return true;
+}
 
 // application entry point
 int main(void) {
@@ -843,7 +854,7 @@ int main(void) {
                     break;
                 }
             if (!found) {
-                if (!run_as_cmd())
+                if (!run_as_cmd("") && !run_as_cmd("/bin"))
                     printf("\nunknown command '%s'. hit ENTER for help\n", argv[0]);
             }
         } else
