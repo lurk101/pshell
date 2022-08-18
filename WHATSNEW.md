@@ -1,3 +1,9 @@
+What's new in version 1.2.9
+
+- executable binaries invoked directly by name, remove run command
+- executable search order is current directory followed by /bin directory
+- verify executable is compatible with current version of pshell, suggest recompile if not
+
 What's new in version 1.2.8
 
 - compiler supports the -o option to create binary executable.
