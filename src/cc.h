@@ -15,6 +15,6 @@
 #ifndef _C4_
 #define _C4_
 
-int cc(int argc, char* argv[]);
+int cc(int mode, int argc, char* argv[]);
 
 #endif

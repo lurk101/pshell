@@ -562,7 +562,13 @@ cd_done:
 static void cc_cmd(void) {
     if (check_mount(true))
         return;
-    cc(argc, argv);
+    cc(0, argc, argv);
+}
+
+static void run_cmd(void) {
+    if (check_mount(true))
+        return;
+    cc(1, argc, argv);
 }
 
 static void tar_cmd(void) {
@@ -711,6 +717,7 @@ cmd_t cmd_table[] = {
     {"reboot",  reboot_cmd,     "Restart the system"},
     {"resize",  resize_cmd,     "establish screen dimensions"},
     {"rm",      rm_cmd,         "remove a file or directory. -r for recursive"},
+    {"run",     run_cmd,        "run a compiled file"},
     {"status",  status_cmd,     "display the filesystem status"},
     {"tar",     tar_cmd,        "manage tar archives"},
 #if !defined(NDEBUG) || defined(PSHELL_TESTS)
