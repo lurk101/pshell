@@ -4129,7 +4129,7 @@ int cc(int mode, int argc, char** argv) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
             }
-            if (fs_file_write(fd, data_base, exe.dsize) != exe.dsize) {
+            if (exe.dsize && fs_file_write(fd, data_base, exe.dsize) != exe.dsize) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
             }
@@ -4160,13 +4160,17 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
-        if (strcmp(exe.pvers, pshell_version)) {
+        if (strncmp(exe.pvers, pshell_version, sizeof(exe.pvers) - 1)) {
             fs_file_close(fd);
             fd = NULL;
             fatal("version mismatch, please recompile %s", ofn);
         }
-        if (fs_file_read(fd, &__StackLimit, exe.tsize) != exe.tsize ||
-            fs_file_read(fd, &__StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
+        if (fs_file_read(fd, &__StackLimit, exe.tsize) != exe.tsize) {
+            fs_file_close(fd);
+            fd = NULL;
+            fatal("error reading %s", ofn);
+        }
+        if (exe.dsize && fs_file_read(fd, &__StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
             fs_file_close(fd);
             fd = NULL;
             fatal("error reading %s", ofn);
