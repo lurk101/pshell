@@ -3941,12 +3941,6 @@ static void add_defines(const struct define_grp* d) {
     }
 }
 
-#ifndef NDEBUG
-void __no_inline_not_in_flash_func(dummy)(void) {
-#include "cc_nops.h"
-}
-#endif
-
 struct exe_s {
     char pvers[16];
     int entry;
