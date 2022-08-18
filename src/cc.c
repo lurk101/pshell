@@ -38,7 +38,7 @@
 #define K 1024
 
 #define DATA_BYTES (16 * K)
-#define TEXT_BYTES (32 * K)
+#define TEXT_BYTES (16 * K)
 #define SYM_TBL_BYTES (16 * K)
 #define SYM_TEXT_SIZE (4 * K)
 #define TS_TBL_BYTES (2 * K)
@@ -61,6 +61,8 @@
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int prnt);
 extern void get_screen_xy(int* x, int* y);
+
+extern char __StackLimit;
 
 extern void __wrap___aeabi_idiv();
 extern void __wrap___aeabi_i2f();
@@ -85,57 +87,58 @@ struct patch_s {
     int val;
 };
 
-static char *p, *lp;            // current position in source code
-static char* data;              // data/bss pointer
-static char* data_base;         // data/bss pointer
-static int* base_sp;            // stack
+static char *p, *lp;                 // current position in source code
+static char* data;                   // data/bss pointer
+static char* data_base;              // data/bss pointer
+static int* base_sp;                 // stack
 static uint16_t *e, *le, *text_base; // current position in emitted code
 static uint16_t* ecas;               // case statement patch-up pointer
 static int* ncas;                    // case statement patch-up pointer
-static uint16_t* def;           // default statement patch-up pointer
-static struct patch_s* brks;    // break statement patch-up pointer
-static struct patch_s* cnts;    // continue statement patch-up pointer
-static struct patch_s* pcrel;   // pc relative address patch-up pointer
-static uint16_t* pcrel_1st;     // first relative load address in group
-static int pcrel_count;         // first relative load address in group
-static int swtc;                // !0 -> in a switch-stmt context
-static int brkc;                // !0 -> in a break-stmt context
-static int cntc;                // !0 -> in a continue-stmt context
-static int* tsize;              // array (indexed by type) of type sizes
-static int tnew;                // next available type
-static int tk;                  // current token
-static union conv {             //
-    int i;                      //
-    float f;                    //
-} tkv;                          // current token value
-static int ty;                  // current expression type
-                                // bit 0:1 - tensor rank, eg a[4][4][4]
-                                // 0=scalar, 1=1d, 2=2d, 3=3d
-                                //   1d etype -- bit 0:30)
-                                //   2d etype -- bit 0:15,16:30 [32768,65536]
-                                //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
-                                // bit 2:9 - type
-                                // bit 10:11 - ptr level
-static int rtf, rtt;            // return flag and return type for current function
-static int loc;                 // local variable offset
-static int lineno;              // current line number
-static int src_opt;             // print source and assembly flag
-static int uchar_opt;           // use unsigned character variables
-static int* n;                  // current position in emitted abstract syntax tree
-                                // With an AST, the compiler is not limited to generate
-                                // code on the fly with parsing.
-                                // This capability allows function parameter code to be
-                                // emitted and pushed on the stack in the proper
-                                // right-to-left order.
-static int ld;                  // local variable depth
-static int pplev, pplevt;       // preprocessor conditional level
-static int* ast;                // abstract syntax tree
-static ARMSTATE state;          // disassembler state
+static uint16_t* def;                // default statement patch-up pointer
+static struct patch_s* brks;         // break statement patch-up pointer
+static struct patch_s* cnts;         // continue statement patch-up pointer
+static struct patch_s* pcrel;        // pc relative address patch-up pointer
+static uint16_t* pcrel_1st;          // first relative load address in group
+static int pcrel_count;              // first relative load address in group
+static int swtc;                     // !0 -> in a switch-stmt context
+static int brkc;                     // !0 -> in a break-stmt context
+static int cntc;                     // !0 -> in a continue-stmt context
+static int* tsize;                   // array (indexed by type) of type sizes
+static int tnew;                     // next available type
+static int tk;                       // current token
+static union conv {                  //
+    int i;                           //
+    float f;                         //
+} tkv;                               // current token value
+static int ty;                       // current expression type
+                                     // bit 0:1 - tensor rank, eg a[4][4][4]
+                                     // 0=scalar, 1=1d, 2=2d, 3=3d
+                                     //   1d etype -- bit 0:30)
+                                     //   2d etype -- bit 0:15,16:30 [32768,65536]
+                                     //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
+                                     // bit 2:9 - type
+                                     // bit 10:11 - ptr level
+static int rtf, rtt;                 // return flag and return type for current function
+static int loc;                      // local variable offset
+static int lineno;                   // current line number
+static int src_opt;                  // print source and assembly flag
+static int uchar_opt;                // use unsigned character variables
+static int* n;                       // current position in emitted abstract syntax tree
+                                     // With an AST, the compiler is not limited to generate
+                                     // code on the fly with parsing.
+                                     // This capability allows function parameter code to be
+                                     // emitted and pushed on the stack in the proper
+                                     // right-to-left order.
+static int ld;                       // local variable depth
+static int pplev, pplevt;            // preprocessor conditional level
+static int* ast;                     // abstract syntax tree
+static ARMSTATE state;               // disassembler state
 static int exit_sp;
 static char* sym_text;
 static char* sym_text_base;
 static char line[128];
 static int line_len;
+static char* ofn;
 
 // identifier
 struct ident_s {
@@ -149,9 +152,9 @@ struct ident_s {
     int class, hclass; // FUNC, GLO (global var), LOC (local var), Syscall
     int type, htype;   // data type such as char and int
     int val, hval;
-    int etype, hetype; // extended type info. different meaning for funcs.
-    uint16_t* forward; // forward call patch address
-	uint8_t inserted : 1; // inserted in disassembler table
+    int etype, hetype;    // extended type info. different meaning for funcs.
+    uint16_t* forward;    // forward call patch address
+    uint8_t inserted : 1; // inserted in disassembler table
 };
 
 struct ident_s *id, // currently parsed identifier
@@ -414,13 +417,14 @@ static void clear_globals(void) {
     ncas = NULL;
     pcrel_1st = ecas = def = e = le = text_base = NULL;
     base_sp = tsize = n = malloc_list = NULL;
-    sym_text_base = data_base = data = p = lp = fp = sym_text = NULL;
+    data_base = data = p = lp = fp = sym_text = sym_text_base = ofn = NULL;
     id = sym = sym_base = NULL;
     pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
-    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld =
-        pplev = pplevt = pcrel_count = 0;
+    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld = pplev = pplevt =
+        pcrel_count = 0;
+    ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
     memset(&done_jmp, 0, sizeof(&done_jmp));
@@ -662,7 +666,7 @@ static void next() {
                         if (t > 255)
                             fatal("bad hexadecimal character in string");
                         tkv.i = t; // hexadecimal representation
-                        break; // an int with value 0
+                        break;     // an int with value 0
                     }
                 }
                 // if it is double quotes (string literal), it is considered as
@@ -1183,17 +1187,17 @@ static void expr(int lev) {
                 d->etype = externs[ix].etype;
                 d->name[namelen] = ch;
             }
-			if (src_opt && !d->inserted) {
-				d ->inserted;
+            if (src_opt && !d->inserted) {
+                d->inserted;
                 int namelen = d->hash & 0x3f;
                 char ch = d->name[namelen];
-            	d->name[namelen] = 0;
-				if (d->class == Func)
-					disasm_symbol(&state, d->name, d->val, ARMMODE_THUMB);
+                d->name[namelen] = 0;
+                if (d->class == Func)
+                    disasm_symbol(&state, d->name, d->val, ARMMODE_THUMB);
                 else
                     disasm_symbol(&state, d->name, (int)externs[d->val].extrn | 1, ARMMODE_THUMB);
                 d->name[namelen] = ch;
-			}
+            }
             next();
             t = 0;
             b = c = 0;
@@ -2321,14 +2325,14 @@ static void emit_enter(int n) {
             emit(0xb080 | n); // sub  sp, #n
         else {                //
             emit_load_immediate(1, loc - ld);
-            emit(0x448d);     // add sp, r1
+            emit(0x448d); // add sp, r1
         }
     }
 }
 
 static void emit_leave(void) {
-    emit(0x46bd);          // mov sp, r7
-    emit(0xbdc0);          // pop {r6, r7, pc}
+    emit(0x46bd); // mov sp, r7
+    emit(0xbdc0); // pop {r6, r7, pc}
 }
 
 static void emit_load_addr(int n) {
@@ -3392,7 +3396,7 @@ static void stmt(int ctx) {
                     dd->forward = e;
                     emit_word(0);
                     emit(0x4700); // bx  r0
-                } else { // function with body
+                } else {          // function with body
                     if (tk != '{')
                         fatal("bad function definition");
                     loc = ++ld;
@@ -3465,13 +3469,13 @@ static void stmt(int ctx) {
                 }
                 sz = (sz + 3) & -4;
                 if (ctx == Glo) {
-					if (src_opt && !dd->inserted) {
+                    if (src_opt && !dd->inserted) {
                         int len = dd->hash & 0x3f;
                         char ch = dd->name[len];
-						dd->name[len] = 0;
-						disasm_symbol(&state, dd->name, (int)data, ARMMODE_THUMB);
-						dd->name[len] = ch;
-					}
+                        dd->name[len] = 0;
+                        disasm_symbol(&state, dd->name, (int)data, ARMMODE_THUMB);
+                        dd->name[len] = ch;
+                    }
                     dd->val = (int)data;
                     if (data + sz >= data_base + (DATA_BYTES / 4))
                         fatal("program data exceeds data segment");
@@ -3895,8 +3899,10 @@ static void show_externals(int i) {
 static void help(char* lib) {
     if (!lib) {
         printf("\n"
-               "usage: cc [-s] [-u] [-h [lib]] [-D [symbol[ = value]]] filename\n"
+               "usage: cc [-s] [-u] [-h [lib]] [-D [symbol[ = value]]]\n"
+               "          [-o filename] filename\n"
                "    -s      display disassembly and quit.\n"
+               "    -o      name of executable output file.\n"
                "    -u      treat char type as unsigned\n"
                "    -D symbol [= value]\n"
                "            define symbol for limited pre-processor, can repeat\n"
@@ -3941,164 +3947,237 @@ void __no_inline_not_in_flash_func(dummy)(void) {
 }
 #endif
 
-int cc(int argc, char** argv) {
+struct exe_s {
+    int entry;
+    int tsize;
+    int dsize;
+};
+
+int cc(int mode, int argc, char** argv) {
 
     clear_globals();
 
     int rslt = -1;
+    struct exe_s exe;
+
     if (setjmp(done_jmp))
         goto done;
 
-    sym_base = sym = sys_malloc(SYM_TBL_BYTES, 1);
-    sym_text_base = sym_text = sys_malloc(SYM_TEXT_SIZE, 1);
+    if (mode == 0) {
+        sym_base = sym = sys_malloc(SYM_TBL_BYTES, 1);
+        sym_text_base = sym_text = sys_malloc(SYM_TEXT_SIZE, 1);
 
-    // Register keywords in symbol stack. Must match the sequence of enum
-    p = "enum char int float struct union sizeof return goto break continue "
-        "if do while for switch case default else void main";
+        // Register keywords in symbol stack. Must match the sequence of enum
+        p = "enum char int float struct union sizeof return goto break continue "
+            "if do while for switch case default else void main";
 
-    // call "next" to create symbol table entry.
-    // store the keyword's token type in the symbol table entry's "tk" field.
-    for (int i = Enum; i <= Else; ++i) {
+        // call "next" to create symbol table entry.
+        // store the keyword's token type in the symbol table entry's "tk" field.
+        for (int i = Enum; i <= Else; ++i) {
+            next();
+            id->tk = i;
+            id->class = Keyword; // add keywords to symbol table
+        }
+
         next();
-        id->tk = i;
-        id->class = Keyword; // add keywords to symbol table
-    }
 
-    next();
+        id->tk = Char;
+        id->class = Keyword; // handle void type
+        next();
+        struct ident_s* idmain = id;
+        id->class = Main; // keep track of main
 
-    id->tk = Char;
-    id->class = Keyword; // handle void type
-    next();
-    struct ident_s* idmain = id;
-    id->class = Main; // keep track of main
+        data_base = data = &__StackLimit + TEXT_BYTES;
+        memset(&__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
+        tsize = sys_malloc(TS_TBL_BYTES, 1);
+        ast = sys_malloc(AST_TBL_BYTES, 1);
+        n = ast + (AST_TBL_BYTES / 4) - 1;
 
-    data_base = data = sys_malloc(DATA_BYTES, 1);
-    tsize = sys_malloc(TS_TBL_BYTES, 1);
-    ast = sys_malloc(AST_TBL_BYTES, 1);
-    n = ast + (AST_TBL_BYTES / 4) - 1;
+        // add primitive types
+        tsize[tnew++] = sizeof(char);
+        tsize[tnew++] = sizeof(int);
+        tsize[tnew++] = sizeof(float);
+        tsize[tnew++] = 0; // reserved for another scalar type
 
-    // add primitive types
-    tsize[tnew++] = sizeof(char);
-    tsize[tnew++] = sizeof(int);
-    tsize[tnew++] = sizeof(float);
-    tsize[tnew++] = 0; // reserved for another scalar type
-
-    --argc;
-    ++argv;
-    char* lib_name = NULL;
-    while (argc > 0 && **argv == '-') {
-        if ((*argv)[1] == 'h') {
-            --argc;
-            ++argv;
-            if (argc)
-                lib_name = *argv;
-            help(lib_name);
-            goto done;
-        } else if ((*argv)[1] == 's') {
-            src_opt = 1;
-        } else if ((*argv)[1] == 'u') {
-            uchar_opt = 1;
-        } else if ((*argv)[1] == 'D') {
-            p = &(*argv)[2];
-            next();
-            if (tk != Id)
-                fatal("bad -D identifier");
-            struct ident_s* dd = id;
-            next();
-            int i = 0;
-            if (tk == Assign) {
-                next();
-                expr(Cond);
-                if (ast_Tk(n) != Num)
-                    fatal("bad -D initializer");
-                i = ast_NumVal(n);
-                n += 2;
-            }
-            dd->class = Num;
-            dd->type = INT;
-            dd->val = i;
-        } else
-            argc = 0; // bad compiler option. Force exit.
         --argc;
         ++argv;
-    }
-    if (argc < 1) {
-        help(NULL);
-        goto done;
-    }
+        char* lib_name = NULL;
+        while (argc > 0 && **argv == '-') {
+            if ((*argv)[1] == 'h') {
+                --argc;
+                ++argv;
+                if (argc)
+                    lib_name = *argv;
+                help(lib_name);
+                goto done;
+            } else if ((*argv)[1] == 's') {
+                src_opt = 1;
+            } else if ((*argv)[1] == 'o') {
+                --argc;
+                ++argv;
+                if (argc)
+                    ofn = *argv;
+            } else if ((*argv)[1] == 'u') {
+                uchar_opt = 1;
+            } else if ((*argv)[1] == 'D') {
+                p = &(*argv)[2];
+                next();
+                if (tk != Id)
+                    fatal("bad -D identifier");
+                struct ident_s* dd = id;
+                next();
+                int i = 0;
+                if (tk == Assign) {
+                    next();
+                    expr(Cond);
+                    if (ast_Tk(n) != Num)
+                        fatal("bad -D initializer");
+                    i = ast_NumVal(n);
+                    n += 2;
+                }
+                dd->class = Num;
+                dd->type = INT;
+                dd->val = i;
+            } else
+                argc = 0; // bad compiler option. Force exit.
+            --argc;
+            ++argv;
+        }
+        if (argc < 1) {
+            help(NULL);
+            goto done;
+        }
 
-    if (src_opt) {
-        disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
-        disasm_symbol(&state, "idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
-        disasm_symbol(&state, "i2f", (uint32_t)__wrap___aeabi_i2f, ARMMODE_THUMB);
-        disasm_symbol(&state, "f2i", (uint32_t)__wrap___aeabi_f2iz, ARMMODE_THUMB);
-        disasm_symbol(&state, "fadd", (uint32_t)__wrap___aeabi_fadd, ARMMODE_THUMB);
-        disasm_symbol(&state, "fsub", (uint32_t)__wrap___aeabi_fsub, ARMMODE_THUMB);
-        disasm_symbol(&state, "fmul", (uint32_t)__wrap___aeabi_fmul, ARMMODE_THUMB);
-        disasm_symbol(&state, "fdiv", (uint32_t)__wrap___aeabi_fdiv, ARMMODE_THUMB);
-        disasm_symbol(&state, "fcmple", (uint32_t)__wrap___aeabi_fcmple, ARMMODE_THUMB);
-        disasm_symbol(&state, "fcmpge", (uint32_t)__wrap___aeabi_fcmpge, ARMMODE_THUMB);
-        disasm_symbol(&state, "fcmpgt", (uint32_t)__wrap___aeabi_fcmpgt, ARMMODE_THUMB);
-        disasm_symbol(&state, "fcmplt", (uint32_t)__wrap___aeabi_fcmplt, ARMMODE_THUMB);
-    }
-    add_defines(stdio_defines);
-    add_defines(gpio_defines);
-    add_defines(pwm_defines);
-    add_defines(clk_defines);
-    add_defines(i2c_defines);
-    add_defines(spi_defines);
-    add_defines(irq_defines);
+        if (src_opt) {
+            disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
+            disasm_symbol(&state, "idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
+            disasm_symbol(&state, "i2f", (uint32_t)__wrap___aeabi_i2f, ARMMODE_THUMB);
+            disasm_symbol(&state, "f2i", (uint32_t)__wrap___aeabi_f2iz, ARMMODE_THUMB);
+            disasm_symbol(&state, "fadd", (uint32_t)__wrap___aeabi_fadd, ARMMODE_THUMB);
+            disasm_symbol(&state, "fsub", (uint32_t)__wrap___aeabi_fsub, ARMMODE_THUMB);
+            disasm_symbol(&state, "fmul", (uint32_t)__wrap___aeabi_fmul, ARMMODE_THUMB);
+            disasm_symbol(&state, "fdiv", (uint32_t)__wrap___aeabi_fdiv, ARMMODE_THUMB);
+            disasm_symbol(&state, "fcmple", (uint32_t)__wrap___aeabi_fcmple, ARMMODE_THUMB);
+            disasm_symbol(&state, "fcmpge", (uint32_t)__wrap___aeabi_fcmpge, ARMMODE_THUMB);
+            disasm_symbol(&state, "fcmpgt", (uint32_t)__wrap___aeabi_fcmpgt, ARMMODE_THUMB);
+            disasm_symbol(&state, "fcmplt", (uint32_t)__wrap___aeabi_fcmplt, ARMMODE_THUMB);
+        }
+        add_defines(stdio_defines);
+        add_defines(gpio_defines);
+        add_defines(pwm_defines);
+        add_defines(clk_defines);
+        add_defines(i2c_defines);
+        add_defines(spi_defines);
+        add_defines(irq_defines);
 
-    char* fn = sys_malloc(strlen(full_path(*argv)) + 3, 1);
-    strcpy(fn, full_path(*argv));
-    if (strrchr(fn, '.') == NULL)
-        strcat(fn, ".c");
-    fd = sys_malloc(sizeof(lfs_file_t), 1);
-    if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
-        sys_free(fd);
-        fd = NULL;
-        fatal("could not open %s \n", fn);
-    }
-    sys_free(fn);
+        char* fn = sys_malloc(strlen(full_path(*argv)) + 3, 1);
+        strcpy(fn, full_path(*argv));
+        if (strrchr(fn, '.') == NULL)
+            strcat(fn, ".c");
+        fd = sys_malloc(sizeof(lfs_file_t), 1);
+        if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
+            sys_free(fd);
+            fd = NULL;
+            fatal("could not open %s \n", fn);
+        }
+        sys_free(fn);
 
 #ifdef NDEBUG
-    text_base = le = sys_malloc(TEXT_BYTES, 1);
+        text_base = le = (uint16_t*)&__StackLimit;
 #else
-    text_base = le = sys_malloc(TEXT_BYTES, 1);
-    // text_base = le = (uint16_t*)((int)dummy & ~1);
+        text_base = le = (uint16_t*)&__StackLimit;
 #endif
-    e = text_base - 1;
-    members = sys_malloc(MEMBER_DICT_BYTES, 1);
+        e = text_base - 1;
+        members = sys_malloc(MEMBER_DICT_BYTES, 1);
 
-    get_line();
+        get_line();
 
-    // parse the program
-    pplevt = -1;
-    next();
-    while (tk) {
-        stmt(Glo);
+        // parse the program
+        pplevt = -1;
         next();
+        while (tk) {
+            stmt(Glo);
+            next();
+        }
+        // check for unpatched forward JMPs
+        for (struct ident_s* scan = sym; scan->tk; ++scan)
+            if (scan->class == Func && scan->forward)
+                fatal("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
+        fs_file_close(fd);
+        sys_free(fd);
+        fd = NULL;
+        sys_free(ast);
+        ast = NULL;
+        sys_free(sym_base);
+        sym_base = NULL;
+        sys_free(sym_text_base);
+        sym_text_base = NULL;
+        sys_free(tsize);
+        tsize = NULL;
+        if (!idmain->val)
+            fatal("main() not defined\n");
+        exe.entry = idmain->val;
+        if (ofn) {
+            fd = sys_malloc(sizeof(lfs_file_t), 1);
+            char* cp = full_path(ofn);
+            if (fs_file_open(fd, cp, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
+                sys_free(fd);
+                fd = NULL;
+                fatal("could not create %s\n", full_path(ofn));
+            }
+            exe.tsize = ((e + 1) - text_base) * sizeof(*e);
+            exe.dsize = data - data_base;
+            if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
+                fs_file_close(fd);
+                fatal("error writing executable file");
+            }
+            if (fs_file_write(fd, text_base, exe.tsize) != exe.tsize) {
+                fs_file_close(fd);
+                fatal("error writing executable file");
+            }
+            if (fs_file_write(fd, data_base, exe.dsize) != exe.dsize) {
+                fs_file_close(fd);
+                fatal("error writing executable file");
+            }
+            fs_file_close(fd);
+            sys_free(fd);
+            fd = NULL;
+            if (fs_setattr(full_path(ofn), 1, "exe", 4) < LFS_ERR_OK)
+                fatal("unable to set executable attribute");
+            goto done;
+        }
+        if (src_opt)
+            goto done;
+    } else {
+        argc--;
+        argc++;
+        if (argc < 2)
+            fatal("specify executable file name");
+        ofn = full_path(argv[1]);
+        char buf[4];
+        if (fs_getattr(ofn, 1, buf, sizeof(buf)) != 4)
+            fatal("file %s not found or not executable", ofn);
+        if (memcmp(buf, "exe", 4))
+            fatal("file %s not found or not executable", ofn);
+        fd = sys_malloc(sizeof(lfs_file_t), 1);
+        if (fs_file_open(fd, ofn, LFS_O_RDONLY) < LFS_ERR_OK)
+            fatal("can't open file %s", ofn);
+        if (fs_file_read(fd, &exe, sizeof(exe)) != sizeof(exe)) {
+            fs_file_close(fd);
+            fatal("error reading %s", ofn);
+        }
+        if (fs_file_read(fd, &__StackLimit, exe.tsize) != exe.tsize) {
+            fs_file_close(fd);
+            fatal("error reading %s", ofn);
+        }
+        if (fs_file_read(fd, &__StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
+            fs_file_close(fd);
+            fatal("error reading %s", ofn);
+        }
+        fs_file_close(fd);
+        sys_free(fd);
+        fd = NULL;
     }
-    // check for unpatched forward JMPs
-    for (struct ident_s* scan = sym; scan->tk; ++scan)
-        if (scan->class == Func && scan->forward)
-            fatal("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
-    fs_file_close(fd);
-    sys_free(fd);
-    fd = NULL;
-    sys_free(ast);
-    ast = NULL;
-    sys_free(sym_base);
-    sym_base = NULL;
-    sys_free(sym_text_base);
-    sym_text_base = NULL;
-    sys_free(tsize);
-    tsize = NULL;
-    if (!idmain->val)
-        fatal("main() not defined\n");
-
-    if (src_opt)
-        goto done;
 
     printf("\n");
     asm volatile("mov  r0, %1 \n"
@@ -4108,7 +4187,7 @@ int cc(int argc, char** argv) {
                  "mov  r1, %3 \n"
                  "mov  %0, sp \n"
                  : "=r"(exit_sp)
-                 : "r"(argc), "r"(argv), "r"(idmain->val | 1));
+                 : "r"(argc), "r"(argv), "r"(exe.entry | 1));
     asm volatile("blx  r1     \n"
                  "add  sp, #8 \n"
                  "mov  %0, r0 \n"
@@ -4126,10 +4205,8 @@ done:
             fs_file_close(&file_list->u.file);
         file_list = file_list->next;
     }
-    while (malloc_list) {
-        // printf("%08x %d\n", (int)malloc_list, *((int*)malloc_list + 1));
+    while (malloc_list)
         sys_free(malloc_list + 2);
-    }
 
     return rslt;
 }

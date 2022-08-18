@@ -29,7 +29,7 @@ void run_tests(int ac, char* av[]) {
                 char* t_av[2] = {"cc"};
                 t_av[1] = strdup(full_path(info.name));
                 printf("cc %s\n", t_av[1]);
-                if (cc(2, t_av) != 0) {
+                if (cc(0, 2, t_av) != 0) {
                     free(t_av[1]);
                     break;
                 }
