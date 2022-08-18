@@ -1,3 +1,8 @@
+What's new in version 1.2.8
+
+- compiler supports the -o option to create binary executable.
+- run command added to run binary executable, till further intgration
+
 What's new in version 1.2.7
 
 - for compatibility use Unix values for O_RDONLY, O_WRONLY, etc, and translate them automatically to LFS mode values.
