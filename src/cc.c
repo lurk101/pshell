@@ -2075,6 +2075,7 @@ static void expr(int lev) {
         }
     }
 }
+
 static void init_array(struct ident_s* tn, int extent[], int dim) {
     int i, cursor, match, coff = 0, off, empty, *vi;
     int inc[3];
@@ -3515,6 +3516,8 @@ static void stmt(int ctx) {
                 }
                 sz = (sz + 3) & -4;
                 if (ctx == Glo) {
+                    if (sz > 1)
+                        data = (char*)(((int)data + 3) & ~3);
                     if (src_opt && !dd->inserted) {
                         int len = dd->hash & 0x3f;
                         char ch = dd->name[len];
