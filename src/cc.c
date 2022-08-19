@@ -494,6 +494,8 @@ static int extern_search(char* name) // get cache index of external function
     return -1;
 }
 
+static void expr(int lev);
+
 /* parse next token
  * 1. store data into id and then set the id to current lexcial form
  * 2. set tk to appropriate type
@@ -597,11 +599,18 @@ static void next() {
                 p += 6;
                 next();
                 if (tk == Id) {
+                    while (*p == ' ' || *p == '\t')
+                        ++p;
+                    t2 = 0;
+                    if (*p == '-') {
+                        t2 = 1;
+                        ++p;
+                    }
                     next();
                     if (tk == Num) {
                         id->class = Num;
                         id->type = INT;
-                        id->val = tkv.i;
+                        id->val = t2 ? -tkv.i : tkv.i;
                     }
                 }
             } else if ((t = !strncmp(p, "ifdef", 5)) || !strncmp(p, "ifndef", 6)) {
@@ -4205,7 +4214,7 @@ int cc(int mode, int argc, char** argv) {
     } else {
         if (argc < 1)
             fatal("specify executable file name");
-        ofn = full_path(argv[0]);
+        ofn = argv[0];
         char buf[4];
         if (fs_getattr(ofn, 1, buf, sizeof(buf)) != 4)
             fatal("file %s not found or not executable", ofn);
@@ -4250,8 +4259,6 @@ int cc(int mode, int argc, char** argv) {
         fs_file_close(fd);
         sys_free(fd);
         fd = NULL;
-        argc--;
-        argv++;
     }
 
     printf("\n");
