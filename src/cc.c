@@ -77,15 +77,39 @@ extern void __wrap___aeabi_fcmplt();
 extern void __wrap___aeabi_fcmpge();
 
 enum {
-    pc_relative = 0,
+    aeabi_idiv = 1,
+    aeabi_i2f,
+    aeabi_f2iz,
+    aeabi_fadd,
+    aeabi_fsub,
+    aeabi_fmul,
+    aeabi_fdiv,
+    aeabi_fcmple,
+    aeabi_fcmpgt,
+    aeabi_fcmplt,
+    aeabi_fcmpge
 };
+
+static void (*fops[])() = {__wrap___aeabi_idiv,   __wrap___aeabi_i2f,    __wrap___aeabi_f2iz,
+                           __wrap___aeabi_fadd,   __wrap___aeabi_fsub,   __wrap___aeabi_fmul,
+                           __wrap___aeabi_fdiv,   __wrap___aeabi_fcmple, __wrap___aeabi_fcmpgt,
+                           __wrap___aeabi_fcmplt, __wrap___aeabi_fcmpge};
 
 struct patch_s {
     struct patch_s* next;
     struct patch_s* locs;
     uint16_t* addr;
     int val;
+    int ext;
 };
+
+struct reloc_s {
+    struct reloc_s* next;
+    int addr;
+};
+
+static struct reloc_s* relocs;
+static int nrelocs;
 
 static char *p, *lp;                 // current position in source code
 static char* data;                   // data/bss pointer
@@ -414,6 +438,7 @@ static lfs_file_t* fd;
 static char* fp;
 
 static void clear_globals(void) {
+    relocs = NULL;
     ncas = NULL;
     pcrel_1st = ecas = def = e = le = text_base = NULL;
     base_sp = tsize = n = malloc_list = NULL;
@@ -423,7 +448,7 @@ static void clear_globals(void) {
     fd = NULL;
     file_list = NULL;
     swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld = pplev = pplevt =
-        pcrel_count = 0;
+        pcrel_count = nrelocs = 0;
     ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
@@ -2232,6 +2257,49 @@ static void emit_word(uint32_t n) {
     ++e;
 }
 
+static void emit_load_long_imm(int r, int val, int ext) {
+    emit(0x4800 | (r << 8)); // ldr rr,[pc + offset n]
+    struct patch_s* p = pcrel;
+    while (p) {
+        if (p->val == val)
+            break;
+        p = p->next;
+    }
+    if (!p) {
+        ++pcrel_count;
+        if (pcrel_1st == 0)
+            pcrel_1st = e;
+        p = sys_malloc(sizeof(struct patch_s), 1);
+        p->val = val;
+        p->ext = ext;
+        if (pcrel == 0)
+            pcrel = p;
+        else {
+            struct patch_s* p2 = pcrel;
+            while (p2->next)
+                p2 = p2->next;
+            p2->next = p;
+        }
+    }
+    struct patch_s* pl = sys_malloc(sizeof(struct patch_s), 1);
+    pl->addr = e;
+    pl->next = p->locs;
+    p->locs = pl;
+}
+
+static void emit_load_immediate(int r, int val) {
+    if (val >= 0 && val < 256) {       //
+        emit(0x2000 | val | (r << 8)); // movs rr, #n
+        return;
+    }
+    if (-val >= 0 && -val < 256) {
+        emit(0x2000 | -val | (r << 8)); // movs rr, #n
+        emit(0x4240 | (r << 3) | r);    // negs rr, rr
+        return;
+    }
+    emit_load_long_imm(r, val, 0);
+}
+
 static void patch_pc_relative(int brnch) {
     int rel_count = pcrel_count;
     pcrel_count = 0;
@@ -2264,6 +2332,13 @@ static void patch_pc_relative(int brnch) {
             sys_free(pl);
         }
         emit_word(p->val);
+        if (ofn && p->ext) {
+            struct reloc_s* r = sys_malloc(sizeof(struct reloc_s), 1);
+            r->addr = (int)(e - 1);
+            r->next = relocs;
+            relocs = r;
+            nrelocs++;
+        }
         pcrel = p->next;
         sys_free(p);
     }
@@ -2277,44 +2352,6 @@ static void check_pc_relative(void) {
     int ta = (int)pcrel_1st;
     if ((te - ta) > 1000)
         patch_pc_relative(1);
-}
-
-static void emit_load_immediate(int r, int val) {
-    if (val >= 0 && val < 256) {       //
-        emit(0x2000 | val | (r << 8)); // movs rr, #n
-        return;
-    }
-    if (-val >= 0 && -val < 256) {
-        emit(0x2000 | -val | (r << 8)); // movs rr, #n
-        emit(0x4240 | (r << 3) | r);    // negs rr, rr
-        return;
-    }
-    emit(0x4800 | (r << 8)); // ldr rr,[pc + offset n]
-    struct patch_s* p = pcrel;
-    while (p) {
-        if (p->val == val)
-            break;
-        p = p->next;
-    }
-    if (!p) {
-        ++pcrel_count;
-        if (pcrel_1st == 0)
-            pcrel_1st = e;
-        p = sys_malloc(sizeof(struct patch_s), 1);
-        p->val = val;
-        if (pcrel == 0)
-            pcrel = p;
-        else {
-            struct patch_s* p2 = pcrel;
-            while (p2->next)
-                p2 = p2->next;
-            p2->next = p;
-        }
-    }
-    struct patch_s* pl = sys_malloc(sizeof(struct patch_s), 1);
-    pl->addr = e;
-    pl->next = p->locs;
-    p->locs = pl;
 }
 
 static void emit_enter(int n) {
@@ -2391,6 +2428,14 @@ static void emit_branch(uint16_t* to) {
         emit(0xe000 | (ofs & 0x7ff)); // JMP n
     else
         emit_call((int)(to + 2));
+}
+
+static void emit_fop(int n) {
+    if (!ofn)
+        emit_load_long_imm(2, (int)fops[n - 1], 0);
+    else
+        emit_load_long_imm(2, -n, 1);
+    emit(0x4790); // blx r2
 }
 
 static void emit_cond_branch(uint16_t* to, int cond) {
@@ -2512,8 +2557,7 @@ static void emit_oper(int op) {
     case MOD:
         emit(0x4601); // mov r1, r0
         emit_pop(0);  // pop {r0}
-        emit_load_immediate(2, (int)__wrap___aeabi_idiv);
-        emit(0x4790); // blx r2
+        emit_fop(aeabi_idiv);
         if (op == MOD)
             emit(0x4608); // mov r0,r1
         break;
@@ -2540,33 +2584,32 @@ static void emit_float_oper(int op) {
         }
         switch (op) {
         case ADDF:
-            emit_load_immediate(2, (int)__wrap___aeabi_fadd);
+            emit_fop((int)aeabi_fadd);
             break;
         case SUBF:
-            emit_load_immediate(2, (int)__wrap___aeabi_fsub);
+            emit_fop((int)aeabi_fsub);
             break;
         case MULF:
-            emit_load_immediate(2, (int)__wrap___aeabi_fmul);
+            emit_fop((int)aeabi_fmul);
             break;
         case DIVF:
-            emit_load_immediate(2, (int)__wrap___aeabi_fdiv);
+            emit_fop((int)aeabi_fdiv);
             break;
         case GEF:
-            emit_load_immediate(2, (int)__wrap___aeabi_fcmpge);
+            emit_fop((int)aeabi_fcmpge);
             break;
         case LTF:
-            emit_load_immediate(2, (int)__wrap___aeabi_fcmplt);
+            emit_fop((int)aeabi_fcmplt);
             break;
         case GTF:
-            emit_load_immediate(2, (int)__wrap___aeabi_fcmpgt);
+            emit_fop((int)aeabi_fcmpgt);
             break;
         case LEF:
-            emit_load_immediate(2, (int)__wrap___aeabi_fcmple);
+            emit_fop((int)aeabi_fcmple);
             break;
         default:
             fatal("unexpected compiler error");
         }
-        emit(0x4790); // blx r2
         break;
 
     case EQF:
@@ -2581,15 +2624,9 @@ static void emit_float_oper(int op) {
     }
 }
 
-static void emit_ftoi() {
-    emit_load_immediate(2, (int)__wrap___aeabi_f2iz);
-    emit(0x4790); // blx r2
-}
+static void emit_ftoi() { emit_fop((int)aeabi_f2iz); }
 
-static void emit_itof() {
-    emit_load_immediate(2, (int)__wrap___aeabi_i2f);
-    emit(0x4790); // blx r2
-}
+static void emit_itof() { emit_fop((int)aeabi_i2f); }
 
 static void emit_cast(int n) {
     switch (n) {
@@ -2633,17 +2670,26 @@ static void emit_syscall(int n, int np) {
     const struct externs_s* p = externs + n;
     if (p->is_printf) {
         emit_load_immediate(0, np);
-        emit_load_immediate(6, (int)x_printf);
+        if (!ofn)
+            emit_load_long_imm(6, (int)x_printf, 0);
+        else
+            emit_load_long_imm(6, 1000, 1);
     } else if (p->is_sprintf) {
         emit_load_immediate(0, np);
-        emit_load_immediate(6, (int)x_sprintf);
+        if (!ofn)
+            emit_load_long_imm(6, (int)x_sprintf, 0);
+        else
+            emit_load_long_imm(6, 1001, 1);
     } else {
         int np = p->etype & ADJ_MASK;
         if (np > 4)
             np = 4;
         while (np--)
             emit_pop(np);
-        emit_load_immediate(6, (int)p->extrn);
+        if (!ofn)
+            emit_load_long_imm(6, (int)p->extrn, 1);
+        else
+            emit_load_long_imm(6, n, 1);
     }
     emit(0x47b0); // blx r6
 }
@@ -3942,10 +3988,10 @@ static void add_defines(const struct define_grp* d) {
 }
 
 struct exe_s {
-    char pvers[16];
     int entry;
     int tsize;
     int dsize;
+    int nreloc;
 };
 
 int cc(int mode, int argc, char** argv) {
@@ -4117,10 +4163,9 @@ int cc(int mode, int argc, char** argv) {
                 fd = NULL;
                 fatal("could not create %s\n", full_path(ofn));
             }
-            strncpy(exe.pvers, pshell_version, sizeof(exe.pvers) - 1);
-            exe.pvers[sizeof(exe.pvers) - 1] = 0;
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
             exe.dsize = data - data_base;
+            exe.nreloc = nrelocs;
             if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
@@ -4133,13 +4178,23 @@ int cc(int mode, int argc, char** argv) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
             }
+            while (relocs) {
+                if (fs_file_write(fd, &relocs->addr, sizeof(relocs->addr)) !=
+                    sizeof(relocs->addr)) {
+                    fs_file_close(fd);
+                    fatal("error writing executable file");
+                }
+                struct reloc_s* r = relocs->next;
+                sys_free(relocs);
+                relocs = r;
+            }
             fs_file_close(fd);
             sys_free(fd);
             fd = NULL;
             if (fs_setattr(full_path(ofn), 1, "exe", 4) < LFS_ERR_OK)
                 fatal("unable to set executable attribute");
-            printf("\ntext  %06x\ndata  %06x\nentry %06x\n", exe.tsize, exe.dsize,
-                   exe.entry - (int)__StackLimit);
+            printf("\ntext  %06x\ndata  %06x\nentry %06x\nreloc %06x\n", exe.tsize, exe.dsize,
+                   exe.entry - (int)__StackLimit, exe.nreloc);
             goto done;
         }
         if (src_opt)
@@ -4160,11 +4215,6 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
-        if (strncmp(exe.pvers, pshell_version, sizeof(exe.pvers) - 1)) {
-            fs_file_close(fd);
-            fd = NULL;
-            fatal("version mismatch, please recompile %s", ofn);
-        }
         if (fs_file_read(fd, &__StackLimit, exe.tsize) != exe.tsize) {
             fs_file_close(fd);
             fd = NULL;
@@ -4174,6 +4224,25 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fd = NULL;
             fatal("error reading %s", ofn);
+        }
+        for (int i = 0; i < exe.nreloc; i++) {
+            int addr;
+            if (fs_file_read(fd, &addr, sizeof(addr)) != sizeof(addr)) {
+                fs_file_close(fd);
+                fd = NULL;
+                fatal("error reading %s", ofn);
+            }
+            int v = *((int*)addr);
+            if (v < 0)
+                *((int*)addr) = (int)fops[-v - 1];
+            else {
+                if (v == 1000)
+                    *((int*)addr) = (int)x_printf;
+                else if (v == 1001)
+                    *((int*)addr) = (int)x_sprintf;
+                else
+                    *((int*)addr) = (int)externs[v].extrn;
+            }
         }
         fs_file_close(fd);
         sys_free(fd);
