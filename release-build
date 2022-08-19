@@ -16,5 +16,5 @@ make -j4
 cp *.elf *.hex *.bin *.uf2 ..
 cd ..
 rm -rf release
-tar czf pshel_$1.tgz *.elf *.hex *.bin *.uf2
+tar czf pshell_$1.tgz *.elf *.hex *.bin *.uf2
 rm *.elf *.hex *.bin *.uf2
