@@ -1,3 +1,7 @@
+What's new in version 1.2.10
+
+- binary executable now pshell version independent
+
 What's new in version 1.2.9
 
 - executable binaries invoked directly by name, remove run command
