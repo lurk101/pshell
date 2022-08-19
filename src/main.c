@@ -761,7 +761,14 @@ static void HardFault_Handler(void) {
 }
 
 static bool run_as_cmd(const char* dir) {
-    char* tfn = full_path(argv[0]);
+    char* tfn;
+    if (strlen(dir) == 0)
+        tfn = full_path(argv[0]);
+    else {
+        if (argv[0][0] == '/')
+            return false;
+        tfn = argv[0];
+    }
     char* fn = malloc(strlen(tfn) + 6);
     strcpy(fn, dir);
     strcat(fn, tfn);
@@ -854,7 +861,7 @@ int main(void) {
                     break;
                 }
             if (!found) {
-                if (!run_as_cmd("") && !run_as_cmd("/bin"))
+                if (!run_as_cmd("") && !run_as_cmd("/bin/"))
                     printf("\nunknown command '%s'. hit ENTER for help\n", argv[0]);
             }
         } else

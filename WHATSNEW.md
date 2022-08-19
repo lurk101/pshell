@@ -1,6 +1,7 @@
 What's new in version 1.2.10
 
 - binary executable now pshell version independent
+- fix search path bug
 
 What's new in version 1.2.9
 
