@@ -2178,13 +2178,13 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
     } while (1);
 }
 
-static uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc02};
+static uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc40};
 static uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
-static uint16_t rep0[] = {0x4639, 0x2000};
+static uint16_t rep0[] = {0x463e, 0x2000};
 
-static uint16_t pat1[] = {0x4800, 0xb401, 0x2000, 0xbc02};
+static uint16_t pat1[] = {0x6800, 0xb401, 0x2000, 0xbc40};
 static uint16_t msk1[] = {0xff00, 0xffff, 0xff00, 0xffff};
-static uint16_t rep1[] = {0x4900, 0x2000};
+static uint16_t rep1[] = {0x6806, 0x2000};
 
 static uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
 static uint16_t msk2[] = {0xff00, 0xffff, 0xffff};
@@ -2200,16 +2200,16 @@ static const struct segs {
 } segments[] = {
 
     // FROM:		   	  TO:
-    // mov  r0, r7		  mov  r1,r7
+    // mov  r0, r7		  mov  r6,r7
     // push {r0}		  movs r0,#n
     // movs r0,#n
-    // pop  {r1}
+    // pop  {r6}
     {numof(pat0), numof(rep0), pat0, msk0, rep0, {2, 1, -1, -1}},
 
-    // ldr  r0,[r0,#n0]   ldr  r1,[r0,#n0]
+    // ldr  r0,[r0,#n0]   ldr  r6,[r0,#n0]
     // push {r0}		  movs r0,#n1
     // movs r0, #n1
-    // pop  {r1}
+    // pop  {r6}
     {numof(pat1), numof(rep1), pat1, msk1, rep1, {0, 0, 2, 1}},
 
     // movs r0,#n         mov  r0,r7
@@ -2371,8 +2371,8 @@ static void emit_enter(int n) {
         if (n < 128)          //
             emit(0xb080 | n); // sub  sp, #n
         else {                //
-            emit_load_immediate(1, loc - ld);
-            emit(0x448d); // add sp, r1
+            emit_load_immediate(6, loc - ld);
+            emit(0x44b5); // add sp, r6
         }
     }
 }
@@ -2384,11 +2384,11 @@ static void emit_leave(void) {
 
 static void emit_load_addr(int n) {
     if (n == -1) {
-        emit(0x4638); // mov r0, r7
+        emit(0x4638); // mov r0,r7
         return;
     }
     emit_load_immediate(0, (n + 1) * 4);
-    emit(0x4438); // add r0, r7
+    emit(0x4438); // add r0,r7
 }
 
 static void emit_push(int n) {
@@ -2400,14 +2400,14 @@ static void emit_pop(int n) {
 }
 
 static void emit_store(int n) {
-    emit_pop(1);
+    emit_pop(6);
     switch (n) {
     case SC:
-        emit(0x7008); // strb r0, [r1, #0]
+        emit(0x7030); // strb r0,[r6,#0]
         break;
     case SI:
     case SF:
-        emit(0x6008); // str r0, [r1, #0]
+        emit(0x6030); // str r0,[r6,#0]
         break;
     default:
         fatal("unexpected compiler error");
@@ -2494,38 +2494,38 @@ static void emit_cond_branch(uint16_t* to, int cond) {
 static void emit_oper(int op) {
     switch (op) {
     case OR:
-        emit_pop(1);
-        emit(0x4308);
+        emit_pop(6);
+        emit(0x4330); // orrs r0,r6
         break;
     case XOR:
-        emit_pop(1);
-        emit(0x4048);
+        emit_pop(6);
+        emit(0x4070); // eors r0,r6
         break;
     case AND:
-        emit_pop(1);
-        emit(0x4008);
+        emit_pop(6);
+        emit(0x4030); // ands r0,r6
         break;
     case SHL:
-        emit(0x4601); // mov r1, r0
+        emit(0x4606); // mov r6,r0
         emit_pop(0);
-        emit(0x4088);
+        emit(0x40b0); // lsls r0,r6
         break;
     case SHR:
-        emit(0x4601); // mov r1, r0
+        emit(0x4606); // mov r6, r0
         emit_pop(0);
-        emit(0x4108);
+        emit(0x4130); // asrs r0,r6
         break;
     case SUB:
-        emit_pop(1);
-        emit(0x1a08); // subs    r0, r1, r0;
+        emit_pop(6);
+        emit(0x1a30); // subs r0,r6,r0;
         break;
     case ADD:
-        emit_pop(1);
-        emit(0x1840); // adds    r0, r0, r1;
+        emit_pop(6);
+        emit(0x1980); // adds r0,r6;
         break;
     case MUL:
-        emit_pop(1);
-        emit(0x4348); // muls    r0, r1;
+        emit_pop(6);
+        emit(0x4370); // muls r0,r6;
         break;
 
     case EQ:
@@ -2534,8 +2534,8 @@ static void emit_oper(int op) {
     case LT:
     case GT:
     case LE:
-        emit_pop(1);
-        emit(0x4281); // cmp r1, r0
+        emit_pop(6);
+        emit(0x4286); // cmp r6,r0
         switch (op) {
         case EQ:
             emit(0xd001); // beq * + 3
@@ -2565,7 +2565,7 @@ static void emit_oper(int op) {
 
     case DIV:
     case MOD:
-        emit(0x4601); // mov r1, r0
+        emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
         emit_fop(aeabi_idiv);
         if (op == MOD)
@@ -3104,8 +3104,8 @@ static void gen(int* n) {
         gen((int*)ast_NumVal(n)); // condition
         // if (*(e - 1) != IMM) // ***FIX***
         //    fatal("case label not a numeric literal");
-        emit(0x9900); // ldr r1, [sp, #0]
-        emit(0x4288); // cmp r0, r1
+        emit(0x9a00); // ldr r2, [sp, #0]
+        emit(0x4290); // cmp r0, r2
         emit_cond_branch(e + 2, BZ);
         ecas = emit_call(0);
         if (*((int*)Case_entry(n).expr) == Switch)
