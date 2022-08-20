@@ -841,6 +841,7 @@ typedef struct {
     int v1;
 } Double_entry_t;
 #define Double_entry(a) (*((Double_entry_t*)a))
+#define Double_entry_words (sizeof(Double_entry_t) / sizeof(int))
 
 typedef struct {
     int tk;
@@ -906,12 +907,14 @@ typedef struct {
     int right_part;
 } Assign_entry_t;
 #define Assign_entry(a) (*((Assign_entry_t*)a))
+#define Assign_words (sizeof(Assign_entry_t) / sizeof(int))
 
 static void ast_Assign(int right_part, int type) {
-    n -= sizeof(Assign_entry_t) / sizeof(int);
+    n -= Assign_words;
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
     Assign_entry(n).right_part = right_part;
+	if (*((int*)right_part) == 0) fatal("xxx");
     Assign_entry(n).type = type;
     Assign_entry(n).tk = Assign;
 }
@@ -977,6 +980,7 @@ static void ast_CastF(int way, int val) {
         fatal("AST overflow compiler error. Program too big");
     CastF_entry(n).tk = CastF;
     CastF_entry(n).val = val;
+	if (*((int*)val) == 0) fatal("xxx");
     CastF_entry(n).way = way;
 }
 
@@ -985,9 +989,10 @@ typedef struct {
     int val;
 } Enter_entry_t;
 #define Enter_entry(a) (*((Enter_entry_t*)a))
+#define Enter_words (sizeof(Enter_entry_t) / sizeof(int))
 
 static uint16_t* ast_Enter(int val) {
-    n -= sizeof(Enter_entry_t) / sizeof(int);
+    n -= Enter_words;
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
     Enter_entry(n).tk = Enter;
@@ -1008,24 +1013,34 @@ typedef struct {
     int oprnd;
 } Oper_entry_t;
 #define Oper_entry(a) (*((Oper_entry_t*)a))
+#define Oper_words (sizeof(Oper_entry_t) / sizeof(int))
 
 static void ast_Oper(int oprnd, int op) {
-    n -= sizeof(Oper_entry_t) / sizeof(int);
+    n -= Oper_words;
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
     Oper_entry(n).tk = op;
     Oper_entry(n).oprnd = oprnd;
+	if (*((int*)oprnd) == 0)
+		fatal("xxx");
 }
-#define ast_Oper_words (sizeof(Oper_entry_t) / sizeof(int))
 
-static void ast_Num(int v1) {
-    n -= sizeof(Double_entry_t) / sizeof(int);
+typedef struct {
+    int tk;
+    int val;
+    int valH;
+} Num_entry_t;
+#define Num_entry(a) (*((Num_entry_t*)a))
+#define Num_words (sizeof(Num_entry_t) / sizeof(int))
+
+static void ast_Num(int val) {
+    n -= Num_words;
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
-    Double_entry(n).tk = Num;
-    Double_entry(n).v1 = v1;
+    Num_entry(n).tk = Num;
+    Num_entry(n).val = val;
+    Num_entry(n).valH = 0;
 }
-#define ast_Num_words (sizeof(Double_entry_t) / sizeof(int))
 
 static void ast_Label(int v1) {
     n -= sizeof(Double_entry_t) / sizeof(int);
@@ -1067,23 +1082,30 @@ static void ast_Loc(int v1) {
     Double_entry(n).v1 = v1;
 }
 
-static void ast_Load(int v1) {
-    n -= sizeof(Double_entry_t) / sizeof(int);
+typedef struct {
+    int tk;
+    int typ;
+} Load_entry_t;
+#define Load_entry(a) (*((Load_entry_t*)a))
+#define Load_words (sizeof(Load_entry_t) / sizeof(int))
+
+static void ast_Load(int typ) {
+    n -= Load_words;
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
-    Double_entry(n).tk = Load;
-    Double_entry(n).v1 = v1;
+    Load_entry(n).tk = Load;
+    Load_entry(n).typ = typ;
 }
-#define ast_Load_words (sizeof(Double_entry_t) / sizeof(int))
 
 typedef struct {
     int tk;
     int addr;
 } Begin_entry_t;
 #define Begin_entry(a) (*((Begin_entry_t*)a))
+#define Begin_words (sizeof(Begin_entry_t) / sizeof(int))
 
 static void ast_Begin(int v1) {
-    n -= sizeof(Begin_entry_t) / sizeof(int);
+    n -= Begin_words;
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
     Begin_entry(n).tk = '{';
@@ -1098,7 +1120,6 @@ typedef struct {
 #define Single_entry(a) (*((Single_entry_t*)a))
 
 #define ast_Tk(a) (Single_entry(a).tk)
-#define ast_NumVal(a) (Double_entry(a).v1)
 
 static void ast_Single(int k) {
     n -= sizeof(Single_entry_t) / sizeof(int);
@@ -1130,9 +1151,9 @@ static void typecheck(int op, int tl, int tr) {
             ; // ptr + int or int + ptr ok
         else if (op == Sub && pt == 2 && it == 1)
             ; // ptr - int ok
-        else if (op == Assign && pt == 2 && ast_Tk(n) == Num && ast_NumVal(n) == 0)
+        else if (op == Assign && pt == 2 && ast_Tk(n) == Num && Num_entry(n).val == 0)
             ; // ok
-        else if (op >= Eq && op <= Le && ast_Tk(n) == Num && ast_NumVal(n) == 0)
+        else if (op >= Eq && op <= Le && ast_Tk(n) == Num && Num_entry(n).val == 0)
             ; // ok
         else
             fatal("bad pointer arithmetic or cast needed");
@@ -1372,7 +1393,7 @@ static void expr(int lev) {
                          : ((ty >= PTR) ? sizeof(int) : tsize[ty >> 2]));
         // just one dimension supported at the moment
         if (d != 0 && (ty & 3))
-            ast_NumVal(n) *= (id->etype + 1);
+            Num_entry(n).val *= (id->etype + 1);
         ty = INT;
         break;
     // Type cast or parenthesis
@@ -1407,7 +1428,7 @@ static void expr(int lev) {
                 if (t == FLOAT && ty < FLOAT) { // float : int
                     if (ast_Tk(n) == Num) {
                         ast_Tk(n) = NumF;
-                        *((float*)&ast_NumVal(n)) = ast_NumVal(n);
+                        *((float*)&Num_entry(n).val) = Num_entry(n).val;
                     } else {
                         b = n;
                         ast_CastF(ITOF, (int)b);
@@ -1415,7 +1436,7 @@ static void expr(int lev) {
                 } else if (t < FLOAT && ty == FLOAT) { // int : float
                     if (ast_Tk(n) == NumF) {
                         ast_Tk(n) = Num;
-                        ast_NumVal(n) = *((float*)&ast_NumVal(n));
+                        Num_entry(n).val = *((float*)&Num_entry(n).val);
                     } else {
                         b = n;
                         ast_CastF(FTOI, (int)b);
@@ -1454,7 +1475,7 @@ static void expr(int lev) {
         expr(Inc);
         if (ast_Tk(n) != Load)
             fatal("bad address-of");
-        n += ast_Load_words;
+        n += Load_words;
         ty += PTR;
         break;
     case '!': // "!x" is equivalent to "x == 0"
@@ -1463,10 +1484,10 @@ static void expr(int lev) {
         if (ty > ATOM_TYPE && ty < PTR)
             fatal("!(struct/union) is meaningless");
         if (ast_Tk(n) == Num)
-            ast_NumVal(n) = !ast_NumVal(n);
+            Num_entry(n).val = !Num_entry(n).val;
         else {
             ast_Num(0);
-            ast_Oper((int)(n + ast_Num_words), Eq);
+            ast_Oper((int)(n + Num_words), Eq); //xxx
         }
         ty = INT;
         break;
@@ -1476,10 +1497,10 @@ static void expr(int lev) {
         if (ty > ATOM_TYPE)
             fatal("~ptr is illegal");
         if (ast_Tk(n) == Num)
-            ast_NumVal(n) = ~ast_NumVal(n);
+            Num_entry(n).val = ~Num_entry(n).val;
         else {
             ast_Num(-1);
-            ast_Oper((int)(n + ast_Num_words), Xor);
+            ast_Oper((int)(n + Num_words), Xor);
         }
         ty = INT;
         break;
@@ -1495,15 +1516,15 @@ static void expr(int lev) {
         if (ty > ATOM_TYPE)
             fatal("unary '-' illegal on ptr");
         if (ast_Tk(n) == Num)
-            ast_NumVal(n) = -ast_NumVal(n);
+            Num_entry(n).val = -Num_entry(n).val;
         else if (ast_Tk(n) == NumF) {
-            ast_NumVal(n) ^= 0x80000000;
+            Num_entry(n).val ^= 0x80000000;
         } else if (ty == FLOAT) {
             ast_NumF(0xbf800000);
-            ast_Oper((int)(n + ast_Oper_words), MulF);
+            ast_Oper((int)(n + Num_words), MulF);
         } else {
             ast_Num(-1);
-            ast_Oper((int)(n + ast_Oper_words), Mul);
+            ast_Oper((int)(n + Num_words), Mul);
         }
         if (ty != FLOAT)
             ty = INT;
@@ -1540,7 +1561,7 @@ static void expr(int lev) {
             if (ast_Tk(n) != Load)
                 fatal("bad lvalue in assignment");
             // get the value of the right part `expr` as the result of `a=expr`
-            n += ast_Load_words;
+            n += Load_words;
             b = n;
             next();
             expr(Assign);
@@ -1563,7 +1584,7 @@ static void expr(int lev) {
             if (ast_Tk(n) != Load)
                 fatal("bad lvalue in assignment");
             otk = tk;
-            n += ast_Oper_words;
+            n += Load_words; //????
             b = n;
             ast_Single(';');
             ast_Load(t);
@@ -1572,10 +1593,8 @@ static void expr(int lev) {
             c = n;
             expr(otk);
             if (ast_Tk(n) == Num)
-                ast_NumVal(n) *= sz;
+                Num_entry(n).val *= sz;
             ast_Oper((int)c, (otk < ShlAssign) ? Or + (otk - OrAssign) : Shl + (otk - ShlAssign));
-            if (t == FLOAT && (otk >= AddAssign && otk <= DivAssign))
-                ast_Tk(n) += 5;
             typecheck(ast_Tk(n), t, ty);
             ast_Assign((int)b, (ty << 16) | t);
             ty = t;
@@ -1597,7 +1616,7 @@ static void expr(int lev) {
             next();
             expr(Lan);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) = ast_NumVal(b) || ast_NumVal(n);
+                Num_entry(b).val = Num_entry(b).val || Num_entry(n).val;
                 n = b;
             } else
                 ast_Oper((int)b, Lor);
@@ -1607,7 +1626,7 @@ static void expr(int lev) {
             next();
             expr(Or);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) = ast_NumVal(b) && ast_NumVal(n);
+                Num_entry(b).val = Num_entry(b).val && Num_entry(n).val;
                 n = b;
             } else
                 ast_Oper((int)b, Lan);
@@ -1618,7 +1637,7 @@ static void expr(int lev) {
             expr(Xor);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) = ast_NumVal(b) | ast_NumVal(n);
+                Num_entry(b).val = Num_entry(b).val | Num_entry(n).val;
                 n = b;
             } else
                 ast_Oper((int)b, Or);
@@ -1629,7 +1648,7 @@ static void expr(int lev) {
             expr(And);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) = ast_NumVal(b) ^ ast_NumVal(n);
+                Num_entry(b).val = Num_entry(b).val ^ Num_entry(n).val;
                 n = b;
             } else
                 ast_Oper((int)b, Xor);
@@ -1640,7 +1659,7 @@ static void expr(int lev) {
             expr(Eq);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) = ast_NumVal(b) & ast_NumVal(n);
+                Num_entry(b).val = Num_entry(b).val & Num_entry(n).val;
                 n = b;
             } else
                 ast_Oper((int)b, And);
@@ -1652,14 +1671,14 @@ static void expr(int lev) {
             typecheck(Eq, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    ast_NumVal(b) = ast_NumVal(n) == ast_NumVal(b);
+                    Num_entry(b).val = Num_entry(n).val == Num_entry(b).val;
                     ast_Tk(b) = Num;
                     n = b;
                 } else
                     ast_Oper((int)b, EqF);
             } else {
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) = ast_NumVal(b) == ast_NumVal(n);
+                    Num_entry(b).val = Num_entry(b).val == Num_entry(n).val;
                     n = b;
                 } else
                     ast_Oper((int)b, Eq);
@@ -1672,14 +1691,14 @@ static void expr(int lev) {
             typecheck(Ne, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    ast_NumVal(b) = ast_NumVal(n) != ast_NumVal(b);
+                    Num_entry(b).val = Num_entry(n).val != Num_entry(b).val;
                     ast_Tk(b) = Num;
                     n = b;
                 } else
                     ast_Oper((int)b, NeF);
             } else {
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) = ast_NumVal(b) != ast_NumVal(n);
+                    Num_entry(b).val = Num_entry(b).val != Num_entry(n).val;
                     n = b;
                 } else {
                     ast_Oper((int)b, Ne);
@@ -1693,7 +1712,8 @@ static void expr(int lev) {
             typecheck(Ge, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    ast_NumVal(b) = (*((float*)&ast_NumVal(b)) >= *((float*)&ast_NumVal(n)));
+                    Num_entry(b).val =
+                        (*((float*)&Num_entry(b).val) >= *((float*)&Num_entry(n).val));
                     ast_Tk(b) = Num;
                     n = b;
                 } else {
@@ -1701,7 +1721,7 @@ static void expr(int lev) {
                 }
             } else {
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) = ast_NumVal(b) >= ast_NumVal(n);
+                    Num_entry(b).val = Num_entry(b).val >= Num_entry(n).val;
                     n = b;
                 } else
                     ast_Oper((int)b, Ge);
@@ -1714,14 +1734,15 @@ static void expr(int lev) {
             typecheck(Lt, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    ast_NumVal(b) = (*((float*)&ast_NumVal(b)) < *((float*)&ast_NumVal(n)));
+                    Num_entry(b).val =
+                        (*((float*)&Num_entry(b).val) < *((float*)&Num_entry(n).val));
                     ast_Tk(b) = Num;
                     n = b;
                 } else
                     ast_Oper((int)b, LtF);
             } else {
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) = ast_NumVal(b) < ast_NumVal(n);
+                    Num_entry(b).val = Num_entry(b).val < Num_entry(n).val;
                     n = b;
                 } else
                     ast_Oper((int)b, Lt);
@@ -1734,14 +1755,15 @@ static void expr(int lev) {
             typecheck(Gt, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    ast_NumVal(b) = (*((float*)&ast_NumVal(b)) > *((float*)&ast_NumVal(n)));
+                    Num_entry(b).val =
+                        (*((float*)&Num_entry(b).val) > *((float*)&Num_entry(n).val));
                     ast_Tk(b) = Num;
                     n = b;
                 } else
                     ast_Oper((int)b, GtF);
             } else {
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) = ast_NumVal(b) > ast_NumVal(n);
+                    Num_entry(b).val = Num_entry(b).val > Num_entry(n).val;
                     n = b;
                 } else
                     ast_Oper((int)b, Gt);
@@ -1754,14 +1776,15 @@ static void expr(int lev) {
             typecheck(Le, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    ast_NumVal(b) = (*((float*)&ast_NumVal(b)) <= *((float*)&ast_NumVal(n)));
+                    Num_entry(b).val =
+                        (*((float*)&Num_entry(b).val) <= *((float*)&Num_entry(n).val));
                     ast_Tk(b) = Num;
                     n = b;
                 } else
                     ast_Oper((int)b, LeF);
             } else {
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) = ast_NumVal(b) <= ast_NumVal(n);
+                    Num_entry(b).val = Num_entry(b).val <= Num_entry(n).val;
                     n = b;
                 } else
                     ast_Oper((int)b, Le);
@@ -1773,8 +1796,8 @@ static void expr(int lev) {
             expr(Add);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) = (ast_NumVal(n) < 0) ? ast_NumVal(b) >> -ast_NumVal(n)
-                                                    : ast_NumVal(b) << ast_NumVal(n);
+                Num_entry(b).val = (Num_entry(n).val < 0) ? Num_entry(b).val >> -Num_entry(n).val
+                                                          : Num_entry(b).val << Num_entry(n).val;
                 n = b;
             } else
                 ast_Oper((int)b, Shl);
@@ -1785,8 +1808,8 @@ static void expr(int lev) {
             expr(Add);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) = (ast_NumVal(n) < 0) ? ast_NumVal(b) << -ast_NumVal(n)
-                                                    : ast_NumVal(b) >> ast_NumVal(n);
+                Num_entry(b).val = (Num_entry(n).val < 0) ? Num_entry(b).val << -Num_entry(n).val
+                                                          : Num_entry(b).val >> Num_entry(n).val;
                 n = b;
             } else
                 ast_Oper((int)b, Shr);
@@ -1798,8 +1821,8 @@ static void expr(int lev) {
             typecheck(Add, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    *((float*)&ast_NumVal(b)) =
-                        (*((float*)&ast_NumVal(b)) + *((float*)&ast_NumVal(n)));
+                    *((float*)&Num_entry(b).val) =
+                        (*((float*)&Num_entry(b).val) + *((float*)&Num_entry(n).val));
                     n = b;
                 } else
                     ast_Oper((int)b, AddF);
@@ -1810,14 +1833,14 @@ static void expr(int lev) {
                     ty = t;
                 sz = (ty >= PTR2) ? sizeof(int) : ((ty >= PTR) ? tsize[(ty - PTR) >> 2] : 1);
                 if (ast_Tk(n) == Num && tc) {
-                    ast_NumVal(n) *= sz;
+                    Num_entry(n).val *= sz;
                     sz = 1;
                 } else if (ast_Tk(b) == Num && !tc) {
-                    ast_NumVal(b) *= sz;
+                    Num_entry(b).val *= sz;
                     sz = 1;
                 }
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) += ast_NumVal(n);
+                    Num_entry(b).val += Num_entry(n).val;
                     n = b;
                 } else if (sz != 1) {
                     ast_Num(sz);
@@ -1833,8 +1856,8 @@ static void expr(int lev) {
             typecheck(Sub, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    *((float*)&ast_NumVal(b)) =
-                        (*((float*)&ast_NumVal(b)) - *((float*)&ast_NumVal(n)));
+                    *((float*)&Num_entry(b).val) =
+                        (*((float*)&Num_entry(b).val) - *((float*)&Num_entry(n).val));
                     n = b;
                 } else
                     ast_Oper((int)b, SubF);
@@ -1843,26 +1866,26 @@ static void expr(int lev) {
                     sz = (t >= PTR2) ? sizeof(int) : tsize[(t - PTR) >> 2];
                     if (ty >= PTR) { // ptr - ptr
                         if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                            ast_NumVal(b) = (ast_NumVal(b) - ast_NumVal(n)) / sz;
+                            Num_entry(b).val = (Num_entry(b).val - Num_entry(n).val) / sz;
                             n = b;
                         } else {
                             ast_Oper((int)b, Sub);
                             if (sz > 1) {
                                 if (is_power_of_2(sz)) { // 2^n
                                     ast_Num(__builtin_popcount(sz - 1));
-                                    ast_Oper((int)(n + ast_Oper_words), Shr);
+                                    ast_Oper((int)(n + Num_words), Shr);
                                 } else {
                                     ast_Num(sz);
-                                    ast_Oper((int)(n + ast_Oper_words), Div);
+                                    ast_Oper((int)(n + Num_words), Div);
                                 }
                             }
                         }
                         ty = INT;
                     } else { // ptr - int
                         if (ast_Tk(n) == Num) {
-                            ast_NumVal(n) *= sz;
+                            Num_entry(n).val *= sz;
                             if (ast_Tk(b) == Num) {
-                                ast_NumVal(b) = ast_NumVal(b) - ast_NumVal(n);
+                                Num_entry(b).val = Num_entry(b).val - Num_entry(n).val;
                                 n = b;
                             } else {
                                 ast_Oper((int)b, Sub);
@@ -1871,10 +1894,10 @@ static void expr(int lev) {
                             if (sz > 1) {
                                 if (is_power_of_2(sz)) { // 2^n
                                     ast_Num(__builtin_popcount(sz - 1));
-                                    ast_Oper((int)(n + ast_Oper_words), Shl);
+                                    ast_Oper((int)(n + Num_words), Shl);
                                 } else {
                                     ast_Num(sz);
-                                    ast_Oper((int)(n + ast_Oper_words), Mul);
+                                    ast_Oper((int)(n + Num_words), Mul);
                                 }
                             }
                             ast_Oper((int)b, Sub);
@@ -1883,7 +1906,7 @@ static void expr(int lev) {
                     }
                 } else { // int - int
                     if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                        ast_NumVal(b) = ast_NumVal(b) - ast_NumVal(n);
+                        Num_entry(b).val = Num_entry(b).val - Num_entry(n).val;
                         n = b;
                     } else
                         ast_Oper((int)b, Sub);
@@ -1897,17 +1920,18 @@ static void expr(int lev) {
             typecheck(Mul, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    *((float*)&ast_NumVal(b)) *= *((float*)&ast_NumVal(n));
+                    *((float*)&Num_entry(b).val) *= *((float*)&Num_entry(n).val);
                     n = b;
                 } else
                     ast_Oper((int)b, MulF);
             } else {
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) *= ast_NumVal(n);
+                    Num_entry(b).val *= Num_entry(n).val;
                     n = b;
                 } else {
-                    if (ast_Tk(n) == Num && ast_NumVal(n) > 0 && is_power_of_2(ast_NumVal(n))) {
-                        ast_NumVal(n) = __builtin_popcount(ast_NumVal(n) - 1);
+                    if (ast_Tk(n) == Num && Num_entry(n).val > 0 &&
+                        is_power_of_2(Num_entry(n).val)) {
+                        Num_entry(n).val = __builtin_popcount(Num_entry(n).val - 1);
                         ast_Oper((int)b, Shl); // 2^n
                     } else
                         ast_Oper((int)b, Mul);
@@ -1935,18 +1959,19 @@ static void expr(int lev) {
             typecheck(Div, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
-                    *((float*)&ast_NumVal(b)) =
-                        (*((float*)&ast_NumVal(b)) / *((float*)&ast_NumVal(n)));
+                    *((float*)&Num_entry(b).val) =
+                        (*((float*)&Num_entry(b).val) / *((float*)&Num_entry(n).val));
                     n = b;
                 } else
                     ast_Oper((int)b, DivF);
             } else {
                 if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                    ast_NumVal(b) /= ast_NumVal(n);
+                    Num_entry(b).val /= Num_entry(n).val;
                     n = b;
                 } else {
-                    if (ast_Tk(n) == Num && ast_NumVal(n) > 0 && is_power_of_2(ast_NumVal(n))) {
-                        ast_NumVal(n) = __builtin_popcount(ast_NumVal(n) - 1);
+                    if (ast_Tk(n) == Num && Num_entry(n).val > 0 &&
+                        is_power_of_2(Num_entry(n).val)) {
+                        Num_entry(n).val = __builtin_popcount(Num_entry(n).val - 1);
                         ast_Oper((int)b, Shr); // 2^n
                     } else
                         ast_Oper((int)b, Div);
@@ -1961,11 +1986,11 @@ static void expr(int lev) {
             if (ty == FLOAT)
                 fatal("use fmodf() for float modulo");
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) %= ast_NumVal(n);
+                Num_entry(b).val %= Num_entry(n).val;
                 n = b;
             } else {
-                if (ast_Tk(n) == Num && ast_NumVal(n) > 0 && is_power_of_2(ast_NumVal(n))) {
-                    --ast_NumVal(n);
+                if (ast_Tk(n) == Num && Num_entry(n).val > 0 && is_power_of_2(Num_entry(n).val)) {
+                    --Num_entry(n).val;
                     ast_Oper((int)b, And); // 2^n
                 } else
                     ast_Oper((int)b, Mod);
@@ -1974,8 +1999,8 @@ static void expr(int lev) {
             break;
         case Dot:
             t += PTR;
-            if (ast_Tk(n) == Load && ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR)
-                n += ast_Load_words; // struct
+            if (ast_Tk(n) == Load && Load_entry(n).typ > ATOM_TYPE && Load_entry(n).typ < PTR)
+                n += Load_words; // struct
         case Arrow:
             if (t <= PTR + ATOM_TYPE || t >= PTR2)
                 fatal("structure expected");
@@ -1989,23 +2014,25 @@ static void expr(int lev) {
                 fatal("structure member not found");
             if (m->offset) {
                 ast_Num(m->offset);
-                ast_Oper((int)(n + ast_Oper_words), Add);
+                ast_Oper((int)(n + Num_words), Add); //xxx
             }
             ty = m->type;
             next();
             if (!(ty & 3)) {
-                ast_Oper((ty >= PTR) ? INT : ty, Load);
+                ast_Load((ty >= PTR) ? INT : ty);
                 break;
             }
             memsub = 1;
-            int dim = ty & 3, ee = m->etype;
+            int dim = ty & 3;
+			int ee = m->etype;
             b = n;
             t = ty & ~3;
         case Bracket:
             if (t < PTR)
                 fatal("pointer type expected");
             if (memsub == 0) {
-                dim = id->type & 3, ee = id->etype;
+                dim = id->type & 3;
+				ee = id->etype;
             }
             int sum = 0, ii = dim - 1, *f = 0;
             int doload = 1;
@@ -2032,11 +2059,11 @@ static void expr(int lev) {
                                                : ((dim == 2 && ii == 1) ? ((ee & 0xffff) + 1) : 1));
                     if (ast_Tk(n) == Num) {
                         // elision with struct offset for efficiency
-                        if (ast_Tk(b) == Add && ast_Tk(b + 1) == Num)
-                            ast_NumVal(b + 1) += factor * ast_NumVal(n) * sz;
+                        if (ast_Tk(b) == Add && ast_Tk(b + Oper_words) == Num)
+                            Num_entry(b + Oper_words).val += factor * Num_entry(n).val * sz;
                         else
-                            sum += factor * ast_NumVal(n);
-                        n += ast_Num_words; // delete the subscript constant
+                            sum += factor * Num_entry(n).val;
+                        n += Num_words; // delete the subscript constant
                     } else {
                         // generate code to add a term
                         if (factor > 1) {
@@ -2064,15 +2091,14 @@ static void expr(int lev) {
             }
             if (sz > 1) {
                 if (ast_Tk(n) == Num)
-                    ast_NumVal(n) *= sz;
+                    Num_entry(n).val *= sz;
                 else {
                     ast_Num(sz);
-                    ast_Oper((int)(n + ast_Oper_words), Mul);
+                    ast_Oper((int)n, Mul);
                 }
             }
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                ast_NumVal(b) += ast_NumVal(n);
-                n = b;
+                Num_entry(n).val += Num_entry(b).val;
             } else
                 ast_Oper((int)b, Add);
         add_simple:
@@ -2142,35 +2168,35 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 
             if (ty == CHAR + PTR) {
                 if (match == CHAR + PTR2) {
-                    vi[i++] = ast_NumVal(n);
+                    vi[i++] = Num_entry(n).val;
                 } else if (match == CHAR + PTR) {
-                    off = strlen((char*)ast_NumVal(n)) + 1;
+                    off = strlen((char*)Num_entry(n).val) + 1;
                     if (off > inc[0]) {
                         off = inc[0];
                         printf("%d: string '%s' truncated to %d chars\n", lineno,
-                               (char*)ast_NumVal(n), off);
+                               (char*)Num_entry(n).val, off);
                     }
-                    memcpy((char*)vi + i, (char*)ast_NumVal(n), off);
+                    memcpy((char*)vi + i, (char*)Num_entry(n).val, off);
                     i += inc[0];
                 } else
                     fatal("can't assign string to scalar");
             } else if (ty == match)
-                vi[i++] = ast_NumVal(n);
+                vi[i++] = Num_entry(n).val;
             else if (ty == INT) {
                 if (match == CHAR + PTR) {
-                    *((char*)vi + i) = ast_NumVal(n);
+                    *((char*)vi + i) = Num_entry(n).val;
                     i += inc[0];
                 } else {
-                    *((float*)&ast_NumVal(n)) = (float)ast_NumVal(n);
-                    vi[i++] = ast_NumVal(n);
+                    *((float*)&Num_entry(n).val) = (float)Num_entry(n).val;
+                    vi[i++] = Num_entry(n).val;
                 }
             } else if (ty == FLOAT) {
                 if (match == INT) {
-                    vi[i++] = (int)*((float*)(&ast_NumVal(n)));
+                    vi[i++] = (int)*((float*)(&Num_entry(n).val));
                 } else
                     fatal("illegal char/string initializer");
             }
-            n += ast_Num_words; // clean up AST
+            n += Num_words; // clean up AST
             empty = 0;
         }
         if (tk == ',')
@@ -2726,48 +2752,48 @@ static void gen(int* n) {
     switch (i) {
     case Num:
     case NumF:
-        emit_load_immediate(0, ast_NumVal(n));
+        emit_load_immediate(0, Num_entry(n).val);
         break; // int or float value
     case Load:
-        gen(n + 2);                                           // load the value
-        if (ast_NumVal(n) > ATOM_TYPE && ast_NumVal(n) < PTR) // unreachable?
+        gen(n + Load_words);                                        // load the value
+        if (Num_entry(n).val > ATOM_TYPE && Num_entry(n).val < PTR) // unreachable?
             fatal("struct copies not yet supported");
-        emit_load((ast_NumVal(n) >= PTR) ? LI : LC + (ast_NumVal(n) >> 2));
+        emit_load((Num_entry(n).val >= PTR) ? LI : LC + (Num_entry(n).val >> 2));
         break;
     case Loc:
-        emit_load_addr(ast_NumVal(n));
+        emit_load_addr(Num_entry(n).val);
         break; // get address of variable
     case '{':
-        gen((int*)ast_NumVal(n));
-        gen(n + 2);
+        gen((int*)Num_entry(n).val);
+        gen(n + Begin_words);
         break;   // parse AST expr or stmt
     case Assign: // assign the value to variables
         gen((int*)Assign_entry(n).right_part);
         emit_push(0);
-        gen(n + 3);
-        l = ast_NumVal(n) & 0xffff;
+        gen(n + Num_words);
+        l = Num_entry(n).val & 0xffff;
         // Add SC/SI instruction to save value in register to variable address
         // held on stack.
         if (l > ATOM_TYPE && l < PTR)
             fatal("struct assign not yet supported");
-        if ((ast_NumVal(n) >> 16) == FLOAT && l == INT)
+        if ((Num_entry(n).val >> 16) == FLOAT && l == INT)
             emit_ftoi();
-        else if ((ast_NumVal(n) >> 16) == INT && l == FLOAT)
+        else if ((Num_entry(n).val >> 16) == INT && l == FLOAT)
             emit_itof();
         emit_store((l >= PTR) ? SI : SC + (l >> 2));
         break;
     case Inc: // increment or decrement variables
     case Dec:
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_push(0);
-        emit_load((ast_NumVal(n) == CHAR) ? LC : LI);
+        emit_load((Num_entry(n).val == CHAR) ? LC : LI);
         emit_push(0);
-        emit_load_immediate(0,
-                            (ast_NumVal(n) >= PTR2)
-                                ? sizeof(int)
-                                : ((ast_NumVal(n) >= PTR) ? tsize[(ast_NumVal(n) - PTR) >> 2] : 1));
+        emit_load_immediate(
+            0, (Num_entry(n).val >= PTR2)
+                   ? sizeof(int)
+                   : ((Num_entry(n).val >= PTR) ? tsize[(Num_entry(n).val - PTR) >> 2] : 1));
         emit_oper((i == Inc) ? ADD : SUB);
-        emit_store((ast_NumVal(n) == CHAR) ? SC : SI);
+        emit_store((Num_entry(n).val == CHAR) ? SC : SI);
         break;
     case Cond:                              // if else condition case
         gen((int*)Cond_entry(n).cond_part); // condition
@@ -2800,19 +2826,19 @@ static void gen(int* n) {
      * the RHS expression.
      */
     case Lor:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit(0x2800); // cmp r0,#0
         emit_cond_branch(e + 2, BZ);
         b = emit_call(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         patch_branch(b, e + 1);
         break;
     case Lan:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit(0x2800); // cmp r0,#0
         emit_cond_branch(e + 2, BNZ);
         b = emit_call(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         patch_branch(b, e + 1);
         break;
     /* If current token is bitwise OR operator:
@@ -2821,159 +2847,159 @@ static void gen(int* n) {
      * Add "OR" instruction to compute the result.
      */
     case Or:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(OR);
         break;
     case Xor:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(XOR);
         break;
     case And:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(AND);
         break;
     case Eq:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(EQ);
         break;
     case Ne:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(NE);
         break;
     case Ge:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(GE);
         break;
     case Lt:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(LT);
         break;
     case Gt:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(GT);
         break;
     case Le:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(LE);
         break;
     case Shl:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(SHL);
         break;
     case Shr:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(SHR);
         break;
     case Add:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(ADD);
         break;
     case Sub:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(SUB);
         break;
     case Mul:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(MUL);
         break;
     case Div:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(DIV);
         break;
     case Mod:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_oper(MOD);
         break;
     case AddF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(ADDF);
         break;
     case SubF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(SUBF);
         break;
     case MulF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(MULF);
         break;
     case DivF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(DIVF);
         break;
     case EqF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(EQF);
         break;
     case NeF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(NEF);
         break;
     case GeF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(GEF);
         break;
     case LtF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(LTF);
         break;
     case GtF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(GTF);
         break;
     case LeF:
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         emit_push(0);
-        gen(n + 2);
+        gen(n + Oper_words);
         emit_float_oper(LEF);
         break;
     case CastF:
@@ -3101,7 +3127,7 @@ static void gen(int* n) {
     case Case:
         a = 0;
         patch_branch(ecas, e + 1);
-        gen((int*)ast_NumVal(n)); // condition
+        gen((int*)Num_entry(n).val); // condition
         // if (*(e - 1) != IMM) // ***FIX***
         //    fatal("case label not a numeric literal");
         emit(0x9a00); // ldr r2, [sp, #0]
@@ -3127,7 +3153,7 @@ static void gen(int* n) {
         cnts = patch;
         break;
     case Goto:
-        label = (struct ident_s*)ast_NumVal(n);
+        label = (struct ident_s*)Num_entry(n).val;
         if (label->class == 0) {
             struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
             l->addr = emit_call(0);
@@ -3138,22 +3164,22 @@ static void gen(int* n) {
         break;
     case Default:
         def = e;
-        gen((int*)ast_NumVal(n));
+        gen((int*)Num_entry(n).val);
         break;
     case Return:
-        if (ast_NumVal(n))
-            gen((int*)ast_NumVal(n));
+        if (Num_entry(n).val)
+            gen((int*)Num_entry(n).val);
         emit_leave();
         break;
     case Enter:
-        emit_enter(ast_NumVal(n));
-        gen(n + 2);
+        emit_enter(Num_entry(n).val);
+        gen(n + Enter_words);
         // if (*(e - 1) != 0x46bd && *e != 0xbdf0)
         emit_leave(); // don't issue it again if already emitted by return stmt
         patch_pc_relative(0);
         break;
     case Label: // target of goto
-        label = (struct ident_s*)ast_NumVal(n);
+        label = (struct ident_s*)Num_entry(n).val;
         if (label->class != 0)
             fatal("duplicate label definition");
         d = e;
@@ -3201,14 +3227,14 @@ static void loc_array_decl(int ct, int extent[3], int* dims, int* et, int* size)
             expr(Cond);
             if (ast_Tk(n) != Num)
                 fatal("non-const array size");
-            if (ast_NumVal(n) <= 0)
+            if (Num_entry(n).val <= 0)
                 fatal("non-positive array dimension");
             if (tk != ']')
                 fatal("missing ]");
             next();
-            extent[*dims] = ast_NumVal(n);
-            *size *= ast_NumVal(n);
-            n += 2;
+            extent[*dims] = Num_entry(n).val;
+            *size *= Num_entry(n).val;
+            n += Num_words;
         }
         ++*dims;
     } while (tk == Bracket && *dims < 3);
@@ -3264,8 +3290,8 @@ static void stmt(int ctx) {
                     expr(Cond);
                     if (ast_Tk(n) != Num)
                         fatal("bad enum initializer");
-                    i = ast_NumVal(n);
-                    n += 2; // Set enum value
+                    i = Num_entry(n).val;
+                    n += Num_words; // Set enum value
                 }
                 dd->class = Num;
                 dd->type = INT;
@@ -3574,17 +3600,17 @@ static void stmt(int ctx) {
                                 fatal("use decl char foo[nn] = \"...\";");
                             if ((ast_Tk(n) == Num && (i == CHAR || i == INT)) ||
                                 (ast_Tk(n) == NumF && i == FLOAT))
-                                *((int*)dd->val) = ast_NumVal(n);
+                                *((int*)dd->val) = Num_entry(n).val;
                             else if (ty == CHAR + PTR) {
-                                i = strlen((char*)ast_NumVal(n)) + 1;
+                                i = strlen((char*)Num_entry(n).val) + 1;
                                 if (i > (dd->etype + 1)) {
                                     i = dd->etype + 1;
                                     printf("%d: string truncated to width\n", lineno);
                                 }
-                                memcpy((char*)dd->val, (char*)ast_NumVal(n), i);
+                                memcpy((char*)dd->val, (char*)Num_entry(n).val, i);
                             } else
                                 fatal("unsupported global initializer");
-                            n += 2;
+                            n += Num_words;
                         }
                     }
                 }
@@ -3684,8 +3710,8 @@ static void stmt(int ctx) {
         a = n;
         if (ast_Tk(n) != Num)
             fatal("case label not a numeric literal");
-        j = ast_NumVal(n);
-        // ast_NumVal(n);
+        j = Num_entry(n).val;
+        // Num_entry(n).val;
         *ncas = j;
         ast_Single(';');
         if (tk != ':')
@@ -4085,8 +4111,8 @@ int cc(int mode, int argc, char** argv) {
                     expr(Cond);
                     if (ast_Tk(n) != Num)
                         fatal("bad -D initializer");
-                    i = ast_NumVal(n);
-                    n += 2;
+                    i = Num_entry(n).val;
+                    n += Num_words;
                 }
                 dd->class = Num;
                 dd->type = INT;
