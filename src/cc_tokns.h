@@ -1,4 +1,5 @@
 // clang-format off
+enum {
     Func = 128, Syscall,
     // 130
     Main, Glo, Par, Loc, Keyword, Id, Load, Enter, Num, NumF,
@@ -58,3 +59,4 @@
     Arrow,
     Bracket
     // clang-format on
+};

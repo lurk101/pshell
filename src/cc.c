@@ -32,6 +32,9 @@
 #include <pico/time.h>
 
 #include "armdisasm.h"
+#ifndef NDEBUG
+#include "cc_dmpast.h"
+#endif
 #include "cc.h"
 #include "fs.h"
 
@@ -147,6 +150,7 @@ static int loc;                      // local variable offset
 static int lineno;                   // current line number
 static int src_opt;                  // print source and assembly flag
 static int uchar_opt;                // use unsigned character variables
+static int ast_opt;                  // dump the abstract symbol table
 static int* n;                       // current position in emitted abstract syntax tree
                                      // With an AST, the compiler is not limited to generate
                                      // code on the fly with parsing.
@@ -197,9 +201,7 @@ static struct member_s** members; // array (indexed by type) of struct member li
 
 // tokens and classes (operators last and in precedence order)
 // ( >= 128 so not to collide with ASCII-valued tokens)
-enum {
 #include "cc_tokns.h"
-};
 
 // opcodes
 enum {
@@ -447,8 +449,8 @@ static void clear_globals(void) {
     pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
-    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld = pplev = pplevt =
-        pcrel_count = nrelocs = 0;
+    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = ast_opt = src_opt = ld =
+        pplev = pplevt = pcrel_count = nrelocs = 0;
     ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
@@ -1074,12 +1076,12 @@ static void ast_NumF(int v1) {
     Double_entry(n).v1 = v1;
 }
 
-static void ast_Loc(int v1) {
+static void ast_Loc(int addr) {
     n -= sizeof(Double_entry_t) / sizeof(int);
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
     Double_entry(n).tk = Loc;
-    Double_entry(n).v1 = v1;
+    Double_entry(n).v1 = addr;
 }
 
 typedef struct {
@@ -1099,17 +1101,17 @@ static void ast_Load(int typ) {
 
 typedef struct {
     int tk;
-    int addr;
+    int* next;
 } Begin_entry_t;
 #define Begin_entry(a) (*((Begin_entry_t*)a))
 #define Begin_words (sizeof(Begin_entry_t) / sizeof(int))
 
-static void ast_Begin(int v1) {
+static void ast_Begin(int* next) {
     n -= Begin_words;
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
     Begin_entry(n).tk = '{';
-    Begin_entry(n).addr = v1;
+    Begin_entry(n).next = next;
 }
 
 // single word entry
@@ -1126,6 +1128,19 @@ static void ast_Single(int k) {
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
     Single_entry(n).tk = k;
+}
+
+typedef struct {
+    int tk;
+} End_entry_t;
+#define End_entry(a) (*((End_entry_t*)a))
+#define End_words (sizeof(End_entry_t) / sizeof(int))
+
+static void ast_End(void) {
+    n -= End_words;
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
+    End_entry(n).tk = ';';
 }
 
 // verify binary operations are legal
@@ -1261,7 +1276,7 @@ static void expr(int lev) {
             while (tk != ')') {
                 expr(Assign);
                 if (c != 0) {
-                    ast_Begin((int)c);
+                    ast_Begin(c);
                     c = 0;
                 }
                 ast_Single((int)b);
@@ -1452,7 +1467,7 @@ static void expr(int lev) {
                 b = n;
                 expr(Assign);
                 if (b != n)
-                    ast_Begin((int)b);
+                    ast_Begin(b);
             }
             if (tk != ')')
                 fatal("close parenthesis expected");
@@ -1586,7 +1601,7 @@ static void expr(int lev) {
             otk = tk;
             n += Load_words; //????
             b = n;
-            ast_Single(';');
+            ast_End();
             ast_Load(t);
             sz = (t >= PTR2) ? sizeof(int) : ((t >= PTR) ? tsize[(t - PTR) >> 2] : 1);
             next();
@@ -2764,7 +2779,7 @@ static void gen(int* n) {
         emit_load_addr(Num_entry(n).val);
         break; // get address of variable
     case '{':
-        gen((int*)Num_entry(n).val);
+        gen(Begin_entry(n).next);
         gen(n + Begin_words);
         break;   // parse AST expr or stmt
     case Assign: // assign the value to variables
@@ -3209,7 +3224,7 @@ static void check_label(int** tt) {
             fatal("invalid label");
         id->type = -1; // hack for id->class deficiency
         ast_Label((int)id);
-        ast_Begin((int)*tt);
+        ast_Begin(*tt);
         *tt = n;
         next();
         next();
@@ -3493,13 +3508,13 @@ static void stmt(int ctx) {
                     // Not declaration and must not be function, analyze inner block.
                     // e represents the address which will store pc
                     // (ld - loc) indicates memory size to allocate
-                    ast_Single(';');
+                    ast_End();
                     while (tk != '}') {
                         int* t = n;
                         check_label(&t);
                         stmt(Loc);
                         if (t != n)
-                            ast_Begin((int)t);
+                            ast_Begin(t);
                     }
                     if (rtf == 0 && rtt != -1)
                         fatal("expecting return value");
@@ -3580,7 +3595,7 @@ static void stmt(int ctx) {
                     else {
                         if (ctx == Loc) {
                             if (b == 0)
-                                ast_Single(';');
+                                ast_End();
                             b = n;
                             ast_Loc(loc - dd->val);
                             a = n;
@@ -3589,7 +3604,7 @@ static void stmt(int ctx) {
                             typecheck(Assign, i, ty);
                             ast_Assign((int)a, (ty << 16) | i);
                             ty = i;
-                            ast_Begin((int)b);
+                            ast_Begin(b);
                         } else { // ctx == Glo
                             i = ty;
                             expr(Cond);
@@ -3671,7 +3686,7 @@ static void stmt(int ctx) {
         if (tk != '(')
             fatal("open parenthesis expected");
         next();
-        ast_Single(';');
+        ast_End();
         expr(Assign);
         b = n;
         if (tk != ')')
@@ -3713,7 +3728,7 @@ static void stmt(int ctx) {
         j = Num_entry(n).val;
         // Num_entry(n).val;
         *ncas = j;
-        ast_Single(';');
+        ast_End();
         if (tk != ':')
             fatal("colon expected");
         next();
@@ -3779,20 +3794,20 @@ static void stmt(int ctx) {
         if (tk != '(')
             fatal("open parenthesis expected");
         next();
-        ast_Single(';');
+        ast_End();
         if (tk != ';')
             expr(Assign);
         while (tk == ',') {
             int* f = n;
             next();
             expr(Assign);
-            ast_Begin((int)f);
+            ast_Begin(f);
         }
         d = n;
         if (tk != ';')
             fatal("semicolon expected");
         next();
-        ast_Single(';');
+        ast_End();
         if (tk != ';') {
             expr(Assign);
             a = n; // Point to entry of for cond
@@ -3801,14 +3816,14 @@ static void stmt(int ctx) {
         } else
             a = 0;
         next();
-        ast_Single(';');
+        ast_End();
         if (tk != ')')
             expr(Assign);
         while (tk == ',') {
             int* g = n;
             next();
             expr(Assign);
-            ast_Begin((int)g);
+            ast_Begin(g);
         }
         b = n;
         if (tk != ')')
@@ -3836,20 +3851,20 @@ static void stmt(int ctx) {
     // stmt -> '{' stmt '}'
     case '{':
         next();
-        ast_Single(';');
+        ast_End();
         while (tk != '}') {
             a = n;
             check_label(&a);
             stmt(ctx);
             if (a != n)
-                ast_Begin((int)a);
+                ast_Begin(a);
         }
         next();
         return;
     // stmt -> ';'
     case ';':
         next();
-        ast_Single(';');
+        ast_End();
         return;
     default:
         expr(Assign);
@@ -3987,9 +4002,10 @@ static void help(char* lib) {
                "          [-o filename] filename\n"
                "    -s      display disassembly and quit.\n"
                "    -o      name of executable output file.\n"
-               "    -u      treat char type as unsigned\n"
+               "    -u      treat char type as unsigned.\n"
+               "    -a      dump the abstract syntax tree."
                "    -D symbol [= value]\n"
-               "            define symbol for limited pre-processor, can repeat\n"
+               "            define symbol for limited pre-processor, can repeat.\n"
                "    -h      Compiler help. lib lists externals.\n"
                "    filename\n"
                "            C source file name.\n"
@@ -4091,6 +4107,8 @@ int cc(int mode, int argc, char** argv) {
                 goto done;
             } else if ((*argv)[1] == 's') {
                 src_opt = 1;
+            } else if ((*argv)[1] == 'a') {
+                ast_opt = 1;
             } else if ((*argv)[1] == 'o') {
                 --argc;
                 ++argv;
@@ -4233,6 +4251,10 @@ int cc(int mode, int argc, char** argv) {
                 fatal("unable to set executable attribute");
             printf("\ntext  %06x\ndata  %06x\nentry %06x\nreloc %06x\n", exe.tsize, exe.dsize,
                    exe.entry - (int)__StackLimit, exe.nreloc);
+            goto done;
+        }
+        if (ast_opt) {
+            ast_dump((int)n);
             goto done;
         }
         if (src_opt)
