@@ -4262,7 +4262,7 @@ int cc(int mode, int argc, char** argv) {
     } else {
         if (argc < 1)
             fatal("specify executable file name");
-        ofn = full_path(argv[0]);
+        ofn = argv[0];
         char buf[4];
         if (fs_getattr(ofn, 1, buf, sizeof(buf)) != 4)
             fatal("file %s not found or not executable", ofn);
@@ -4307,8 +4307,6 @@ int cc(int mode, int argc, char** argv) {
         fs_file_close(fd);
         sys_free(fd);
         fd = NULL;
-        argc--;
-        argv++;
     }
 
     printf("\n");

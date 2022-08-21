@@ -12,5 +12,6 @@ typedef struct {
 extern cmd_t cmd_table[];
 
 char* dgreadln(char* buffer, int mnt, char* prom);
+void savehist();
 
 #endif

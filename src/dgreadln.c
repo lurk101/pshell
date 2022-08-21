@@ -261,7 +261,23 @@ static void dotab() {
     return;
 }
 
-static void addhist(char* s) {
+void savehist(){
+	lfs_file_t fp;
+	if(fs_file_open(&fp,"/.history",
+		LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0) {
+		return;
+	}
+    int j = hista;
+    while (j != histb) {
+        char c = history[j];
+        if (c == 0) fs_file_write(&fp,"\n",1);
+        else fs_file_write(&fp,&c,1);
+        j = (j + 1) % HSTSIZE;
+    }
+	fs_file_close(&fp);
+}
+
+static void addhistw(char* s) {
     for (;;) {
         int j = (histb + 1) % HSTSIZE;
         if (j == hista) {
@@ -275,6 +291,36 @@ static void addhist(char* s) {
             break;
         s++;
     }
+}
+
+static void addhist(char* s){
+	int oldhistb = histb;
+	addhistw(s);
+	if (histb < oldhistb) savehist();
+}
+
+static void resthist(){
+	lfs_file_t fp;
+	if(fs_file_open(&fp,"/.history",LFS_O_RDONLY) < 0) {
+		return;
+	}
+	int j = 0;
+	for (;;) {
+		char c;
+		if (fs_file_read(&fp,&c,1) <= 0) break;
+		if(c == '\n') {
+			cmdline[j] = 0;
+			addhistw(cmdline);
+			j = 0;
+		} else {
+			cmdline[j++] = c;
+		}
+	}
+	if (j > 0){
+		cmdline[j] = 0;
+		addhist(cmdline);
+	}
+	fs_file_close(&fp);
 }
 
 static const char* strprefix(const char* s, char* p) {
@@ -401,6 +447,7 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
     cmdlb = 0;
     cmdli = 0;
     twotabs = 0;
+	if(hista==0&&histb==0) resthist();
     for (;;) {
         int c = getchar();
         if (c == '\t') {
