@@ -591,8 +591,10 @@ static void clear_cmd(void) {
 
 static void reboot_cmd(void) {
     // release any resources we were using
-    if (mounted)
+    if (mounted){
+		savehist();
         fs_unmount();
+	}
     watchdog_reboot(0, 0, 1);
 }
 
