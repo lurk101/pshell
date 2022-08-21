@@ -1,3 +1,10 @@
+What's new in version 1.2.11
+
+- command history survives reboots
+- integer arrays were not always word aligned, causing crashes on CM0
+- allow negative values in simple defines
+- fix executable search path misbehavior
+
 What's new in version 1.2.10
 
 - binary executable now pshell version independent
