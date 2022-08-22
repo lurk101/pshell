@@ -2216,6 +2216,22 @@ static uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
 static uint16_t msk2[] = {0xff00, 0xffff, 0xffff};
 static uint16_t rep2[] = {0x4638, 0x3800};
 
+static uint16_t pat3[] = {0xb401, 0xbc01};
+static uint16_t msk3[] = {0xffff, 0xffff};
+static uint16_t rep3[] = {0};
+
+static uint16_t pat4[] = {0x2000, 0xb401, 0xbc02};
+static uint16_t msk4[] = {0xff00, 0xffff, 0xffff};
+static uint16_t rep4[] = {0x2100};
+
+static uint16_t pat5[] = {0x4638, 0x3800, 0xb401, 0x2000, 0xbc40};
+static uint16_t msk5[] = {0xffff, 0xff00, 0xffff, 0xff00, 0xffff};
+static uint16_t rep5[] = {0x463e, 0x3e00, 0x2000};
+
+static uint16_t pat6[] = {0x4638, 0x6800};
+static uint16_t msk6[] = {0xffff, 0xffff};
+static uint16_t rep6[] = {0x6838};
+
 static const struct segs {
     uint8_t n_pats;
     uint8_t n_reps;
@@ -2241,7 +2257,27 @@ static const struct segs {
     // movs r0,#n         mov  r0,r7
     // rsbs r0,r0		  subs r0,#n
     // add  r0,r7
-    {numof(pat2), numof(rep2), pat2, msk2, rep2, {0, 1, -1, -1}}};
+    {numof(pat2), numof(rep2), pat2, msk2, rep2, {0, 1, -1, -1}},
+
+    // push {r0}
+    // pop {r0}
+    {numof(pat3), numof(rep3), pat3, msk3, rep3, {-1, -1, -1, -1}},
+
+    // movs r0,#n          mov r1,#n
+    // push {r0}
+    // pop  {r1}
+    {numof(pat4), numof(rep4), pat4, msk4, rep4, {0, 0, -1, -1}},
+
+    // mov  r0,r7          mov  r6,r7
+    // subs r0,#n0         subs r6,#n0
+    // push {r0}           movs r0,#n1
+    // movs r0,#n1
+    // pop  {r6}
+    {numof(pat5), numof(rep5), pat5, msk5, rep5, {1, 1, 3, 2}},
+
+    // mov  r0,r7          ldr  r0,[r7,#0]
+    // ldr  r0,[r0,#0]
+    {numof(pat6), numof(rep6), pat6, msk6, rep6, {0, 0, -1, -1}}};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[8];
@@ -2263,7 +2299,8 @@ static int peep_hole(const struct segs* s) {
             break;
         pe[s->xmap[i + 1]] |= rslt[s->xmap[i]];
     }
-    e += l;
+    if (s->xmap[0] >= 0)
+        e += l;
     return 1;
 }
 
