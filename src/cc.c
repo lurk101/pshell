@@ -834,12 +834,18 @@ static void next() {
     }
 }
 
+static void push_ast(int l) {
+    n -= l;
+    if (n < ast)
+        fatal("AST overflow compiler error. Program too big");
+}
+
 typedef struct {
     int tk;
     int v1;
 } Double_entry_t;
 #define Double_entry(a) (*((Double_entry_t*)a))
-#define Double_entry_words (sizeof(Double_entry_t) / sizeof(int))
+#define Double_words (sizeof(Double_entry_t) / sizeof(int))
 
 typedef struct {
     int tk;
@@ -849,11 +855,10 @@ typedef struct {
     int parm_types;
 } Func_entry_t;
 #define Func_entry(a) (*((Func_entry_t*)a))
+#define Func_words (sizeof(Func_entry_t) / sizeof(int))
 
 static void ast_Func(int parm_types, int n_parms, int addr, int next, int tk) {
-    n -= sizeof(Func_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Func_words);
     Func_entry(n).parm_types = parm_types;
     Func_entry(n).n_parms = n_parms;
     Func_entry(n).addr = addr;
@@ -869,11 +874,10 @@ typedef struct {
     int init;
 } For_entry_t;
 #define For_entry(a) (*((For_entry_t*)a))
+#define For_words (sizeof(For_entry_t) / sizeof(int))
 
 static void ast_For(int init, int body, int incr, int cond) {
-    n -= sizeof(For_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(For_words);
     For_entry(n).init = init;
     For_entry(n).body = body;
     For_entry(n).incr = incr;
@@ -888,11 +892,10 @@ typedef struct {
     int else_part;
 } Cond_entry_t;
 #define Cond_entry(a) (*((Cond_entry_t*)a))
+#define Cond_words (sizeof(Cond_entry_t) / sizeof(int))
 
 static void ast_Cond(int else_part, int if_part, int cond_part) {
-    n -= sizeof(Cond_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Cond_words);
     Cond_entry(n).else_part = else_part;
     Cond_entry(n).if_part = if_part;
     Cond_entry(n).cond_part = cond_part;
@@ -908,9 +911,7 @@ typedef struct {
 #define Assign_words (sizeof(Assign_entry_t) / sizeof(int))
 
 static void ast_Assign(int right_part, int type) {
-    n -= Assign_words;
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Assign_words);
     Assign_entry(n).right_part = right_part;
     Assign_entry(n).type = type;
     Assign_entry(n).tk = Assign;
@@ -922,11 +923,10 @@ typedef struct {
     int cond;
 } While_entry_t;
 #define While_entry(a) (*((While_entry_t*)a))
+#define While_words (sizeof(While_entry_t) / sizeof(int))
 
 static void ast_While(int cond, int body, int tk) {
-    n -= sizeof(While_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(While_words);
     While_entry(n).cond = cond;
     While_entry(n).body = body;
     While_entry(n).tk = tk;
@@ -938,11 +938,10 @@ typedef struct {
     int cas;
 } Switch_entry_t;
 #define Switch_entry(a) (*((Switch_entry_t*)a))
+#define Switch_words (sizeof(Switch_entry_t) / sizeof(int))
 
 static void ast_Switch(int cas, int cond) {
-    n -= sizeof(Switch_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Switch_words);
     Switch_entry(n).cas = cas;
     Switch_entry(n).cond = cond;
     Switch_entry(n).tk = Switch;
@@ -954,11 +953,10 @@ typedef struct {
     int expr;
 } Case_entry_t;
 #define Case_entry(a) (*((Case_entry_t*)a))
+#define Case_words (sizeof(Case_entry_t) / sizeof(int))
 
 static void ast_Case(int expr, int next) {
-    n -= sizeof(Case_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Case_words);
     Case_entry(n).expr = expr;
     Case_entry(n).next = next;
     Case_entry(n).tk = Case;
@@ -970,11 +968,10 @@ typedef struct {
     int way;
 } CastF_entry_t;
 #define CastF_entry(a) (*((CastF_entry_t*)a))
+#define CastF_words (sizeof(CastF_entry_t) / sizeof(int))
 
 static void ast_CastF(int way, int val) {
-    n -= sizeof(CastF_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(CastF_words);
     CastF_entry(n).tk = CastF;
     CastF_entry(n).val = val;
     CastF_entry(n).way = way;
@@ -988,18 +985,14 @@ typedef struct {
 #define Enter_words (sizeof(Enter_entry_t) / sizeof(int))
 
 static uint16_t* ast_Enter(int val) {
-    n -= Enter_words;
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Enter_words);
     Enter_entry(n).tk = Enter;
     Enter_entry(n).val = val;
 }
 
 // two word entries
 static void ast_Return(int v1) {
-    n -= sizeof(Double_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Double_words);
     Double_entry(n).tk = Return;
     Double_entry(n).v1 = v1;
 }
@@ -1012,9 +1005,7 @@ typedef struct {
 #define Oper_words (sizeof(Oper_entry_t) / sizeof(int))
 
 static void ast_Oper(int oprnd, int op) {
-    n -= Oper_words;
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Oper_words);
     Oper_entry(n).tk = op;
     Oper_entry(n).oprnd = oprnd;
 }
@@ -1028,50 +1019,38 @@ typedef struct {
 #define Num_words (sizeof(Num_entry_t) / sizeof(int))
 
 static void ast_Num(int val) {
-    n -= Num_words;
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Num_words);
     Num_entry(n).tk = Num;
     Num_entry(n).val = val;
     Num_entry(n).valH = 0;
 }
 
 static void ast_Label(int v1) {
-    n -= sizeof(Double_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Double_words);
     Double_entry(n).tk = Label;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Goto(int v1) {
-    n -= sizeof(Double_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Double_words);
     Double_entry(n).tk = Goto;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Default(int v1) {
-    n -= sizeof(Double_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Double_words);
     Double_entry(n).tk = Default;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_NumF(int v1) {
-    n -= sizeof(Double_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Double_words);
     Double_entry(n).tk = NumF;
     Double_entry(n).v1 = v1;
 }
 
 static void ast_Loc(int addr) {
-    n -= sizeof(Double_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Double_words);
     Double_entry(n).tk = Loc;
     Double_entry(n).v1 = addr;
 }
@@ -1084,9 +1063,7 @@ typedef struct {
 #define Load_words (sizeof(Load_entry_t) / sizeof(int))
 
 static void ast_Load(int typ) {
-    n -= Load_words;
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Load_words);
     Load_entry(n).tk = Load;
     Load_entry(n).typ = typ;
 }
@@ -1099,9 +1076,7 @@ typedef struct {
 #define Begin_words (sizeof(Begin_entry_t) / sizeof(int))
 
 static void ast_Begin(int* next) {
-    n -= Begin_words;
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Begin_words);
     Begin_entry(n).tk = '{';
     Begin_entry(n).next = next;
 }
@@ -1112,13 +1087,12 @@ typedef struct {
     int tk;
 } Single_entry_t;
 #define Single_entry(a) (*((Single_entry_t*)a))
+#define Single_words (sizeof(Single_entry_t) / sizeof(int))
 
 #define ast_Tk(a) (Single_entry(a).tk)
 
 static void ast_Single(int k) {
-    n -= sizeof(Single_entry_t) / sizeof(int);
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(Single_words);
     Single_entry(n).tk = k;
 }
 
@@ -1129,9 +1103,7 @@ typedef struct {
 #define End_words (sizeof(End_entry_t) / sizeof(int))
 
 static void ast_End(void) {
-    n -= End_words;
-    if (n < ast)
-        fatal("AST overflow compiler error. Program too big");
+    push_ast(End_words);
     End_entry(n).tk = ';';
 }
 
