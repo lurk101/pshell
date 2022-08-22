@@ -35,7 +35,7 @@
     {"coshf", 1 | (1 << 5) | (1 << 10), math_defines, coshf, 1, 0, 0},
     {"exit", 1, stdlib_defines, x_exit, 0, 0, 0},
     {"fmodf", 2 | (2 << 5) | (0b11 << 10), math_defines, fmodf, 1, 0, 0},
-    {"free", 1, stdlib_defines, sys_free, 0, 0, 0},
+    {"free", 1, stdlib_defines, cc_free, 0, 0, 0},
     {"frequency_count_khz", 1, clk_defines, frequency_count_khz, 0, 0, 0},
     {"frequency_count_mhz", 1, clk_defines, frequency_count_mhz, 0, 0, 0},
     {"getchar", 0, stdio_defines, getchar, 0, 0, 0},

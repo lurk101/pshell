@@ -251,7 +251,7 @@ static __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
     longjmp(done_jmp, 1);
 }
 
-static void* sys_malloc(int l, int die) {
+static void* cc_malloc(int l, int die) {
     int* p = malloc(l + 8);
     if (!p) {
         if (die)
@@ -265,7 +265,7 @@ static void* sys_malloc(int l, int die) {
     return p + 2;
 }
 
-static void sys_free(void* p) {
+static void cc_free(void* p) {
     if (!p)
         fatal("freeing a NULL pointer");
     int* p2 = (int*)p - 2;
@@ -284,7 +284,7 @@ static void sys_free(void* p) {
 }
 
 // stubs for now
-static void* wrap_malloc(int len) { return sys_malloc(len, 0); };
+static void* wrap_malloc(int len) { return cc_malloc(len, 0); };
 
 static struct file_handle {
     struct file_handle* next;
@@ -296,7 +296,7 @@ static struct file_handle {
 } * file_list;
 
 static int wrap_open(char* name, int mode) {
-    struct file_handle* h = sys_malloc(sizeof(struct file_handle), 1);
+    struct file_handle* h = cc_malloc(sizeof(struct file_handle), 1);
     h->is_dir = false;
     int lfs_mode = (mode & 0xf) + 1;
     if (mode & O_CREAT)
@@ -308,7 +308,7 @@ static int wrap_open(char* name, int mode) {
     if (mode & O_APPEND)
         lfs_mode |= LFS_O_APPEND;
     if (fs_file_open(&h->u.file, full_path(name), lfs_mode) < LFS_ERR_OK) {
-        sys_free(h);
+        cc_free(h);
         return 0;
     }
     h->next = file_list;
@@ -317,10 +317,10 @@ static int wrap_open(char* name, int mode) {
 }
 
 static int wrap_opendir(char* name) {
-    struct file_handle* h = sys_malloc(sizeof(struct file_handle), 1);
+    struct file_handle* h = cc_malloc(sizeof(struct file_handle), 1);
     h->is_dir = true;
     if (fs_dir_open(&h->u.dir, full_path(name)) < LFS_ERR_OK) {
-        sys_free(h);
+        cc_free(h);
         return 0;
     }
     h->next = file_list;
@@ -338,7 +338,7 @@ static void wrap_close(int handle) {
                 fs_dir_close(&h->u.dir);
             else
                 fs_file_close(&h->u.file);
-            sys_free(h);
+            cc_free(h);
             return;
         }
         last_h = h;
@@ -380,11 +380,11 @@ static int wrap_remove(char* name) { return fs_remove(full_path(name)); };
 
 static int wrap_rename(char* old, char* new) {
     char* fp = full_path(old);
-    char* fpa = sys_malloc(strlen(fp) + 1, 1);
+    char* fpa = cc_malloc(strlen(fp) + 1, 1);
     strcpy(fpa, fp);
     char* fpb = full_path(new);
     int r = fs_rename(fpa, fpb);
-    sys_free(fpa);
+    cc_free(fpa);
     return r;
 }
 
@@ -2313,7 +2313,7 @@ static void emit_load_long_imm(int r, int val, int ext) {
         ++pcrel_count;
         if (pcrel_1st == 0)
             pcrel_1st = e;
-        p = sys_malloc(sizeof(struct patch_s), 1);
+        p = cc_malloc(sizeof(struct patch_s), 1);
         p->val = val;
         p->ext = ext;
         if (pcrel == 0)
@@ -2325,7 +2325,7 @@ static void emit_load_long_imm(int r, int val, int ext) {
             p2->next = p;
         }
     }
-    struct patch_s* pl = sys_malloc(sizeof(struct patch_s), 1);
+    struct patch_s* pl = cc_malloc(sizeof(struct patch_s), 1);
     pl->addr = e;
     pl->next = p->locs;
     p->locs = pl;
@@ -2373,18 +2373,18 @@ static void patch_pc_relative(int brnch) {
                 fatal("unexpected compiler error");
             *pl->addr |= ofs;
             p->locs = pl->next;
-            sys_free(pl);
+            cc_free(pl);
         }
         emit_word(p->val);
         if (ofn && p->ext) {
-            struct reloc_s* r = sys_malloc(sizeof(struct reloc_s), 1);
+            struct reloc_s* r = cc_malloc(sizeof(struct reloc_s), 1);
             r->addr = (int)(e - 1);
             r->next = relocs;
             relocs = r;
             nrelocs++;
         }
         pcrel = p->next;
-        sys_free(p);
+        cc_free(p);
     }
     pcrel_1st = 0;
 }
@@ -3022,7 +3022,7 @@ static void gen(int* n) {
         if (k) {
             l = Func_entry(n).parm_types >> 10;
             int* t;
-            t = sys_malloc(sizeof(int) * (k + 1), 1);
+            t = cc_malloc(sizeof(int) * (k + 1), 1);
             j = 0;
             while (ast_Tk(b)) {
                 t[j++] = (int)b;
@@ -3035,7 +3035,7 @@ static void gen(int* n) {
                 --j;
                 b = (uint16_t*)t[j];
             }
-            sys_free(t);
+            cc_free(t);
         }
         if (i == Syscall)
             emit_syscall(Func_entry(n).addr, Func_entry(n).parm_types);
@@ -3062,7 +3062,7 @@ static void gen(int* n) {
         while (cnts) {
             t = (uint16_t*)cnts->next;
             patch_branch(cnts->addr, e + 1);
-            sys_free(cnts);
+            cc_free(cnts);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
@@ -3072,7 +3072,7 @@ static void gen(int* n) {
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch(brks->addr, e + 1);
-            sys_free(brks);
+            cc_free(brks);
             brks = (struct patch_s*)t;
         }
         brks = (struct patch_s*)b;
@@ -3090,7 +3090,7 @@ static void gen(int* n) {
             t = (uint16_t*)cnts->next;
             t2 = e;
             patch_branch(cnts->addr, e + 1);
-            sys_free(cnts);
+            cc_free(cnts);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
@@ -3105,7 +3105,7 @@ static void gen(int* n) {
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch(brks->addr, e + 1);
-            sys_free(brks);
+            cc_free(brks);
             brks = (struct patch_s*)t;
         }
         brks = (struct patch_s*)b;
@@ -3125,7 +3125,7 @@ static void gen(int* n) {
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch((uint16_t*)(brks->addr), e + 1);
-            sys_free(brks);
+            cc_free(brks);
             brks = (struct patch_s*)t;
         }
         emit_adjust_stack(1);
@@ -3149,13 +3149,13 @@ static void gen(int* n) {
             ecas = a;
         break;
     case Break:
-        patch = sys_malloc(sizeof(struct patch_s), 1);
+        patch = cc_malloc(sizeof(struct patch_s), 1);
         patch->addr = emit_call(0);
         patch->next = brks;
         brks = patch;
         break;
     case Continue:
-        patch = sys_malloc(sizeof(struct patch_s), 1);
+        patch = cc_malloc(sizeof(struct patch_s), 1);
         patch->next = cnts;
         patch->addr = emit_call(0);
         cnts = patch;
@@ -3163,7 +3163,7 @@ static void gen(int* n) {
     case Goto:
         label = (struct ident_s*)Num_entry(n).val;
         if (label->class == 0) {
-            struct patch_s* l = sys_malloc(sizeof(struct patch_s), 1);
+            struct patch_s* l = cc_malloc(sizeof(struct patch_s), 1);
             l->addr = emit_call(0);
             l->next = (struct patch_s*)label->forward;
             label->forward = (uint16_t*)l;
@@ -3194,7 +3194,7 @@ static void gen(int* n) {
             struct patch_s* l = (struct patch_s*)label->forward;
             patch_branch(l->addr, d + 1);
             label->forward = (uint16_t*)l->next;
-            sys_free(l);
+            cc_free(l);
         }
         label->val = (int)d;
         label->class = Label;
@@ -3376,7 +3376,7 @@ static void stmt(int ctx) {
                         if (tk != Id)
                             fatal("bad struct member definition");
                         sz = (ty >= PTR) ? sizeof(int) : tsize[ty >> 2];
-                        struct member_s* m = sys_malloc(sizeof(struct member_s), 1);
+                        struct member_s* m = cc_malloc(sizeof(struct member_s), 1);
                         m->id = id;
                         m->etype = 0;
                         next();
@@ -3919,7 +3919,7 @@ static void x_exit(int rc) {
 
 static char* x_strdup(char* s) {
     int l = strlen(s);
-    char* c = sys_malloc(l + 1, 0);
+    char* c = cc_malloc(l + 1, 0);
     strcpy(c, s);
     return c;
 }
@@ -4050,8 +4050,8 @@ int cc(int mode, int argc, char** argv) {
         goto done;
 
     if (mode == 0) {
-        sym_base = sym = sys_malloc(SYM_TBL_BYTES, 1);
-        sym_text_base = sym_text = sys_malloc(SYM_TEXT_SIZE, 1);
+        sym_base = sym = cc_malloc(SYM_TBL_BYTES, 1);
+        sym_text_base = sym_text = cc_malloc(SYM_TEXT_SIZE, 1);
 
         // Register keywords in symbol stack. Must match the sequence of enum
         p = "enum char int float struct union sizeof return goto break continue "
@@ -4075,8 +4075,8 @@ int cc(int mode, int argc, char** argv) {
 
         data_base = data = __StackLimit + TEXT_BYTES;
         memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
-        tsize = sys_malloc(TS_TBL_BYTES, 1);
-        ast = sys_malloc(AST_TBL_BYTES, 1);
+        tsize = cc_malloc(TS_TBL_BYTES, 1);
+        ast = cc_malloc(AST_TBL_BYTES, 1);
         n = ast + (AST_TBL_BYTES / 4) - 1;
 
         // add primitive types
@@ -4156,22 +4156,22 @@ int cc(int mode, int argc, char** argv) {
         add_defines(spi_defines);
         add_defines(irq_defines);
 
-        char* fn = sys_malloc(strlen(full_path(*argv)) + 3, 1);
+        char* fn = cc_malloc(strlen(full_path(*argv)) + 3, 1);
         strcpy(fn, full_path(*argv));
         if (strrchr(fn, '.') == NULL)
             strcat(fn, ".c");
-        fd = sys_malloc(sizeof(lfs_file_t), 1);
+        fd = cc_malloc(sizeof(lfs_file_t), 1);
         if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
-            sys_free(fd);
+            cc_free(fd);
             fd = NULL;
             fatal("could not open %s \n", fn);
         }
-        sys_free(fn);
+        cc_free(fn);
 
         text_base = le = (uint16_t*)__StackLimit;
         e = text_base - 1;
 
-        members = sys_malloc(MEMBER_DICT_BYTES, 1);
+        members = cc_malloc(MEMBER_DICT_BYTES, 1);
 
         get_line();
 
@@ -4187,24 +4187,24 @@ int cc(int mode, int argc, char** argv) {
             if (scan->class == Func && scan->forward)
                 fatal("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
         fs_file_close(fd);
-        sys_free(fd);
+        cc_free(fd);
         fd = NULL;
-        sys_free(ast);
+        cc_free(ast);
         ast = NULL;
-        sys_free(sym_base);
+        cc_free(sym_base);
         sym_base = NULL;
-        sys_free(sym_text_base);
+        cc_free(sym_text_base);
         sym_text_base = NULL;
-        sys_free(tsize);
+        cc_free(tsize);
         tsize = NULL;
         if (!idmain->val)
             fatal("main() not defined\n");
         exe.entry = idmain->val;
         if (ofn) {
-            fd = sys_malloc(sizeof(lfs_file_t), 1);
+            fd = cc_malloc(sizeof(lfs_file_t), 1);
             char* cp = full_path(ofn);
             if (fs_file_open(fd, cp, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
-                sys_free(fd);
+                cc_free(fd);
                 fd = NULL;
                 fatal("could not create %s\n", full_path(ofn));
             }
@@ -4230,11 +4230,11 @@ int cc(int mode, int argc, char** argv) {
                     fatal("error writing executable file");
                 }
                 struct reloc_s* r = relocs->next;
-                sys_free(relocs);
+                cc_free(relocs);
                 relocs = r;
             }
             fs_file_close(fd);
-            sys_free(fd);
+            cc_free(fd);
             fd = NULL;
             if (fs_setattr(full_path(ofn), 1, "exe", 4) < LFS_ERR_OK)
                 fatal("unable to set executable attribute");
@@ -4253,7 +4253,7 @@ int cc(int mode, int argc, char** argv) {
             fatal("file %s not found or not executable", ofn);
         if (memcmp(buf, "exe", 4))
             fatal("file %s not found or not executable", ofn);
-        fd = sys_malloc(sizeof(lfs_file_t), 1);
+        fd = cc_malloc(sizeof(lfs_file_t), 1);
         if (fs_file_open(fd, ofn, LFS_O_RDONLY) < LFS_ERR_OK)
             fatal("can't open file %s", ofn);
         if (fs_file_read(fd, &exe, sizeof(exe)) != sizeof(exe)) {
@@ -4290,7 +4290,7 @@ int cc(int mode, int argc, char** argv) {
             }
         }
         fs_file_close(fd);
-        sys_free(fd);
+        cc_free(fd);
         fd = NULL;
     }
 
@@ -4321,7 +4321,7 @@ done:
         file_list = file_list->next;
     }
     while (malloc_list)
-        sys_free(malloc_list + 2);
+        cc_free(malloc_list + 2);
 
     return rslt;
 }
