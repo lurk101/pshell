@@ -32,9 +32,6 @@
 #include <pico/time.h>
 
 #include "armdisasm.h"
-#ifndef NDEBUG
-#include "cc_dmpast.h"
-#endif
 #include "cc.h"
 #include "fs.h"
 
@@ -150,7 +147,6 @@ static int loc;                      // local variable offset
 static int lineno;                   // current line number
 static int src_opt;                  // print source and assembly flag
 static int uchar_opt;                // use unsigned character variables
-static int ast_opt;                  // dump the abstract symbol table
 static int* n;                       // current position in emitted abstract syntax tree
                                      // With an AST, the compiler is not limited to generate
                                      // code on the fly with parsing.
@@ -449,8 +445,8 @@ static void clear_globals(void) {
     pcrel = brks = cnts = NULL;
     fd = NULL;
     file_list = NULL;
-    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = ast_opt = src_opt = ld =
-        pplev = pplevt = pcrel_count = nrelocs = 0;
+    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld = pplev = pplevt =
+        pcrel_count = nrelocs = 0;
     ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
@@ -916,7 +912,6 @@ static void ast_Assign(int right_part, int type) {
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
     Assign_entry(n).right_part = right_part;
-	if (*((int*)right_part) == 0) fatal("xxx");
     Assign_entry(n).type = type;
     Assign_entry(n).tk = Assign;
 }
@@ -982,7 +977,6 @@ static void ast_CastF(int way, int val) {
         fatal("AST overflow compiler error. Program too big");
     CastF_entry(n).tk = CastF;
     CastF_entry(n).val = val;
-	if (*((int*)val) == 0) fatal("xxx");
     CastF_entry(n).way = way;
 }
 
@@ -1023,8 +1017,6 @@ static void ast_Oper(int oprnd, int op) {
         fatal("AST overflow compiler error. Program too big");
     Oper_entry(n).tk = op;
     Oper_entry(n).oprnd = oprnd;
-	if (*((int*)oprnd) == 0)
-		fatal("xxx");
 }
 
 typedef struct {
@@ -1502,7 +1494,7 @@ static void expr(int lev) {
             Num_entry(n).val = !Num_entry(n).val;
         else {
             ast_Num(0);
-            ast_Oper((int)(n + Num_words), Eq); //xxx
+            ast_Oper((int)(n + Num_words), Eq);
         }
         ty = INT;
         break;
@@ -1599,7 +1591,7 @@ static void expr(int lev) {
             if (ast_Tk(n) != Load)
                 fatal("bad lvalue in assignment");
             otk = tk;
-            n += Load_words; //????
+            n += Load_words;
             b = n;
             ast_End();
             ast_Load(t);
@@ -2029,7 +2021,7 @@ static void expr(int lev) {
                 fatal("structure member not found");
             if (m->offset) {
                 ast_Num(m->offset);
-                ast_Oper((int)(n + Num_words), Add); //xxx
+                ast_Oper((int)(n + Num_words), Add);
             }
             ty = m->type;
             next();
@@ -2109,11 +2101,12 @@ static void expr(int lev) {
                     Num_entry(n).val *= sz;
                 else {
                     ast_Num(sz);
-                    ast_Oper((int)n, Mul);
+                    ast_Oper((int)(n + Num_words), Mul);
                 }
             }
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
-                Num_entry(n).val += Num_entry(b).val;
+                Num_entry(b).val += Num_entry(n).val;
+                n = b;
             } else
                 ast_Oper((int)b, Add);
         add_simple:
@@ -2785,7 +2778,7 @@ static void gen(int* n) {
     case Assign: // assign the value to variables
         gen((int*)Assign_entry(n).right_part);
         emit_push(0);
-        gen(n + Num_words);
+        gen(n + Assign_words); // xxxx
         l = Num_entry(n).val & 0xffff;
         // Add SC/SI instruction to save value in register to variable address
         // held on stack.
@@ -3189,7 +3182,6 @@ static void gen(int* n) {
     case Enter:
         emit_enter(Num_entry(n).val);
         gen(n + Enter_words);
-        // if (*(e - 1) != 0x46bd && *e != 0xbdf0)
         emit_leave(); // don't issue it again if already emitted by return stmt
         patch_pc_relative(0);
         break;
@@ -4003,7 +3995,6 @@ static void help(char* lib) {
                "    -s      display disassembly and quit.\n"
                "    -o      name of executable output file.\n"
                "    -u      treat char type as unsigned.\n"
-               "    -a      dump the abstract syntax tree."
                "    -D symbol [= value]\n"
                "            define symbol for limited pre-processor, can repeat.\n"
                "    -h      Compiler help. lib lists externals.\n"
@@ -4107,8 +4098,6 @@ int cc(int mode, int argc, char** argv) {
                 goto done;
             } else if ((*argv)[1] == 's') {
                 src_opt = 1;
-            } else if ((*argv)[1] == 'a') {
-                ast_opt = 1;
             } else if ((*argv)[1] == 'o') {
                 --argc;
                 ++argv;
@@ -4251,10 +4240,6 @@ int cc(int mode, int argc, char** argv) {
                 fatal("unable to set executable attribute");
             printf("\ntext  %06x\ndata  %06x\nentry %06x\nreloc %06x\n", exe.tsize, exe.dsize,
                    exe.entry - (int)__StackLimit, exe.nreloc);
-            goto done;
-        }
-        if (ast_opt) {
-            ast_dump((int)n);
             goto done;
         }
         if (src_opt)
