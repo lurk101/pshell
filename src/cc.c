@@ -163,6 +163,7 @@ static char* sym_text_base;
 static char line[128];
 static int line_len;
 static char* ofn;
+static int indef;
 
 // identifier
 struct ident_s {
@@ -446,7 +447,7 @@ static void clear_globals(void) {
     fd = NULL;
     file_list = NULL;
     swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld = pplev = pplevt =
-        pcrel_count = nrelocs = 0;
+        pcrel_count = nrelocs = indef = 0;
     ncas = 0;
     memset(&tkv, 0, sizeof(tkv));
     memset(&members, 0, sizeof(members));
@@ -490,348 +491,6 @@ static int extern_search(char* name) // get cache index of external function
             return middle;
     }
     return -1;
-}
-
-static void expr(int lev);
-
-/* parse next token
- * 1. store data into id and then set the id to current lexcial form
- * 2. set tk to appropriate type
- */
-static void next() {
-    char* pp;
-    int t, t2;
-
-    /* using loop to ignore whitespace characters, but characters that
-     * cannot be recognized by the lexical analyzer are considered blank
-     * characters, such as '@' and '$'.
-     */
-    while ((tk = *p)) {
-        ++p;
-        if ((tk >= 'a' && tk <= 'z') || (tk >= 'A' && tk <= 'Z') || (tk == '_')) {
-            pp = p - 1;
-            while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
-                   (*p >= '0' && *p <= '9') || (*p == '_'))
-                tk = tk * 147 + *p++;
-            tk = (tk << 6) + (p - pp); // hash plus symbol length
-            // hash value is used for fast comparison. Since it is inaccurate,
-            // we have to validate the memory content as well.
-            for (id = sym; id->tk; ++id) { // find one free slot in table
-                if (tk == id->hash &&      // if token is found (hash match), overwrite
-                    !memcmp(id->name, pp, p - pp)) {
-                    tk = id->tk;
-                    return;
-                }
-            }
-            /* At this point, existing symbol name is not found.
-             * "id" points to the first unused symbol table entry.
-             */
-            if ((id + 1) > (sym_base + (SYM_TBL_BYTES / sizeof(*id))))
-                fatal("symbol table overflow");
-            int nl = p - pp;
-            if (sym_text + nl >= sym_text_base + SYM_TEXT_SIZE)
-                fatal("symbol table overflow");
-            id->name = sym_text;
-            memcpy(sym_text, pp, nl);
-            sym_text += nl;
-            id->hash = tk;
-            id->forward = 0;
-            id->inserted = 0;
-            tk = id->tk = Id; // token type identifier
-            return;
-        }
-        /* Calculate the constant */
-        // first byte is a number, and it is considered a numerical value
-        else if (tk >= '0' && tk <= '9') {
-            tk = Num;                             // token is char or int
-            tkv.i = strtoul((pp = p - 1), &p, 0); // octal, decimal, hex parsing
-            if (*p == '.') {
-                tkv.f = strtof(pp, &p);
-                tk = NumF;
-            } // float
-            return;
-        }
-        switch (tk) {
-        case '\n':
-            if (src_opt)
-                printf("%d: %.*s", lineno, p - lp, line);
-            get_line();
-            ++lineno;
-        case ' ':
-        case '\t':
-        case '\v':
-        case '\f':
-        case '\r':
-            break;
-        case '/':
-            if (*p == '/') { // comment
-                while (*p != 0 && *p != '\n')
-                    ++p;
-                if (*p)
-                    get_line();
-            } else if (*p == '*') { // C-style multiline comments
-                for (++p; (*p != 0); ++p) {
-                    pp = p + 1;
-                    if (*p == '\n') {
-                        get_line();
-                        ++lineno;
-                        p = line - 1;
-                    } else if (*p == '*' && *pp == '/') {
-                        p += 1;
-                        break;
-                    }
-                }
-                if (*p)
-                    ++p;
-            } else {
-                if (*p == '=') {
-                    ++p;
-                    tk = DivAssign;
-                } else
-                    tk = Div;
-                return;
-            }
-            break;
-        case '#': // skip include statements, and most preprocessor directives
-            if (!strncmp(p, "define", 6)) {
-                p += 6;
-                next();
-                if (tk == Id) {
-                    while (*p == ' ' || *p == '\t')
-                        ++p;
-                    t2 = 0;
-                    if (*p == '-') {
-                        t2 = 1;
-                        ++p;
-                    }
-                    next();
-                    if (tk == Num) {
-                        id->class = Num;
-                        id->type = INT;
-                        id->val = t2 ? -tkv.i : tkv.i;
-                    }
-                }
-            } else if ((t = !strncmp(p, "ifdef", 5)) || !strncmp(p, "ifndef", 6)) {
-                p += 6;
-                next();
-                if (tk != Id)
-                    fatal("No identifier");
-                ++pplev;
-                if ((((id->class != Num) ? 0 : 1) ^ (t ? 1 : 0)) & 1) {
-                    t = pplevt;
-                    pplevt = pplev - 1;
-                    while (*p != 0 && *p != '\n')
-                        ++p; // discard until end-of-line
-                    if (*p)
-                        get_line();
-                    do
-                        next();
-                    while (pplev != pplevt);
-                    pplevt = t;
-                }
-            } else if (!strncmp(p, "if", 2)) {
-                // ignore side effects of preprocessor if-statements
-                ++pplev;
-            } else if (!strncmp(p, "endif", 5)) {
-                if (--pplev < 0)
-                    fatal("preprocessor context nesting error");
-                if (pplev == pplevt)
-                    return;
-            }
-            while (*p != 0 && *p != '\n')
-                ++p; // discard until end-of-line
-            if (*p)
-                get_line();
-            break;
-        case '\'': // quotes start with character (string)
-        case '"':
-            pp = data;
-            while (*p != 0 && *p != tk) {
-                if ((tkv.i = *p++) == '\\') {
-                    switch (tkv.i = *p++) {
-                    case 'n':
-                        tkv.i = '\n';
-                        break; // new line
-                    case 't':
-                        tkv.i = '\t';
-                        break; // horizontal tab
-                    case 'v':
-                        tkv.i = '\v';
-                        break; // vertical tab
-                    case 'f':
-                        tkv.i = '\f';
-                        break; // form feed
-                    case 'r':
-                        tkv.i = '\r';
-                        break; // carriage return
-                    case '0':
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                        t = tkv.i - '0';
-                        t2 = 1;
-                        while (*p >= '0' & *p <= '7') {
-                            if (++t2 > 3)
-                                break;
-                            t = (t << 3) + *p++ - '0';
-                        }
-                        if (t > 255)
-                            fatal("bad octal character in string");
-                        tkv.i = t; // octal representation
-                        break;
-                    case 'x':
-                    case 'X':
-                        t = 0;
-                        while ((*p >= '0' & *p <= '9') || (*p >= 'a' & *p <= 'f') ||
-                               (*p >= 'A' & *p <= 'F')) {
-                            if (*p >= '0' & *p <= '9')
-                                t = (t << 4) + *p++ - '0';
-                            else if (*p >= 'A' & *p <= 'F')
-                                t = (t << 4) + *p++ - 'A' + 10;
-                            else
-                                t = (t << 4) + *p++ - 'a' + 10;
-                        }
-                        if (t > 255)
-                            fatal("bad hexadecimal character in string");
-                        tkv.i = t; // hexadecimal representation
-                        break;     // an int with value 0
-                    }
-                }
-                // if it is double quotes (string literal), it is considered as
-                // a string, copying characters to data
-                if (tk == '"') {
-                    if (data >= data_base + (DATA_BYTES / 4))
-                        fatal("program data exceeds data segment");
-                    *data++ = tkv.i;
-                }
-            }
-            ++p;
-            if (tk == '"')
-                tkv.i = (int)pp;
-            else
-                tk = Num;
-            return;
-        case '=':
-            if (*p == '=') {
-                ++p;
-                tk = Eq;
-            } else
-                tk = Assign;
-            return;
-        case '*':
-            if (*p == '=') {
-                ++p;
-                tk = MulAssign;
-            } else
-                tk = Mul;
-            return;
-        case '+':
-            if (*p == '+') {
-                ++p;
-                tk = Inc;
-            } else if (*p == '=') {
-                ++p;
-                tk = AddAssign;
-            } else
-                tk = Add;
-            return;
-        case '-':
-            if (*p == '-') {
-                ++p;
-                tk = Dec;
-            } else if (*p == '>') {
-                ++p;
-                tk = Arrow;
-            } else if (*p == '=') {
-                ++p;
-                tk = SubAssign;
-            } else
-                tk = Sub;
-            return;
-        case '[':
-            tk = Bracket;
-            return;
-        case '&':
-            if (*p == '&') {
-                ++p;
-                tk = Lan;
-            } else if (*p == '=') {
-                ++p;
-                tk = AndAssign;
-            } else
-                tk = And;
-            return;
-        case '!':
-            if (*p == '=') {
-                ++p;
-                tk = Ne;
-            }
-            return;
-        case '<':
-            if (*p == '=') {
-                ++p;
-                tk = Le;
-            } else if (*p == '<') {
-                ++p;
-                if (*p == '=') {
-                    ++p;
-                    tk = ShlAssign;
-                } else
-                    tk = Shl;
-            } else
-                tk = Lt;
-            return;
-        case '>':
-            if (*p == '=') {
-                ++p;
-                tk = Ge;
-            } else if (*p == '>') {
-                ++p;
-                if (*p == '=') {
-                    ++p;
-                    tk = ShrAssign;
-                } else
-                    tk = Shr;
-            } else
-                tk = Gt;
-            return;
-        case '|':
-            if (*p == '|') {
-                ++p;
-                tk = Lor;
-            } else if (*p == '=') {
-                ++p;
-                tk = OrAssign;
-            } else
-                tk = Or;
-            return;
-        case '^':
-            if (*p == '=') {
-                ++p;
-                tk = XorAssign;
-            } else
-                tk = Xor;
-            return;
-        case '%':
-            if (*p == '=') {
-                ++p;
-                tk = ModAssign;
-            } else
-                tk = Mod;
-            return;
-        case '?':
-            tk = Cond;
-            return;
-        case '.':
-            tk = Dot;
-        default:
-            return;
-        }
-    }
 }
 
 static void push_ast(int l) {
@@ -1044,9 +703,10 @@ static void ast_Default(int v1) {
 }
 
 static void ast_NumF(int v1) {
-    push_ast(Double_words);
-    Double_entry(n).tk = NumF;
-    Double_entry(n).v1 = v1;
+    push_ast(Num_words);
+    Num_entry(n).tk = NumF;
+    Num_entry(n).val = v1;
+    Num_entry(n).valH = 0;
 }
 
 static void ast_Loc(int addr) {
@@ -1105,6 +765,363 @@ typedef struct {
 static void ast_End(void) {
     push_ast(End_words);
     End_entry(n).tk = ';';
+}
+
+static void expr(int lev);
+
+/* parse next token
+ * 1. store data into id and then set the id to current lexcial form
+ * 2. set tk to appropriate type
+ */
+static void next() {
+    char *pp, *tp, tc;
+    int t, t2;
+    struct ident_s* i2;
+
+    /* using loop to ignore whitespace characters, but characters that
+     * cannot be recognized by the lexical analyzer are considered blank
+     * characters, such as '@' and '$'.
+     */
+    while ((tk = *p)) {
+        ++p;
+        if ((tk >= 'a' && tk <= 'z') || (tk >= 'A' && tk <= 'Z') || (tk == '_')) {
+            pp = p - 1;
+            while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+                   (*p >= '0' && *p <= '9') || (*p == '_'))
+                tk = tk * 147 + *p++;
+            tk = (tk << 6) + (p - pp); // hash plus symbol length
+            // hash value is used for fast comparison. Since it is inaccurate,
+            // we have to validate the memory content as well.
+            for (id = sym; id->tk; ++id) { // find one free slot in table
+                if (tk == id->hash &&      // if token is found (hash match), overwrite
+                    !memcmp(id->name, pp, p - pp)) {
+                    tk = id->tk;
+                    return;
+                }
+            }
+            /* At this point, existing symbol name is not found.
+             * "id" points to the first unused symbol table entry.
+             */
+            if ((id + 1) > (sym_base + (SYM_TBL_BYTES / sizeof(*id))))
+                fatal("symbol table overflow");
+            int nl = p - pp;
+            if (sym_text + nl >= sym_text_base + SYM_TEXT_SIZE)
+                fatal("symbol table overflow");
+            id->name = sym_text;
+            memcpy(sym_text, pp, nl);
+            sym_text += nl;
+            id->hash = tk;
+            id->forward = 0;
+            id->inserted = 0;
+            tk = id->tk = Id; // token type identifier
+            return;
+        }
+        /* Calculate the constant */
+        // first byte is a number, and it is considered a numerical value
+        else if (tk >= '0' && tk <= '9') {
+            tk = Num;                             // token is char or int
+            tkv.i = strtoul((pp = p - 1), &p, 0); // octal, decimal, hex parsing
+            if (*p == '.') {
+                tkv.f = strtof(pp, &p);
+                tk = NumF;
+            } // float
+            return;
+        }
+        switch (tk) {
+        case '\n':
+            if (src_opt)
+                printf("%d: %.*s", lineno, p - lp, line);
+            get_line();
+            ++lineno;
+            if (indef) {
+                indef = 0;
+                tk = ';';
+                return;
+            }
+        case ' ':
+        case '\t':
+        case '\v':
+        case '\f':
+        case '\r':
+            break;
+        case '/':
+            if (*p == '/') { // comment
+                while (*p != 0 && *p != '\n')
+                    ++p;
+                if (*p)
+                    get_line();
+            } else if (*p == '*') { // C-style multiline comments
+                for (++p; (*p != 0); ++p) {
+                    pp = p + 1;
+                    if (*p == '\n') {
+                        get_line();
+                        ++lineno;
+                        p = line - 1;
+                    } else if (*p == '*' && *pp == '/') {
+                        p += 1;
+                        break;
+                    }
+                }
+                if (*p)
+                    ++p;
+            } else {
+                if (*p == '=') {
+                    ++p;
+                    tk = DivAssign;
+                } else
+                    tk = Div;
+                return;
+            }
+            break;
+        case '#': // skip include statements, and most preprocessor directives
+            if (!strncmp(p, "define", 6)) {
+                p += 6;
+                next();
+                i2 = id;
+                // anything before eol?
+                tp = p;
+                while ((*tp == ' ') || (*tp == '\t'))
+                    ++tp;
+                if ((*tp != 0) && (*tp != '\n') && memcmp(tp, "//", 2) && memcmp(tp, "/*", 2)) {
+                    // id->class = Glo;
+                    indef = 1; // prevent recursive loop
+                    next();
+                    expr(Assign);
+                    if ((ast_Tk(n) == Num) || (ast_Tk(n) == NumF)) {
+                        id = i2;
+                        id->class = ast_Tk(n);
+                        id->type = ast_Tk(n) == Num ? INT : FLOAT;
+                        id->val = Num_entry(n).val;
+                        n += Num_words;
+                        break;
+                    } else
+                        fatal("define value must be a constant integer or float expression");
+                } else {
+                    id->class = Num;
+                    id->type = INT;
+                    id->val = 0;
+                }
+            } else if ((t = !strncmp(p, "ifdef", 5)) || !strncmp(p, "ifndef", 6)) {
+                p += 6;
+                next();
+                if (tk != Id)
+                    fatal("No identifier");
+                ++pplev;
+                if ((((id->class != Num && id->class != NumF) ? 0 : 1) ^ (t ? 1 : 0)) & 1) {
+                    t = pplevt;
+                    pplevt = pplev - 1;
+                    while (*p != 0 && *p != '\n')
+                        ++p; // discard until end-of-line
+                    if (*p)
+                        get_line();
+                    do
+                        next();
+                    while (pplev != pplevt);
+                    pplevt = t;
+                }
+            } else if (!strncmp(p, "if", 2)) {
+                // ignore side effects of preprocessor if-statements
+                ++pplev;
+            } else if (!strncmp(p, "endif", 5)) {
+                if (--pplev < 0)
+                    fatal("preprocessor context nesting error");
+                if (pplev == pplevt)
+                    return;
+            }
+            while (*p != 0 && *p != '\n')
+                ++p; // discard until end-of-line
+            if (!*p)
+                get_line();
+            break;
+        case '\'': // quotes start with character (string)
+        case '"':
+            pp = data;
+            while (*p != 0 && *p != tk) {
+                if ((tkv.i = *p++) == '\\') {
+                    switch (tkv.i = *p++) {
+                    case 'n':
+                        tkv.i = '\n';
+                        break; // new line
+                    case 't':
+                        tkv.i = '\t';
+                        break; // horizontal tab
+                    case 'v':
+                        tkv.i = '\v';
+                        break; // vertical tab
+                    case 'f':
+                        tkv.i = '\f';
+                        break; // form feed
+                    case 'r':
+                        tkv.i = '\r';
+                        break; // carriage return
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                        t = tkv.i - '0';
+                        t2 = 1;
+                        while (*p >= '0' & *p <= '7') {
+                            if (++t2 > 3)
+                                break;
+                            t = (t << 3) + *p++ - '0';
+                        }
+                        if (t > 255)
+                            fatal("bad octal character in string");
+                        tkv.i = t; // octal representation
+                        break;
+                    case 'x':
+                    case 'X':
+                        t = 0;
+                        while ((*p >= '0' & *p <= '9') || (*p >= 'a' & *p <= 'f') ||
+                               (*p >= 'A' & *p <= 'F')) {
+                            if (*p >= '0' & *p <= '9')
+                                t = (t << 4) + *p++ - '0';
+                            else if (*p >= 'A' & *p <= 'F')
+                                t = (t << 4) + *p++ - 'A' + 10;
+                            else
+                                t = (t << 4) + *p++ - 'a' + 10;
+                        }
+                        if (t > 255)
+                            fatal("bad hexadecimal character in string");
+                        tkv.i = t; // hexadecimal representation
+                        break;     // an int with value 0
+                    }
+                }
+                // if it is double quotes (string literal), it is considered as
+                // a string, copying characters to data
+                if (tk == '"') {
+                    if (data >= data_base + (DATA_BYTES / 4))
+                        fatal("program data exceeds data segment");
+                    *data++ = tkv.i;
+                }
+            }
+            ++p;
+            if (tk == '"')
+                tkv.i = (int)pp;
+            else
+                tk = Num;
+            return;
+        case '=':
+            if (*p == '=') {
+                ++p;
+                tk = Eq;
+            } else
+                tk = Assign;
+            return;
+        case '*':
+            if (*p == '=') {
+                ++p;
+                tk = MulAssign;
+            } else
+                tk = Mul;
+            return;
+        case '+':
+            if (*p == '+') {
+                ++p;
+                tk = Inc;
+            } else if (*p == '=') {
+                ++p;
+                tk = AddAssign;
+            } else
+                tk = Add;
+            return;
+        case '-':
+            if (*p == '-') {
+                ++p;
+                tk = Dec;
+            } else if (*p == '>') {
+                ++p;
+                tk = Arrow;
+            } else if (*p == '=') {
+                ++p;
+                tk = SubAssign;
+            } else
+                tk = Sub;
+            return;
+        case '[':
+            tk = Bracket;
+            return;
+        case '&':
+            if (*p == '&') {
+                ++p;
+                tk = Lan;
+            } else if (*p == '=') {
+                ++p;
+                tk = AndAssign;
+            } else
+                tk = And;
+            return;
+        case '!':
+            if (*p == '=') {
+                ++p;
+                tk = Ne;
+            }
+            return;
+        case '<':
+            if (*p == '=') {
+                ++p;
+                tk = Le;
+            } else if (*p == '<') {
+                ++p;
+                if (*p == '=') {
+                    ++p;
+                    tk = ShlAssign;
+                } else
+                    tk = Shl;
+            } else
+                tk = Lt;
+            return;
+        case '>':
+            if (*p == '=') {
+                ++p;
+                tk = Ge;
+            } else if (*p == '>') {
+                ++p;
+                if (*p == '=') {
+                    ++p;
+                    tk = ShrAssign;
+                } else
+                    tk = Shr;
+            } else
+                tk = Gt;
+            return;
+        case '|':
+            if (*p == '|') {
+                ++p;
+                tk = Lor;
+            } else if (*p == '=') {
+                ++p;
+                tk = OrAssign;
+            } else
+                tk = Or;
+            return;
+        case '^':
+            if (*p == '=') {
+                ++p;
+                tk = XorAssign;
+            } else
+                tk = Xor;
+            return;
+        case '%':
+            if (*p == '=') {
+                ++p;
+                tk = ModAssign;
+            } else
+                tk = Mod;
+            return;
+        case '?':
+            tk = Cond;
+            return;
+        case '.':
+            tk = Dot;
+        default:
+            return;
+        }
+    }
 }
 
 // verify binary operations are legal
@@ -1276,6 +1293,9 @@ static void expr(int lev) {
         else if (d->class == Num) {
             ast_Num(d->val);
             ty = INT;
+        } else if (d->class == NumF) {
+            ast_Num(d->val);
+            ty = FLOAT;
         } else if (d->class == Func) {
             ast_Num(d->val | 1);
             ty = INT;
