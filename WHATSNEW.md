@@ -1,3 +1,11 @@
+What's new in version 1.2.12
+
+- fix load data init bug preventing older code execution
+- save history on quit and usb reboot
+- add pentamino example
+- more peep hole optimizations
+- allow constant integer or float expressions as #define values
+
 What's new in version 1.2.11
 
 - command history survives reboots
