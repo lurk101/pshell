@@ -601,16 +601,20 @@ static void reboot_cmd(void) {
 #if LIB_PICO_STDIO_USB
 static void usbboot_cmd(void) {
     // release any resources we were using
-    if (mounted)
+    if (mounted) {
+        savehist();
         fs_unmount();
+    }
     reset_usb_boot(0, 0);
 }
 #endif
 
 static void quit_cmd(void) {
     // release any resources we were using
-    if (mounted)
+    if (mounted) {
+        savehist();
         fs_unmount();
+    }
     printf("\nbye!\n");
     sleep_ms(1000);
     exit(0);
