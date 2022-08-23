@@ -57,10 +57,6 @@ Starting with version 1.0.4 all development will occur on the dev branch. To bui
 ```
 git checkout dev
 ```
-To build for UART (USB is the default):
-```
-cmake .. -DUSB_CONSOLE=OFF
-```
 
 Git branches
 
@@ -79,16 +75,16 @@ C source code [examples].
 Example console log.
 
 ```sh
-Pico Shell - Copyright 1883 (c) Thomas Edison
+Pico Shell - Copyright © 1883 Thomas Edison
 This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions. See LICENSE file for details.
 
-Pico Shell v1.0.8 [master d002f0a], LittleFS v2.5, Vi 0.9.1, SDK 1.4.0
+Pico Shell v1.2.11, LittleFS v2.5, Vi 0.9.1, SDK v1.4.0
 
-console on UART [120 X 48]
+console on UART [100 X 40]
 
-enter command, hit return for help
+enter command or hit ENTER for help
 
 file system automatically mounted
 
