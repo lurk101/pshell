@@ -90,10 +90,18 @@ enum {
     aeabi_fcmpge
 };
 
-static void (*fops[])() = {__wrap___aeabi_idiv,   __wrap___aeabi_i2f,    __wrap___aeabi_f2iz,
-                           __wrap___aeabi_fadd,   __wrap___aeabi_fsub,   __wrap___aeabi_fmul,
-                           __wrap___aeabi_fdiv,   __wrap___aeabi_fcmple, __wrap___aeabi_fcmpgt,
-                           __wrap___aeabi_fcmplt, __wrap___aeabi_fcmpge};
+static void (*fops[])() = {0,
+                           __wrap___aeabi_idiv,
+                           __wrap___aeabi_i2f,
+                           __wrap___aeabi_f2iz,
+                           __wrap___aeabi_fadd,
+                           __wrap___aeabi_fsub,
+                           __wrap___aeabi_fmul,
+                           __wrap___aeabi_fdiv,
+                           __wrap___aeabi_fcmple,
+                           __wrap___aeabi_fcmpgt,
+                           __wrap___aeabi_fcmplt,
+                           __wrap___aeabi_fcmpge};
 
 struct patch_s {
     struct patch_s* next;
@@ -2505,7 +2513,7 @@ static void emit_branch(uint16_t* to) {
 
 static void emit_fop(int n) {
     if (!ofn)
-        emit_load_long_imm(2, (int)fops[n - 1], 0);
+        emit_load_long_imm(2, (int)fops[n], 0);
     else
         emit_load_long_imm(2, -n, 1);
     emit(0x4790); // blx r2
@@ -4289,12 +4297,13 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
-        if (fs_file_read(fd, &__StackLimit, exe.tsize) != exe.tsize) {
+        memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
+        if (fs_file_read(fd, __StackLimit, exe.tsize) != exe.tsize) {
             fs_file_close(fd);
             fd = NULL;
             fatal("error reading %s", ofn);
         }
-        if (exe.dsize && fs_file_read(fd, &__StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
+        if (exe.dsize && fs_file_read(fd, __StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
             fs_file_close(fd);
             fd = NULL;
             fatal("error reading %s", ofn);
@@ -4308,7 +4317,7 @@ int cc(int mode, int argc, char** argv) {
             }
             int v = *((int*)addr);
             if (v < 0)
-                *((int*)addr) = (int)fops[-v - 1];
+                *((int*)addr) = (int)fops[-v];
             else {
                 if (v == 1000)
                     *((int*)addr) = (int)x_printf;
