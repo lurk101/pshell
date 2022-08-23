@@ -2513,10 +2513,10 @@ static void emit_branch(uint16_t* to) {
 
 static void emit_fop(int n) {
     if (!ofn)
-        emit_load_long_imm(2, (int)fops[n], 0);
+        emit_load_long_imm(6, (int)fops[n], 0);
     else
-        emit_load_long_imm(2, -n, 1);
-    emit(0x4790); // blx r2
+        emit_load_long_imm(6, -n, 1);
+    emit(0x47b0); // blx r6
 }
 
 static void emit_cond_branch(uint16_t* to, int cond) {
@@ -3175,8 +3175,8 @@ static void gen(int* n) {
         gen((int*)Num_entry(n).val); // condition
         // if (*(e - 1) != IMM) // ***FIX***
         //    fatal("case label not a numeric literal");
-        emit(0x9a00); // ldr r2, [sp, #0]
-        emit(0x4290); // cmp r0, r2
+        emit(0x9e00); // ldr r6, [sp, #0]
+        emit(0x42b0); // cmp r0, r6
         emit_cond_branch(e + 2, BZ);
         ecas = emit_call(0);
         if (*((int*)Case_entry(n).expr) == Switch)
