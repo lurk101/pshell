@@ -2441,7 +2441,7 @@ static void check_pc_relative(void) {
 }
 
 static void emit_enter(int n) {
-    emit(0xb5c0);             // push {r6,r7,lr}
+    emit(0xb5f0);             // push {r4-r7,lr}
     emit(0x466f);             // mov  r7, sp
     if (n) {                  //
         if (n < 128)          //
@@ -2455,10 +2455,12 @@ static void emit_enter(int n) {
 
 static void emit_leave(void) {
     emit(0x46bd); // mov sp, r7
-    emit(0xbdc0); // pop {r6, r7, pc}
+    emit(0xbdf0); // pop {r4-r7, pc}
 }
 
 static void emit_load_addr(int n) {
+    if (n >= 0)
+        n += 2;
     if (n == -1) {
         emit(0x4638); // mov r0,r7
         return;
@@ -2605,38 +2607,50 @@ static void emit_oper(int op) {
         break;
 
     case EQ:
+        emit_pop(1);
+        emit(0x1a08); // subs r0,r1,r0
+        emit(0x4243); // negs r3,r0
+        emit(0x4158); // adcs r0,r3
+        break;
     case NE:
+        emit_pop(1);
+        emit(0x1a08); // subs r0,r1,r0
+        emit(0x1e43); // subs r3,r0,#1
+        emit(0x4198); // sbcs r0,r3
+        break;
     case GE:
+        emit_pop(1);
+        emit(0x0003); // movs r3,r0
+        emit(0x17c8); // asrs r0,r1,#31
+        emit(0x0fda); // lsrs r2,r3,#31
+        emit(0x4299); // cmp  r1,r3
+        emit(0x4150); // adcs r0,r2
+        break;
     case LT:
+        emit_pop(1);
+        emit(0x2301); // movs r3,#1
+        emit(0x4281); // cmp  r1,r0
+        emit(0xdb00); // blt.n L2
+        emit(0x2300); // movs r3,#0
+                      // L2:
+        emit(0x0018); // movs r0,r3
+        break;
     case GT:
+        emit_pop(1);
+        emit(0x2301); // movs r3,#1
+        emit(0x4281); // cmp  r1,r0
+        emit(0xdc00); // bgt.n L1
+        emit(0x2300); // movs r3,#0
+                      // L1:
+        emit(0x0018); // movs r0,r3
+        break;
     case LE:
-        emit_pop(6);
-        emit(0x4286); // cmp r6,r0
-        switch (op) {
-        case EQ:
-            emit(0xd001); // beq * + 3
-            break;
-        case NE:
-            emit(0xd101); // bne * + 3
-            break;
-        case GE:
-            emit(0xda01); // bge * + 3
-            break;
-        case LT:
-            emit(0xdb01); // blt * + 3
-            break;
-        case GT:
-            emit(0xdc01); // bgt * + 3
-            break;
-        case LE:
-            emit(0xdd01); // ble * + 3
-            break;
-        default:
-            fatal("unexpected compiler error");
-        }
-        emit(0x2000); // movs r0, #0
-        emit(0xe000); // b.n *+2
-        emit(0x2001); // movs r0, #1
+        emit_pop(1);
+        emit(0x0003); // movs r3,r0
+        emit(0x0fc8); // lsrs r0,r1,#31
+        emit(0x17da); // asrs r2,r3,#31
+        emit(0x428b); // cmp  r3,r1
+        emit(0x4150); // adcs r0,r2
         break;
 
     case DIV:
