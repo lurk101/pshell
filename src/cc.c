@@ -1601,7 +1601,12 @@ static void expr(int lev) {
             expr(otk);
             if (ast_Tk(n) == Num)
                 Num_entry(n).val *= sz;
-            ast_Oper((int)c, (otk < ShlAssign) ? Or + (otk - OrAssign) : Shl + (otk - ShlAssign));
+            if (otk < ShlAssign)
+                ast_Oper((int)c, Or + (otk - OrAssign));
+            else
+                ast_Oper((int)c, Shl + (otk - ShlAssign));
+            if (t == FLOAT && (otk >= AddAssign && otk <= DivAssign))
+                ast_Tk(n) += AddF - Add; // move to float
             typecheck(ast_Tk(n), t, ty);
             ast_Assign((int)b, (ty << 16) | t);
             ty = t;
@@ -2031,7 +2036,7 @@ static void expr(int lev) {
             }
             memsub = 1;
             int dim = ty & 3;
-			int ee = m->etype;
+            int ee = m->etype;
             b = n;
             t = ty & ~3;
         case Bracket:
@@ -2039,7 +2044,7 @@ static void expr(int lev) {
                 fatal("pointer type expected");
             if (memsub == 0) {
                 dim = id->type & 3;
-				ee = id->etype;
+                ee = id->etype;
             }
             int sum = 0, ii = dim - 1, *f = 0;
             int doload = 1;
