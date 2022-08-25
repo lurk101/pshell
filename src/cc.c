@@ -2669,49 +2669,43 @@ static void emit_oper(int op) {
 static void emit_float_oper(int op) {
     switch (op) {
     case ADDF:
-    case SUBF:
-    case MULF:
-    case DIVF:
-    case GEF:
-    case LTF:
-    case GTF:
-    case LEF:
-        if (op == ADDF || op == MULF)
-            emit_pop(1); // pop {r1}
-        else {
-            emit(0x4601); // mov r1, r0
-            emit_pop(0);  // pop {r0}
-        }
-        switch (op) {
-        case ADDF:
-            emit_fop((int)aeabi_fadd);
-            break;
-        case SUBF:
-            emit_fop((int)aeabi_fsub);
-            break;
-        case MULF:
-            emit_fop((int)aeabi_fmul);
-            break;
-        case DIVF:
-            emit_fop((int)aeabi_fdiv);
-            break;
-        case GEF:
-            emit_fop((int)aeabi_fcmpge);
-            break;
-        case LTF:
-            emit_fop((int)aeabi_fcmplt);
-            break;
-        case GTF:
-            emit_fop((int)aeabi_fcmpgt);
-            break;
-        case LEF:
-            emit_fop((int)aeabi_fcmple);
-            break;
-        default:
-            fatal("unexpected compiler error");
-        }
+        emit_pop(1); // pop {r1}
+        emit_fop((int)aeabi_fadd);
         break;
-
+    case SUBF:
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
+        emit_fop((int)aeabi_fsub);
+        break;
+    case MULF:
+        emit_pop(1);
+        emit_fop((int)aeabi_fmul);
+        break;
+    case DIVF:
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
+        emit_fop((int)aeabi_fdiv);
+        break;
+    case GEF:
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
+        emit_fop((int)aeabi_fcmpge);
+        break;
+    case GTF:
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
+        emit_fop((int)aeabi_fcmpgt);
+        break;
+    case LTF:
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
+        emit_fop((int)aeabi_fcmplt);
+        break;
+    case LEF:
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
+        emit_fop((int)aeabi_fcmple);
+        break;
     case EQF:
         emit_oper(EQ);
         break;

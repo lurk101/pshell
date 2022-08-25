@@ -1,3 +1,8 @@
+What's new in version 1.2.13
+
+- optimize integer compare operators
+- fix broken  /= *= += -= for floats
+
 What's new in version 1.2.12
 
 - fix load data init bug preventing older code execution
