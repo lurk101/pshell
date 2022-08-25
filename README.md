@@ -1,5 +1,7 @@
 A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 
+This project explores to what extent a reasonably competent self-hosted programming environment can be built on a modern embedded SoC.
+
 [busybox]: https://www.busybox.net
 [amacc compiler]: https://github.com/jserv/amacc.git
 [c4 virtual machine]: https://github.com/rswier/c4.git
