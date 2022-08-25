@@ -2459,12 +2459,12 @@ static void emit_leave(void) {
 }
 
 static void emit_load_addr(int n) {
-    if (n >= 0)
-        n += 2;
     if (n == -1) {
         emit(0x4638); // mov r0,r7
         return;
     }
+    if (n >= 0)
+        n += 2;
     emit_load_immediate(0, (n + 1) * 4);
     emit(0x4438); // add r0,r7
 }
