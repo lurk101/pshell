@@ -287,8 +287,8 @@ static void cp_cmd(void) {
     if (out_ok)
         fs_file_close(&out);
     if (buf) {
-        if (out_ok && fs_getattr(from, 1, buf, 3) == 3 && memcmp(buf, "exe", 3) == 0)
-            fs_setattr(to, 1, buf, 3);
+        if (out_ok && fs_getattr(from, 1, buf, 4) == 4 && memcmp(buf, "exe", 4) == 0)
+            fs_setattr(to, 1, buf, 4);
         free(buf);
     }
     if (!result[0])

@@ -72,63 +72,86 @@ static int dgscmp(const char* p, const char* q, int n) {
     return n;
 }
 
-static char* findcmd() {
-    int i, l;
-    l = cmdli;
-    int rmin = 0;
-    namebuf[0] = 0;
-    int c = 0;
-    for (i = 0; cmd_table[i].name; i++) {
-        const char* cmdname = cmd_table[i].name;
-        if (dgscmp(&cmdline[0], cmdname, l) == l) {
-            if (c++) {
-                int r = dgscmp(&cmdname[l], namebuf, DOGSIZE);
-                if (r < rmin)
-                    rmin = r;
-            } else {
-                rmin = strlen(&cmdname[l]);
-            }
-            strncpy(namebuf, &cmdname[l], DOGSIZE - l);
-            namebuf[DOGSIZE] = 0;
-        }
+static struct {
+    int i, isopen, st;
+    lfs_dir_t fd;
+    struct lfs_info nbuf;
+} dgiter;
+
+static const char *nextcmd(){
+    const char *s=cmd_table[dgiter.i].name;
+    if(s){
+        dgiter.nbuf.type = LFS_TYPE_REG;
+        dgiter.i++;
+        return s;
     }
-    if (c == 1) {
-        twotabs = 0;
-        namebuf[rmin++] = ' ';
-        namebuf[rmin] = 0;
-        return namebuf;
+    return 0;
+}
+
+static const char *opencmd(){
+    dgiter.i=0;
+}
+
+static const char *firstcmd(){
+    opencmd();
+    return nextcmd();
+}
+
+static const char *nextfil(){
+    if (!dgiter.isopen) return 0;
+    if (fs_dir_read(&dgiter.fd, &dgiter.nbuf) > 0) {
+        return dgiter.nbuf.name;
     }
-    if (c > 1 && rmin > 0) {
+    fs_dir_close(&dgiter.fd);
+    dgiter.isopen = 0;
+    return 0;
+}
+
+static const char *openfil(char *p){
+    lfs_dir_t fd;
+    if (dgiter.isopen) {
+        fs_dir_close(&dgiter.fd);
+        dgiter.isopen = 0;
+    }
+    if (fs_dir_open(&dgiter.fd, p) < LFS_ERR_OK) {
+        putchar('\007');
         twotabs = 1;
-        namebuf[rmin] = 0;
-        return namebuf;
+        return 0;
     }
-    putchar('\007');
-    if (c == 0 || twotabs < 2) {
-        twotabs = 2;
-        namebuf[0] = 0;
-        return namebuf;
+    dgiter.isopen = 1;
+}
+
+static const char *firstfil(char *p){
+    openfil(p);
+    return nextfil();
+}
+
+static const char *nextpath(){
+    const char *s;
+    switch(dgiter.st){
+case 0:
+        s = nextcmd();
+        if(s) return s;
+        dgiter.st = 1;
+        openfil(full_path(""));
+case 1:
+        s = nextfil();
+        if(s) return s;
+        dgiter.st = 2;
+        openfil("/bin");
+default:
+        return nextfil();
     }
-    c = 0;
-    dgputs("\r\n");
-    for (i = 0; cmd_table[i].name; i++) {
-        const char* cmdname = cmd_table[i].name;
-        if (dgscmp(&cmdline[0], cmdname, l) == l) {
-            printf("%12s", cmdname);
-            if (++c % 6 == 0)
-                dgputs("\r\n");
-        }
-    }
-    if (c % 6 != 0)
-        dgputs("\r\n");
-    if (dgprom)
-        dgputs(dgprom);
-    dgputs(cmdline);
-    for (i = cmdli; i < cmdlb; i++) {
-        putchar('\b');
-    }
-    namebuf[0] = 0;
-    return namebuf;
+}
+
+static const char *openpath(){
+    dgiter.st = 0;
+    opencmd();
+}
+
+static const char *firstpath(char *p){
+    openpath();
+    return nextpath();
 }
 
 static char* findit(int patha) {
@@ -153,49 +176,50 @@ static char* findit(int patha) {
     } else {
         p = full_path("");
     }
-    lfs_dir_t fd;
-    if (fs_dir_open(&fd, p) < LFS_ERR_OK) {
-        putchar('\007');
-        twotabs = 1;
-        return namebuf;
+    const char *(*first)(char *p),*(*next)();
+    if(!j) {
+        first=firstpath;
+        next=nextpath;
+    } else {
+        first=firstfil;
+        next=nextfil;
     }
+
     int c = 0;
-    struct lfs_info nbuf;
     int rmin = 0, rtyp = 0, nmax = 0;
-    while (fs_dir_read(&fd, &nbuf) > 0) {
-        if (dgscmp(&cmdline[j], nbuf.name, l) == l) {
-            int nlen = strlen(nbuf.name);
+    const char *nbname;
+    for (nbname=first(p); nbname; nbname=next()) {
+        if (!strcmp(nbname,".") || !strcmp(nbname,"..")) continue;
+        if (dgscmp(&cmdline[j], nbname, l) == l) {
+            int nlen = strlen(nbname);
             if (c++) {
-                int r = dgscmp(&nbuf.name[l], namebuf, DOGSIZE);
+                int r = dgscmp(&nbname[l], namebuf, DOGSIZE);
                 if (r < rmin)
                     rmin = r;
                 rtyp = 0;
             } else {
-                rmin = strlen(&nbuf.name[l]);
-                rtyp = nbuf.type == LFS_TYPE_DIR ? '/' : ' ';
+                rmin = strlen(&nbname[l]);
+                rtyp = dgiter.nbuf.type == LFS_TYPE_DIR ? '/' : ' ';
             }
             if (nmax < nlen)
                 nmax = nlen;
-            strncpy(namebuf, &nbuf.name[l], DOGSIZE - l);
+            strncpy(namebuf, &nbname[l], DOGSIZE - l);
             namebuf[DOGSIZE] = 0;
         }
     }
     if (c == 1) {
-        fs_dir_close(&fd);
         twotabs = 0;
         namebuf[rmin++] = rtyp;
         namebuf[rmin] = 0;
         return namebuf;
     }
     if (c > 1 && rmin > 0) {
-        fs_dir_close(&fd);
         twotabs = 1;
         namebuf[rmin] = 0;
         return namebuf;
     }
     putchar('\007');
     if (c == 0 || twotabs < 2) {
-        fs_dir_close(&fd);
         twotabs = 2;
         namebuf[0] = 0;
         return namebuf;
@@ -203,16 +227,17 @@ static char* findit(int patha) {
     c = 0;
     int nmod = 72 / (nmax + 4);
     nmax = 72 / nmod;
-    fs_dir_rewind(&fd);
+
     dgputs("\r\n");
-    while (fs_dir_read(&fd, &nbuf) > 0) {
-        if (dgscmp(&cmdline[j], nbuf.name, l) == l) {
-            printf("%*s", nmax, nbuf.name);
+    for (nbname=first(p); nbname; nbname=next()) {
+        if (!strcmp(nbname,".") || !strcmp(nbname,"..")) continue;
+        if (dgscmp(&cmdline[j], nbname, l) == l) {
+            printf("%*s", nmax, nbname);
             if (++c % nmod == 0)
                 dgputs("\r\n");
         }
     }
-    fs_dir_close(&fd);
+
     if (c % nmod != 0)
         dgputs("\r\n");
     if (dgprom)
@@ -240,10 +265,7 @@ static void dotab() {
             break;
         }
     }
-    if (j == 0)
-        p = findcmd();
-    else
-        p = findit(j);
+    p = findit(j);
     int n = strlen(p);
     for (j = cmdlb - 1; j >= cmdli; j--) {
         cmdline[j + n] = cmdline[j];
@@ -262,11 +284,11 @@ static void dotab() {
 }
 
 void savehist(){
-	lfs_file_t fp;
-	if(fs_file_open(&fp,"/.history",
-		LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0) {
-		return;
-	}
+    lfs_file_t fp;
+    if(fs_file_open(&fp,"/.history",
+        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0) {
+        return;
+    }
     int j = hista;
     while (j != histb) {
         char c = history[j];
@@ -274,7 +296,7 @@ void savehist(){
         else fs_file_write(&fp,&c,1);
         j = (j + 1) % HSTSIZE;
     }
-	fs_file_close(&fp);
+    fs_file_close(&fp);
 }
 
 static void addhistw(char* s) {
@@ -294,33 +316,38 @@ static void addhistw(char* s) {
 }
 
 static void addhist(char* s){
-	int oldhistb = histb;
-	addhistw(s);
-	if (histb < oldhistb) savehist();
+    int oldhistb = histb;
+    addhistw(s);
+    if (histb < oldhistb) savehist();
 }
 
 static void resthist(){
-	lfs_file_t fp;
-	if(fs_file_open(&fp,"/.history",LFS_O_RDONLY) < 0) {
-		return;
-	}
-	int j = 0;
-	for (;;) {
-		char c;
-		if (fs_file_read(&fp,&c,1) <= 0) break;
-		if(c == '\n') {
-			cmdline[j] = 0;
-			addhistw(cmdline);
-			j = 0;
-		} else {
-			cmdline[j++] = c;
-		}
-	}
-	if (j > 0){
-		cmdline[j] = 0;
-		addhist(cmdline);
-	}
-	fs_file_close(&fp);
+    lfs_file_t fp;
+    if(fs_file_open(&fp,"/.history",LFS_O_RDONLY) < 0) {
+        return;
+    }
+    int j = 0;
+    for (;;) {
+        char c;
+        if (fs_file_read(&fp,&c,1) <= 0) break;
+        if(c == '\n') {
+            cmdline[j] = 0;
+            addhistw(cmdline);
+            j = 0;
+        } else {
+            cmdline[j++] = c;
+            if (j >= CMDFULL) {
+                cmdline[j] = 0;
+                addhistw(cmdline);
+                j = 0;
+            }
+        }
+    }
+    if (j > 0){
+        cmdline[j] = 0;
+        addhist(cmdline);
+    }
+    fs_file_close(&fp);
 }
 
 static const char* strprefix(const char* s, char* p) {
@@ -447,7 +474,7 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
     cmdlb = 0;
     cmdli = 0;
     twotabs = 0;
-	if(hista==0&&histb==0) resthist();
+    if(hista==0&&histb==0) resthist();
     for (;;) {
         int c = getchar();
         if (c == '\t') {
