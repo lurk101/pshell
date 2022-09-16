@@ -1,6 +1,3 @@
-This project has been archived. Raspberry's decision to effectively abandon hobbyists and
-makers in order to satisfy commercial demand motivated this action.
-
 A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
 
 This project explores to what extent a reasonably competent self-hosted programming environment can be built on a modern embedded SoC.
