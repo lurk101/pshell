@@ -122,6 +122,7 @@ static const char *openfil(char *p){
 }
 
 static const char *firstfil(char *p){
+    dgiter.st = 1;
     openfil(p);
     return nextfil();
 }
@@ -188,8 +189,18 @@ static char* findit(int patha) {
     int c = 0;
     int rmin = 0, rtyp = 0, nmax = 0;
     const char *nbname;
+    char attrbf[4],attrfn[128];
     for (nbname=first(p); nbname; nbname=next()) {
         if (!strcmp(nbname,".") || !strcmp(nbname,"..")) continue;
+        if (!patha && dgiter.st > 0 && dgiter.nbuf.type != LFS_TYPE_DIR) {
+            if (j>0 || dgiter.st==1) {
+                snprintf(attrfn,sizeof(attrfn),"%s/%s",p,nbname);
+            } else {
+                snprintf(attrfn,sizeof(attrfn),"/bin/%s",nbname);
+            }
+            if (fs_getattr(attrfn,1,attrbf,4) != 4 
+                || memcmp(attrbf,"exe",4) != 0) continue;
+        }
         if (dgscmp(&cmdline[j], nbname, l) == l) {
             int nlen = strlen(nbname);
             if (c++) {
@@ -231,6 +242,15 @@ static char* findit(int patha) {
     dgputs("\r\n");
     for (nbname=first(p); nbname; nbname=next()) {
         if (!strcmp(nbname,".") || !strcmp(nbname,"..")) continue;
+        if (!patha && dgiter.st > 0 && dgiter.nbuf.type != LFS_TYPE_DIR) {
+            if (j>0 || dgiter.st==1) {
+                snprintf(attrfn,sizeof(attrfn),"%s/%s",p,nbname);
+            } else {
+                snprintf(attrfn,sizeof(attrfn),"/bin/%s",nbname);
+            }
+            if (fs_getattr(attrfn,1,attrbf,4) != 4 
+                || memcmp(attrbf,"exe",4) != 0) continue;
+        }
         if (dgscmp(&cmdline[j], nbname, l) == l) {
             printf("%*s", nmax, nbname);
             if (++c % nmod == 0)
