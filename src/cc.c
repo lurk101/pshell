@@ -2786,6 +2786,8 @@ static void emit_syscall(int n, int np) {
             emit_load_long_imm(6, n, 1);
     }
     emit(0x47b0); // blx r6
+    if (p->is_printf || p->is_sprintf)
+        emit_adjust_stack(np);
 }
 
 static void patch_branch(uint16_t* from, uint16_t* to) {
@@ -3976,14 +3978,14 @@ static char* x_strdup(char* s) {
 
 static int x_printf(int etype) {
     int* sp;
-    asm volatile("mov %0, sp \n" : "=r"(sp) : : "r0");
+    asm volatile("mov %0, sp \n" : "=r"(sp));
     sp += 2;
     common_vfunc(etype, 1, sp);
 }
 
 static int x_sprintf(int etype) {
     int* sp;
-    asm volatile("mov %0, sp \n" : "=r"(sp) : : "r0");
+    asm volatile("mov %0, sp \n" : "=r"(sp));
     sp += 2;
     common_vfunc(etype, 0, sp);
 }
