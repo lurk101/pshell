@@ -1,3 +1,10 @@
+What's new in version 1.2.14
+
+- Merge CC and VI uninitialized globals to save memory.
+- Fix printf bug. prevent uncontrolled stack growth
+- Check executable attributes on tab completion.
+- Fix executable attribute on copy and refactor tab completion.
+
 What's new in version 1.2.13
 
 - optimize integer compare operators
