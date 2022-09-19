@@ -1,4 +1,3 @@
-
 /*
  * tiny vi.c: A small 'vi' clone
  * Copyright (C) 2000, 2001 Sterling Huxley <sterling@europa.com>
@@ -29,7 +28,9 @@ extern char* full_path(const char* name);
 
 #define ARRAY_SIZE(x) ((uint32_t)(sizeof(x) / sizeof((x)[0])))
 
-static jmp_buf die_jmp;
+#define UDATA __attribute__((section(".viudata")))
+
+static jmp_buf die_jmp UDATA;
 
 static inline void puts_no_eol(const char* s) {
     while (*s)
@@ -190,14 +191,13 @@ enum {
     C_END = -1, // cursor is at end of line due to '$' command
 };
 
-struct globals {
-    // many references - keep near the top of globals
-    char *text, *end; // pointers to the user data in memory
-    char* dot;        // where all the action takes place
-    int text_size;    // size of the allocated buffer
+// many references - keep near the top of globals
+static char *text UDATA, *end UDATA; // pointers to the user data in memory
+static char* dot UDATA;              // where all the action takes place
+static int text_size UDATA;          // size of the allocated buffer
 
-    // the rest
-    int16_t vi_setops; // set by setops()
+// the rest
+static int16_t vi_setops UDATA; // set by setops()
 #define VI_AUTOINDENT (1 << 0)
 #define VI_EXPANDTAB (1 << 1)
 #define VI_ERR_METHOD (1 << 2)
@@ -209,7 +209,7 @@ struct globals {
 #define err_method (vi_setops & VI_ERR_METHOD) // indicate error with beep or flash
 #define ignorecase (vi_setops & VI_IGNORECASE)
 #define showmatch (vi_setops & VI_SHOWMATCH)
-    // order of constants and strings must match
+// order of constants and strings must match
 #define OPTS_STR                                                                                   \
     "ai\0"                                                                                         \
     "autoindent\0"                                                                                 \
@@ -228,56 +228,56 @@ struct globals {
 #define SET_READONLY_MODE(flags) ((void)0)
 #define UNSET_READONLY_FILE(flags) ((void)0)
 
-    int16_t editing;         // >0 while we are editing a file
-                             // [code audit says "can be 0, 1 or 2 only"]
-    int16_t cmd_mode;        // 0=command  1=insert 2=replace
-    int modified_count;      // buffer contents changed if !0
-    int last_modified_count; // = -1;
-    int cmdcnt;              // repetition count
-    uint32_t rows, columns;  // the terminal screen is this size
-    int crow, ccol;          // cursor is on Crow x Ccol
-    int offset;              // chars scrolled off the screen to the left
-    int have_status_msg;     // is default edit status needed?
-                             // [don't make int16_t!]
-    int last_status_cksum;   // hash of current status line
-    char* current_filename;
-    char* screenbegin; // index into text[], of top line on the screen
-    char* screen;      // pointer to the virtual screen buffer
-    int screensize;    //            and its size
-    int tabstop;
-    int last_search_char;    // last char searched for (int because of Unicode)
-    int16_t last_search_cmd; // command used to invoke last char search
-    char last_input_char;    // last char read from user
-    char undo_queue_state;   // One of UNDO_INS, UNDO_DEL, UNDO_EMPTY
+static int16_t editing UDATA;              // >0 while we are editing a file
+                                           // [code audit says "can be 0, 1 or 2 only"]
+static int16_t cmd_mode UDATA;             // 0=command  1=insert 2=replace
+static int modified_count UDATA;           // buffer contents changed if !0
+static int last_modified_count UDATA;      // = -1;
+static int cmdcnt UDATA;                   // repetition count
+static uint32_t rows UDATA, columns UDATA; // the terminal screen is this size
+static int crow UDATA, ccol UDATA;         // cursor is on Crow x Ccol
+static int offset UDATA;                   // chars scrolled off the screen to the left
+static int have_status_msg UDATA;          // is default edit status needed?
+                                           // [don't make int16_t!]
+static int last_status_cksum UDATA;        // hash of current status line
+static char* current_filename UDATA;
+static char* screenbegin UDATA; // index into text[], of top line on the screen
+static char* screen UDATA;      // pointer to the virtual screen buffer
+static int screensize UDATA;    //            and its size
+static int tabstop UDATA;
+static int last_search_char UDATA;    // last char searched for (int because of Unicode)
+static int16_t last_search_cmd UDATA; // command used to invoke last char search
+static char last_input_char UDATA;    // last char read from user
+static char undo_queue_state UDATA;   // One of UNDO_INS, UNDO_DEL, UNDO_EMPTY
 
-    int16_t adding2q;          // are we currently adding user input to q
-    int lmc_len;               // length of last_modifying_cmd
-    char *ioq, *ioq_start;     // pointer to string for get_one_char to "read"
-    int dotcnt;                // number of times to repeat '.' command
-    char* last_search_pattern; // last pattern from a '/' or '?' search
-    int indentcol;             // column of recently autoindent, 0 or -1
-    int16_t cmd_error;
+static int16_t adding2q UDATA;            // are we currently adding user input to q
+static int lmc_len UDATA;                 // length of last_modifying_cmd
+static char *ioq UDATA, *ioq_start UDATA; // pointer to string for get_one_char to "read"
+static int dotcnt UDATA;                  // number of times to repeat '.' command
+static char* last_search_pattern UDATA;   // last pattern from a '/' or '?' search
+static int indentcol UDATA;               // column of recently autoindent, 0 or -1
+static int16_t cmd_error UDATA;
 
-    // former statics
-    char* edit_file_cur_line;
-    int refresh_old_offset;
-    int format_edit_status_tot;
+// former statics
+static char* edit_file_cur_line UDATA;
+static int refresh_old_offset UDATA;
+static int format_edit_status_tot UDATA;
 
-    // a few references only
-    uint16_t YDreg; //,Ureg;// default delete register and orig line for "U"
+// a few references only
+static uint16_t YDreg UDATA; //,Ureg;// default delete register and orig line for "U"
 #define Ureg 27
-    char* reg[28];      // named register a-z, "D", and "U" 0-25,26,27
-    char regtype[28];   // buffer type: WHOLE, MULTI or PARTIAL
-    char* mark[28];     // user marks points somewhere in text[]-  a-z and previous context ''
-    int cindex;         // saved character index for up/down motion
-    int16_t keep_index; // retain saved character index
-    char readbuffer[KEYCODE_BUFFER_SIZE];
+static char* reg[28] UDATA;    // named register a-z, "D", and "U" 0-25,26,27
+static char regtype[28] UDATA; // buffer type: WHOLE, MULTI or PARTIAL
+static char* mark[28] UDATA; // user marks points somewhere in text[]-  a-z and previous context ''
+static int cindex UDATA;     // saved character index for up/down motion
+static int16_t keep_index UDATA; // retain saved character index
+static char readbuffer[KEYCODE_BUFFER_SIZE] UDATA;
 #define STATUS_BUFFER_LEN 200
-    char status_buffer[STATUS_BUFFER_LEN];  // messages to the user
-    char last_modifying_cmd[MAX_INPUT_LEN]; // last modifying cmd for "."
-    char get_input_line_buf[MAX_INPUT_LEN]; // former static
+static char status_buffer[STATUS_BUFFER_LEN] UDATA;  // messages to the user
+static char last_modifying_cmd[MAX_INPUT_LEN] UDATA; // last modifying cmd for "."
+static char get_input_line_buf[MAX_INPUT_LEN] UDATA; // former static
 
-    char scr_out_buf[MAX_SCR_COLS + MAX_TABSTOP * 2];
+static char scr_out_buf[MAX_SCR_COLS + MAX_TABSTOP * 2] UDATA;
 
 // undo_push() operations
 #define UNDO_INS 0
@@ -293,92 +293,20 @@ struct globals {
 #define ALLOW_UNDO_CHAIN 2
 #define ALLOW_UNDO_QUEUED 3
 
-    struct undo_object {
-        struct undo_object* prev; // Linking back avoids list traversal (LIFO)
-        int start;                // Offset where the data should be restored/deleted
-        int length;               // total data size
-        uint8_t u_type;           // 0=deleted, 1=inserted, 2=swapped
-        char undo_text[1];        // text that was deleted (if deletion)
-    } * undo_stack_tail;
+static struct undo_object {
+    struct undo_object* prev; // Linking back avoids list traversal (LIFO)
+    int start;                // Offset where the data should be restored/deleted
+    int length;               // total data size
+    uint8_t u_type;           // 0=deleted, 1=inserted, 2=swapped
+    char undo_text[1];        // text that was deleted (if deletion)
+} * undo_stack_tail UDATA;
 #define UNDO_USE_SPOS 32
 #define UNDO_EMPTY 64
-    char* undo_queue_spos; // Start position of queued operation
-    int undo_q;
-    char undo_queue[VI_UNDO_QUEUE_MAX];
+static char* undo_queue_spos UDATA; // Start position of queued operation
+static int undo_q;
+static char undo_queue[VI_UNDO_QUEUE_MAX] UDATA;
 
-    char ring_buf[16 * 1024];
-    int ring_count, ring_head, ring_tail;
-    int argc, optind;
-};
-
-#define text (G.text)
-#define text_size (G.text_size)
-#define end (G.end)
-#define dot (G.dot)
-#define reg (G.reg)
-
-#define vi_setops (G.vi_setops)
-#define editing (G.editing)
-#define cmd_mode (G.cmd_mode)
-#define modified_count (G.modified_count)
-#define last_modified_count (G.last_modified_count)
-#define cmdcnt (G.cmdcnt)
-#define rows (G.rows)
-#define columns (G.columns)
-#define crow (G.crow)
-#define ccol (G.ccol)
-#define offset (G.offset)
-#define status_buffer (G.status_buffer)
-#define have_status_msg (G.have_status_msg)
-#define last_status_cksum (G.last_status_cksum)
-#define current_filename (G.current_filename)
-#define screen (G.screen)
-#define screensize (G.screensize)
-#define screenbegin (G.screenbegin)
-#define tabstop (G.tabstop)
-#define last_search_char (G.last_search_char)
-#define last_search_cmd (G.last_search_cmd)
-#define readonly_mode 0
-#define adding2q (G.adding2q)
-#define lmc_len (G.lmc_len)
-#define ioq (G.ioq)
-#define ioq_start (G.ioq_start)
-#define dotcnt (G.dotcnt)
-#define last_search_pattern (G.last_search_pattern)
-#define indentcol (G.indentcol)
-#define cmd_error (G.cmd_error)
-
-#define edit_file_cur_line (G.edit_file_cur_line)
-#define refresh_old_offset (G.refresh_old_offset)
-#define format_edit_status_tot (G.format_edit_status_tot)
-
-#define YDreg (G.YDreg)
-#define regtype (G.regtype)
-#define mark (G.mark)
-#define restart (G.restart)
-#define term_orig (G.term_orig)
-#define cindex (G.cindex)
-#define keep_index (G.keep_index)
-#define initial_cmds (G.initial_cmds)
-#define readbuffer (G.readbuffer)
-#define scr_out_buf (G.scr_out_buf)
-#define last_modifying_cmd (G.last_modifying_cmd)
-#define get_input_line_buf (G.get_input_line_buf)
-
-#define undo_stack_tail (G.undo_stack_tail)
-#define undo_queue_state (G.undo_queue_state)
-#define undo_q (G.undo_q)
-#define undo_queue (G.undo_queue)
-#define undo_queue_spos (G.undo_queue_spos)
-
-#define ring_buf (G.ring_buf)
-#define ring_count (G.ring_count)
-#define ring_head (G.ring_head)
-#define ring_tail (G.ring_tail)
-#define argc (G.argc)
-#define optind (G.optind)
-
-static struct globals G;
+static int argc UDATA, optind UDATA;
 
 //----- Terminal Drawing ---------------------------------------
 // The terminal is made up of 'rows' line of 'columns' columns.
@@ -3780,7 +3708,9 @@ static void* xmalloc_open_read_close(const char* filename) {
 extern void get_screen_xy(uint32_t* x, uint32_t* y);
 
 int vi(int ac, char* argv[]) {
-    memset(&G, 0, sizeof G); // clear the globals
+    extern char __viudata_start__, __viudata_end__;
+    memset(&__viudata_start__, 0, &__viudata_end__ - &__viudata_start__);
+    last_modified_count = -1;
     get_screen_xy(&columns, &rows);
     argc = ac;
     last_modified_count = -1;

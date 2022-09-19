@@ -156,6 +156,18 @@ SECTIONS
         *(.uninitialized_data*)
     } > RAM
 
+    .cc_uninitialized_data ALIGN(4) (NOLOAD): {
+        *(.ccudata)
+    } > RAM
+    __ccudata_start__ = ADDR(.cc_uninitialized_data);
+    __ccudata_end__ = __ccudata_start__ + SIZEOF(.cc_uninitialized_data);
+
+    .vi_uninitialized_data __ccudata_start__ (NOLOAD) : {
+        *(.viudata)
+    } > RAM
+    __viudata_start__ = __ccudata_start__;
+    __viudata_end__ = __ccudata_start__ + SIZEOF(.vi_uninitialized_data);
+
     /* Start and end symbols must be word-aligned */
     .scratch_x : {
         __scratch_x_start__ = .;

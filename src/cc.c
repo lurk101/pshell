@@ -35,6 +35,8 @@
 #include "cc.h"
 #include "fs.h"
 
+#define UDATA __attribute__((section(".ccudata")))
+
 #define K 1024
 
 #define DATA_BYTES (16 * K)
@@ -116,33 +118,33 @@ struct reloc_s {
     int addr;
 };
 
-static struct reloc_s* relocs;
-static int nrelocs;
+static struct reloc_s* relocs UDATA;
+static int nrelocs UDATA;
 
-static char *p, *lp;                 // current position in source code
-static char* data;                   // data/bss pointer
-static char* data_base;              // data/bss pointer
-static int* base_sp;                 // stack
-static uint16_t *e, *le, *text_base; // current position in emitted code
-static uint16_t* ecas;               // case statement patch-up pointer
-static int* ncas;                    // case statement patch-up pointer
-static uint16_t* def;                // default statement patch-up pointer
-static struct patch_s* brks;         // break statement patch-up pointer
-static struct patch_s* cnts;         // continue statement patch-up pointer
-static struct patch_s* pcrel;        // pc relative address patch-up pointer
-static uint16_t* pcrel_1st;          // first relative load address in group
-static int pcrel_count;              // first relative load address in group
-static int swtc;                     // !0 -> in a switch-stmt context
-static int brkc;                     // !0 -> in a break-stmt context
-static int cntc;                     // !0 -> in a continue-stmt context
-static int* tsize;                   // array (indexed by type) of type sizes
-static int tnew;                     // next available type
-static int tk;                       // current token
+static char *p UDATA, *lp UDATA;                       // current position in source code
+static char* data UDATA;                               // data/bss pointer
+static char* data_base UDATA;                          // data/bss pointer
+static int* base_sp UDATA;                             // stack
+static uint16_t *e UDATA, *le UDATA, *text_base UDATA; // current position in emitted code
+static uint16_t* ecas UDATA;                           // case statement patch-up pointer
+static int* ncas UDATA;                                // case statement patch-up pointer
+static uint16_t* def UDATA;                            // default statement patch-up pointer
+static struct patch_s* brks UDATA;                     // break statement patch-up pointer
+static struct patch_s* cnts UDATA;                     // continue statement patch-up pointer
+static struct patch_s* pcrel UDATA;                    // pc relative address patch-up pointer
+static uint16_t* pcrel_1st UDATA;                      // first relative load address in group
+static int pcrel_count UDATA;                          // first relative load address in group
+static int swtc UDATA;                                 // !0 -> in a switch-stmt context
+static int brkc UDATA;                                 // !0 -> in a break-stmt context
+static int cntc UDATA;                                 // !0 -> in a continue-stmt context
+static int* tsize UDATA;                               // array (indexed by type) of type sizes
+static int tnew UDATA;                                 // next available type
+static int tk UDATA;                                   // current token
 static union conv {                  //
     int i;                           //
     float f;                         //
-} tkv;                               // current token value
-static int ty;                       // current expression type
+} tkv UDATA;                         // current token value
+static int ty UDATA;                 // current expression type
                                      // bit 0:1 - tensor rank, eg a[4][4][4]
                                      // 0=scalar, 1=1d, 2=2d, 3=3d
                                      //   1d etype -- bit 0:30)
@@ -150,28 +152,28 @@ static int ty;                       // current expression type
                                      //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
                                      // bit 2:9 - type
                                      // bit 10:11 - ptr level
-static int rtf, rtt;                 // return flag and return type for current function
-static int loc;                      // local variable offset
-static int lineno;                   // current line number
-static int src_opt;                  // print source and assembly flag
-static int uchar_opt;                // use unsigned character variables
-static int* n;                       // current position in emitted abstract syntax tree
+static int rtf UDATA, rtt UDATA;     // return flag and return type for current function
+static int loc UDATA;                // local variable offset
+static int lineno UDATA;             // current line number
+static int src_opt UDATA;            // print source and assembly flag
+static int uchar_opt UDATA;          // use unsigned character variables
+static int* n UDATA;                 // current position in emitted abstract syntax tree
                                      // With an AST, the compiler is not limited to generate
                                      // code on the fly with parsing.
                                      // This capability allows function parameter code to be
                                      // emitted and pushed on the stack in the proper
                                      // right-to-left order.
-static int ld;                       // local variable depth
-static int pplev, pplevt;            // preprocessor conditional level
-static int* ast;                     // abstract syntax tree
-static ARMSTATE state;               // disassembler state
-static int exit_sp;
-static char* sym_text;
-static char* sym_text_base;
-static char line[128];
-static int line_len;
-static char* ofn;
-static int indef;
+static int ld UDATA;                 // local variable depth
+static int pplev UDATA, pplevt UDATA; // preprocessor conditional level
+static int* ast UDATA;                // abstract syntax tree
+static ARMSTATE state UDATA;          // disassembler state
+static int exit_sp UDATA;
+static char* sym_text UDATA;
+static char* sym_text_base UDATA;
+static char line[128] UDATA;
+static int line_len UDATA;
+static char* ofn UDATA;
+static int indef UDATA;
 
 // identifier
 struct ident_s {
@@ -190,9 +192,9 @@ struct ident_s {
     uint8_t inserted : 1; // inserted in disassembler table
 };
 
-struct ident_s *id, // currently parsed identifier
-    *sym,           // symbol table (simple list of identifiers)
-    *sym_base;
+static struct ident_s *id UDATA, // currently parsed identifier
+    *sym UDATA,                  // symbol table (simple list of identifiers)
+    *sym_base UDATA;
 
 struct member_s {
     struct member_s* next;
@@ -202,7 +204,7 @@ struct member_s {
     int etype;
 };
 
-static struct member_s** members; // array (indexed by type) of struct member lists
+static struct member_s** members UDATA; // array (indexed by type) of struct member lists
 
 // tokens and classes (operators last and in precedence order)
 // ( >= 128 so not to collide with ASCII-valued tokens)
@@ -227,8 +229,8 @@ struct define_grp {
 
 #include "cc_defs.h"
 
-static jmp_buf done_jmp;
-static int* malloc_list;
+static jmp_buf done_jmp UDATA;
+static int* malloc_list UDATA;
 
 #define fatal(fmt, ...) fatal_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
@@ -441,26 +443,8 @@ static const struct {
                 {"i2c", i2c_defines},       {"spi", spi_defines},
                 {"irq", irq_defines},       {0}};
 
-static lfs_file_t* fd;
-static char* fp;
-
-static void clear_globals(void) {
-    relocs = NULL;
-    ncas = NULL;
-    pcrel_1st = ecas = def = e = le = text_base = NULL;
-    base_sp = tsize = n = malloc_list = NULL;
-    data_base = data = p = lp = fp = sym_text = sym_text_base = ofn = NULL;
-    id = sym = sym_base = NULL;
-    pcrel = brks = cnts = NULL;
-    fd = NULL;
-    file_list = NULL;
-    swtc = brkc = cntc = tnew = tk = ty = loc = lineno = uchar_opt = src_opt = ld = pplev = pplevt =
-        pcrel_count = nrelocs = indef = 0;
-    ncas = 0;
-    memset(&tkv, 0, sizeof(tkv));
-    memset(&members, 0, sizeof(members));
-    memset(&done_jmp, 0, sizeof(&done_jmp));
-}
+static lfs_file_t* fd UDATA;
+static char* fp UDATA;
 
 #define numof(a) (sizeof(a) / sizeof(a[0]))
 
@@ -4092,8 +4076,9 @@ struct exe_s {
 };
 
 int cc(int mode, int argc, char** argv) {
+    extern char __ccudata_start__, __ccudata_end__;
+    memset(&__ccudata_start__, 0, &__ccudata_end__ - &__ccudata_start__);
 
-    clear_globals();
     extern const char* pshell_version;
     int rslt = -1;
     struct exe_s exe;
