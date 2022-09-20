@@ -1,3 +1,7 @@
+What's new in version 1.2.15
+
+- Another critical printf fix
+
 What's new in version 1.2.14
 
 - Merge CC and VI uninitialized globals to save memory.
