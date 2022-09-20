@@ -1,6 +1,8 @@
 What's new in version 1.2.15
 
 - Another critical printf fix
+- optimize float relational operators
+- trig function optimization
 
 What's new in version 1.2.14
 
