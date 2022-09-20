@@ -2759,19 +2759,20 @@ static void emit_syscall(int n, int np) {
         else
             emit_load_long_imm(6, 1001, 1);
     } else {
-        int np = p->etype & ADJ_MASK;
-        if (np > 4)
-            np = 4;
-        while (np--)
-            emit_pop(np);
+        int nparm = np & ADJ_MASK;
+        if (nparm > 4)
+            nparm = 4;
+        while (nparm--)
+            emit_pop(nparm);
         if (!ofn)
             emit_load_long_imm(6, (int)p->extrn, 1);
         else
             emit_load_long_imm(6, n, 1);
     }
     emit(0x47b0); // blx r6
+    int nparm = np & ADJ_MASK;
     if (p->is_printf || p->is_sprintf)
-        emit_adjust_stack(np);
+        emit_adjust_stack(nparm);
 }
 
 static void patch_branch(uint16_t* from, uint16_t* to) {
