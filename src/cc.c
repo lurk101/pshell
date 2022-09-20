@@ -35,6 +35,8 @@
 #include "cc.h"
 #include "fs.h"
 
+#define EXE_DBG 0
+
 #define UDATA __attribute__((section(".ccudata")))
 
 #define K 1024
@@ -77,6 +79,8 @@ extern void __wrap___aeabi_fcmple();
 extern void __wrap___aeabi_fcmpgt();
 extern void __wrap___aeabi_fcmplt();
 extern void __wrap___aeabi_fcmpge();
+
+extern void __wrap_sinf();
 
 enum {
     aeabi_idiv = 1,
@@ -2773,6 +2777,11 @@ static void emit_syscall(int n, int np) {
     int nparm = np & ADJ_MASK;
     if (p->is_printf || p->is_sprintf)
         emit_adjust_stack(nparm);
+    else {
+        nparm = (nparm > 4) ? nparm - 4 : 0;
+        if (nparm)
+            emit_adjust_stack(nparm);
+    }
 }
 
 static void patch_branch(uint16_t* from, uint16_t* to) {
@@ -3076,13 +3085,10 @@ static void gen(int* n) {
         }
         if (i == Syscall)
             emit_syscall(Func_entry(n).addr, Func_entry(n).parm_types);
-        else if (i == Func)
+        else if (i == Func) {
             emit_call(Func_entry(n).addr);
-        int np = Func_entry(n).n_parms;
-        if (i == Syscall)
-            np = (np > 4) ? np - 4 : 0;
-        if (np)
-            emit_adjust_stack(np);
+            emit_adjust_stack(Func_entry(n).n_parms);
+        }
         break;
     case While:
     case DoWhile:
@@ -4069,6 +4075,14 @@ static void add_defines(const struct define_grp* d) {
     }
 }
 
+#if EXE_DBG
+void __not_in_flash_func(dummy)(void) {
+    asm volatile(
+#include "cc_nops.h"
+    );
+}
+#endif
+
 struct exe_s {
     int entry;
     int tsize;
@@ -4206,7 +4220,11 @@ int cc(int mode, int argc, char** argv) {
         }
         cc_free(fn);
 
+#if EXE_DBG
+        text_base = le = (uint16_t*)((int)dummy & ~1);
+#else
         text_base = le = (uint16_t*)__StackLimit;
+#endif
         e = text_base - 1;
 
         members = cc_malloc(MEMBER_DICT_BYTES, 1);

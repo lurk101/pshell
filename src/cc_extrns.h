@@ -173,7 +173,7 @@
     {"rename", 2, stdio_defines, wrap_rename, 0, 0, 0},
     {"screen_height", 0, stdio_defines, wrap_screen_height, 0, 0, 0},
     {"screen_width", 0, stdio_defines, wrap_screen_width, 0, 0, 0},
-    {"sinf", 1 | (1 << 5) | (1 << 10), math_defines, sinf, 1, 0, 0},
+    {"sinf", 1 | (1 << 5) | (1 << 10), math_defines, __wrap_sinf, 1, 0, 0},
     {"sinhf", 1 | (1 << 5) | (1 << 10), math_defines, sinhf, 1, 0, 0},
     {"sleep_ms", 1, time_defines, sleep_ms, 0, 0, 0},
     {"sleep_us", 1, time_defines, sleep_us, 0, 0, 0},
