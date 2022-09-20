@@ -2440,7 +2440,7 @@ static void check_pc_relative(void) {
 }
 
 static void emit_enter(int n) {
-    emit(0xb5f0);             // push {r4-r7,lr}
+    emit(0xb5c0);             // push {r6-r7,lr}
     emit(0x466f);             // mov  r7, sp
     if (n) {                  //
         if (n < 128)          //
@@ -2454,7 +2454,7 @@ static void emit_enter(int n) {
 
 static void emit_leave(void) {
     emit(0x46bd); // mov sp, r7
-    emit(0xbdf0); // pop {r4-r7, pc}
+    emit(0xbdc0); // pop {r6-r7, pc}
 }
 
 static void emit_load_addr(int n) {
@@ -2462,8 +2462,6 @@ static void emit_load_addr(int n) {
         emit(0x4638); // mov r0,r7
         return;
     }
-    if (n >= 0)
-        n += 2;
     emit_load_immediate(0, (n + 1) * 4);
     emit(0x4438); // add r0,r7
 }
