@@ -81,6 +81,17 @@ extern void __wrap___aeabi_fcmplt();
 extern void __wrap___aeabi_fcmpge();
 
 extern void __wrap_sinf();
+extern void __wrap_cosf();
+extern void __wrap_tanf();
+extern void __wrap_asinf();
+extern void __wrap_acosf();
+extern void __wrap_atanf();
+extern void __wrap_sinhf();
+extern void __wrap_coshf();
+extern void __wrap_tanhf();
+extern void __wrap_asinhf();
+extern void __wrap_acoshf();
+extern void __wrap_atanhf();
 
 enum {
     aeabi_idiv = 1,
