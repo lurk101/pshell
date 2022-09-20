@@ -107,18 +107,19 @@ enum {
     aeabi_fcmpge
 };
 
-static void (*fops[])() = {0,
-                           __wrap___aeabi_idiv,
-                           __wrap___aeabi_i2f,
-                           __wrap___aeabi_f2iz,
-                           __wrap___aeabi_fadd,
-                           __wrap___aeabi_fsub,
-                           __wrap___aeabi_fmul,
-                           __wrap___aeabi_fdiv,
-                           __wrap___aeabi_fcmple,
-                           __wrap___aeabi_fcmpgt,
-                           __wrap___aeabi_fcmplt,
-                           __wrap___aeabi_fcmpge};
+static void (*fops[])() = { //
+    0,
+    __wrap___aeabi_idiv,
+    __wrap___aeabi_i2f,
+    __wrap___aeabi_f2iz,
+    __wrap___aeabi_fadd,
+    __wrap___aeabi_fsub,
+    __wrap___aeabi_fmul,
+    __wrap___aeabi_fdiv,
+    __wrap___aeabi_fcmple,
+    __wrap___aeabi_fcmpgt,
+    __wrap___aeabi_fcmplt,
+    __wrap___aeabi_fcmpge};
 
 struct patch_s {
     struct patch_s* next;
@@ -183,12 +184,9 @@ static int pplev UDATA, pplevt UDATA; // preprocessor conditional level
 static int* ast UDATA;                // abstract syntax tree
 static ARMSTATE state UDATA;          // disassembler state
 static int exit_sp UDATA;
-static char* sym_text UDATA;
-static char* sym_text_base UDATA;
-static char line[128] UDATA;
-static int line_len UDATA;
 static char* ofn UDATA;
 static int indef UDATA;
+static char* src_base UDATA;
 
 // identifier
 struct ident_s {
@@ -261,8 +259,12 @@ static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, 
     vprintf(fmt, ap);
     va_end(ap);
     if (lineno > 0) {
-        line[line_len] = 0;
-        printf("\n" VT_BOLD "%d:" VT_NORMAL " %s\n", lineno, line);
+        lp = src_base;
+        int lno = lineno;
+        while (lno--)
+            lp = strchr(lp, '\n') + 1;
+        p = strchr(lp, '\n');
+        printf("\n" VT_BOLD "%d:" VT_NORMAL " %.*s\n", lineno, p - lp, lp);
     }
     longjmp(done_jmp, 1);
 }
@@ -462,28 +464,6 @@ static lfs_file_t* fd UDATA;
 static char* fp UDATA;
 
 #define numof(a) (sizeof(a) / sizeof(a[0]))
-
-static void get_line(void) {
-    char* cp = line;
-    char ch;
-next_ch:
-    if (fs_file_read(fd, &ch, 1) <= 0) {
-        *cp++ = 0;
-        if ((cp - line) >= sizeof(line))
-            fatal("line buffer overflow");
-        lp = p = line;
-        line_len = 0;
-        return;
-    }
-    if (ch != '\n') {
-        *cp++ = ch;
-        goto next_ch;
-    }
-    *cp++ = '\n';
-    line_len = cp - line;
-    lp = p = line;
-    // printf("%.*s", line_len, line);
-}
 
 static int extern_search(char* name) // get cache index of external function
 {
@@ -811,12 +791,7 @@ static void next() {
              */
             if ((id + 1) > (sym_base + (SYM_TBL_BYTES / sizeof(*id))))
                 fatal("symbol table overflow");
-            int nl = p - pp;
-            if (sym_text + nl >= sym_text_base + SYM_TEXT_SIZE)
-                fatal("symbol table overflow");
-            id->name = sym_text;
-            memcpy(sym_text, pp, nl);
-            sym_text += nl;
+            id->name = pp;
             id->hash = tk;
             id->forward = 0;
             id->inserted = 0;
@@ -836,9 +811,10 @@ static void next() {
         }
         switch (tk) {
         case '\n':
-            if (src_opt)
-                printf("%d: %.*s", lineno, p - lp, line);
-            get_line();
+            if (src_opt) {
+                printf("%d: %.*s", lineno, p - lp, lp);
+                lp = p;
+            }
             ++lineno;
             if (indef) {
                 indef = 0;
@@ -855,15 +831,11 @@ static void next() {
             if (*p == '/') { // comment
                 while (*p != 0 && *p != '\n')
                     ++p;
-                if (*p)
-                    get_line();
             } else if (*p == '*') { // C-style multiline comments
                 for (++p; (*p != 0); ++p) {
                     pp = p + 1;
                     if (*p == '\n') {
-                        get_line();
                         ++lineno;
-                        p = line - 1;
                     } else if (*p == '*' && *pp == '/') {
                         p += 1;
                         break;
@@ -919,8 +891,6 @@ static void next() {
                     pplevt = pplev - 1;
                     while (*p != 0 && *p != '\n')
                         ++p; // discard until end-of-line
-                    if (*p)
-                        get_line();
                     do
                         next();
                     while (pplev != pplevt);
@@ -937,8 +907,6 @@ static void next() {
             }
             while (*p != 0 && *p != '\n')
                 ++p; // discard until end-of-line
-            if (!*p)
-                get_line();
             break;
         case '\'': // quotes start with character (string)
         case '"':
@@ -4133,7 +4101,6 @@ int cc(int mode, int argc, char** argv) {
 
     if (mode == 0) {
         sym_base = sym = cc_malloc(SYM_TBL_BYTES, 1);
-        sym_text_base = sym_text = cc_malloc(SYM_TEXT_SIZE, 1);
 
         // Register keywords in symbol stack. Must match the sequence of enum
         p = "enum char int float struct union sizeof return goto break continue "
@@ -4249,6 +4216,15 @@ int cc(int mode, int argc, char** argv) {
             fatal("could not open %s \n", fn);
         }
         cc_free(fn);
+        int fl = fs_file_seek(fd, 0, SEEK_END);
+        fs_file_seek(fd, 0, SEEK_SET);
+        src_base = p = lp = cc_malloc(fl + 1, 1);
+        if (fs_file_read(fd, src_base, fl) != fl)
+            fatal("error reading source");
+        src_base[fl] = 0;
+        fs_file_close(fd);
+        cc_free(fd);
+        fd = 0;
 
 #if EXE_DBG
         text_base = le = (uint16_t*)((int)dummy & ~1);
@@ -4258,8 +4234,6 @@ int cc(int mode, int argc, char** argv) {
         e = text_base - 1;
 
         members = cc_malloc(MEMBER_DICT_BYTES, 1);
-
-        get_line();
 
         // parse the program
         pplevt = -1;
@@ -4272,20 +4246,21 @@ int cc(int mode, int argc, char** argv) {
         for (struct ident_s* scan = sym; scan->tk; ++scan)
             if (scan->class == Func && scan->forward)
                 fatal("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
-        fs_file_close(fd);
-        cc_free(fd);
-        fd = NULL;
+
+        cc_free(src_base);
+        src_base = NULL;
         cc_free(ast);
         ast = NULL;
         cc_free(sym_base);
         sym_base = NULL;
-        cc_free(sym_text_base);
-        sym_text_base = NULL;
         cc_free(tsize);
         tsize = NULL;
+
         if (!idmain->val)
             fatal("main() not defined\n");
+
         exe.entry = idmain->val;
+
         if (ofn) {
             fd = cc_malloc(sizeof(lfs_file_t), 1);
             char* cp = full_path(ofn);
