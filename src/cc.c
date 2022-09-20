@@ -2691,14 +2691,12 @@ static void emit_float_oper(int op) {
         emit_fop((int)aeabi_fcmpge);
         break;
     case GTF:
-        emit(0x0001); // movs r1,r0
-        emit_pop(0);
-        emit_fop((int)aeabi_fcmpgt);
+        emit_pop(1);
+        emit_fop((int)aeabi_fcmple);
         break;
     case LTF:
-        emit(0x0001); // movs r1,r0
-        emit_pop(0);
-        emit_fop((int)aeabi_fcmplt);
+        emit_pop(1);
+        emit_fop((int)aeabi_fcmpge);
         break;
     case LEF:
         emit(0x0001); // movs r1,r0
