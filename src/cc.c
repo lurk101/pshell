@@ -2230,7 +2230,7 @@ static uint16_t rep2[] = {0x4638, 0x3800};
 
 static uint16_t pat3[] = {0xb401, 0xbc01};
 static uint16_t msk3[] = {0xffff, 0xffff};
-static uint16_t rep3[] = {0};
+static uint16_t rep3[0] = {};
 
 static uint16_t pat4[] = {0x2000, 0xb401, 0xbc02};
 static uint16_t msk4[] = {0xff00, 0xffff, 0xffff};
@@ -2309,11 +2309,11 @@ static const struct segs {
 
     // mov  r0,r7          ldr  r0,[r7,#0]
     // ldr  r0,[r0,#0]
-    {numof(pat6), numof(rep6), pat6, msk6, rep6, {{0, 0}, {-1, -1}}},
+    {numof(pat6), numof(rep6), pat6, msk6, rep6, {{-1, -1}, {-1, -1}}},
 
     // movs r0,#4			lsls r0,r6,#2
     // muls r0,r6
-    {numof(pat7), numof(rep7), pat7, msk7, rep7, {{0, 0}, {-1, -1}}}};
+    {numof(pat7), numof(rep7), pat7, msk7, rep7, {{-1, -1}, {-1, -1}}}};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[8];
@@ -2335,8 +2335,7 @@ static int peep_hole(const struct segs* s) {
             break;
         pe[s->map[i].to] |= rslt[s->map[i].from];
     }
-    if (s->map[0].to >= 0)
-        e += l;
+    e += l;
     return 1;
 }
 
