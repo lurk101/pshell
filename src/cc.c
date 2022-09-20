@@ -2230,7 +2230,7 @@ static uint16_t rep2[] = {0x4638, 0x3800};
 
 static uint16_t pat3[] = {0xb401, 0xbc01};
 static uint16_t msk3[] = {0xffff, 0xffff};
-static uint16_t rep3[] = {0};
+static uint16_t rep3[0] = {};
 
 static uint16_t pat4[] = {0x2000, 0xb401, 0xbc02};
 static uint16_t msk4[] = {0xff00, 0xffff, 0xffff};
@@ -2244,13 +2244,26 @@ static uint16_t pat6[] = {0x4638, 0x6800};
 static uint16_t msk6[] = {0xffff, 0xffff};
 static uint16_t rep6[] = {0x6838};
 
+static uint16_t pat7[] = {0x2004, 0x4370};
+static uint16_t msk7[] = {0xffff, 0xffff};
+static uint16_t rep7[] = {0x00b0};
+
+static uint16_t pat8[] = {0x4638, 0x3804, 0xb401, 0x2000, 0xbc40};
+static uint16_t msk8[] = {0xffff, 0xffff, 0xffff, 0xff00, 0xffff};
+static uint16_t rep8[] = {0x1f3e, 0x2000};
+
+struct subs {
+    int8_t from;
+    int8_t to;
+};
+
 static const struct segs {
     uint8_t n_pats;
     uint8_t n_reps;
     uint16_t* pat;
     uint16_t* msk;
     uint16_t* rep;
-    int8_t xmap[4];
+    const struct subs map[2];
 } segments[] = {
 
     // FROM:		   	  TO:
@@ -2258,38 +2271,49 @@ static const struct segs {
     // push {r0}		  movs r0,#n
     // movs r0,#n
     // pop  {r6}
-    {numof(pat0), numof(rep0), pat0, msk0, rep0, {2, 1, -1, -1}},
+    {numof(pat0), numof(rep0), pat0, msk0, rep0, {{2, 1}, {-1, -1}}},
 
     // ldr  r0,[r0,#n0]   ldr  r6,[r0,#n0]
     // push {r0}		  movs r0,#n1
     // movs r0, #n1
     // pop  {r6}
-    {numof(pat1), numof(rep1), pat1, msk1, rep1, {0, 0, 2, 1}},
+    {numof(pat1), numof(rep1), pat1, msk1, rep1, {{0, 0}, {2, 1}}},
 
     // movs r0,#n         mov  r0,r7
     // rsbs r0,r0		  subs r0,#n
     // add  r0,r7
-    {numof(pat2), numof(rep2), pat2, msk2, rep2, {0, 1, -1, -1}},
+    {numof(pat2), numof(rep2), pat2, msk2, rep2, {{0, 1}, {-1, -1}}},
 
     // push {r0}
     // pop {r0}
-    {numof(pat3), numof(rep3), pat3, msk3, rep3, {-1, -1, -1, -1}},
+    {numof(pat3), numof(rep3), pat3, msk3, rep3, {{-1, -1}, {-1, -1}}},
 
     // movs r0,#n          mov r1,#n
     // push {r0}
     // pop  {r1}
-    {numof(pat4), numof(rep4), pat4, msk4, rep4, {0, 0, -1, -1}},
+    {numof(pat4), numof(rep4), pat4, msk4, rep4, {{0, 0}, {-1, -1}}},
+
+    // mov  r0,r7          subs r6,r7,#4
+    // subs r0,#4          movs r0,#n1
+    // push {r0}
+    // movs r0,#n1
+    // pop  {r6}
+    {numof(pat8), numof(rep8), pat8, msk8, rep8, {{3, 1}, {-1, -1}}},
 
     // mov  r0,r7          mov  r6,r7
     // subs r0,#n0         subs r6,#n0
     // push {r0}           movs r0,#n1
     // movs r0,#n1
     // pop  {r6}
-    {numof(pat5), numof(rep5), pat5, msk5, rep5, {1, 1, 3, 2}},
+    {numof(pat5), numof(rep5), pat5, msk5, rep5, {{1, 1}, {3, 2}}},
 
     // mov  r0,r7          ldr  r0,[r7,#0]
     // ldr  r0,[r0,#0]
-    {numof(pat6), numof(rep6), pat6, msk6, rep6, {0, 0, -1, -1}}};
+    {numof(pat6), numof(rep6), pat6, msk6, rep6, {{-1, -1}, {-1, -1}}},
+
+    // movs r0,#4			lsls r0,r6,#2
+    // muls r0,r6
+    {numof(pat7), numof(rep7), pat7, msk7, rep7, {{-1, -1}, {-1, -1}}}};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[8];
@@ -2306,18 +2330,17 @@ static int peep_hole(const struct segs* s) {
     l = s->n_reps;
     for (int i = 0; i < l; i++)
         pe[i] = s->rep[i];
-    for (int i = 0; i < 4; i += 2) {
-        if (s->xmap[i] < 0)
+    for (int i = 0; i < 2; ++i) {
+        if (s->map[i].from < 0)
             break;
-        pe[s->xmap[i + 1]] |= rslt[s->xmap[i]];
+        pe[s->map[i].to] |= rslt[s->map[i].from];
     }
-    if (s->xmap[0] >= 0)
-        e += l;
+    e += l;
     return 1;
 }
 
 static void peep(void) {
-    for (int i = 0; i < numof(segments); i++)
+    for (int i = 0; i < numof(segments); ++i)
         if (peep_hole(&segments[i]))
             return;
 }
@@ -2440,7 +2463,7 @@ static void check_pc_relative(void) {
 }
 
 static void emit_enter(int n) {
-    emit(0xb5f0);             // push {r4-r7,lr}
+    emit(0xb5c0);             // push {r6-r7,lr}
     emit(0x466f);             // mov  r7, sp
     if (n) {                  //
         if (n < 128)          //
@@ -2454,7 +2477,7 @@ static void emit_enter(int n) {
 
 static void emit_leave(void) {
     emit(0x46bd); // mov sp, r7
-    emit(0xbdf0); // pop {r4-r7, pc}
+    emit(0xbdc0); // pop {r6-r7, pc}
 }
 
 static void emit_load_addr(int n) {
@@ -2462,8 +2485,6 @@ static void emit_load_addr(int n) {
         emit(0x4638); // mov r0,r7
         return;
     }
-    if (n >= 0)
-        n += 2;
     emit_load_immediate(0, (n + 1) * 4);
     emit(0x4438); // add r0,r7
 }
