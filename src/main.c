@@ -486,7 +486,8 @@ static void status_cmd(void) {
     const char percent = 37;
     int total_size = stat.block_count * stat.block_size;
 #ifndef NDEBUG
-    printf("\ntext size 0x%x, bss size 0x%x (%d)", stat.text_size, stat.bss_size, stat.bss_size);
+    printf("\ntext size 0x%x (%d), bss size 0x%x (%d)", stat.text_size, stat.text_size,
+           stat.bss_size, stat.bss_size);
 #endif
     sprintf(result,
             "\ntotal blocks %d, block size %d, used %d (%dK), %1.1f%c "

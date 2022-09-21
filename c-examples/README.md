@@ -13,6 +13,7 @@ Example C source files.
 | life.c | Conway's game of life. The Gosper glider canon |
 | penta.c | Conway's game of life. The Pentamino |
 | pi.c | Test floats and recursion |
+| qsort.c | Quicksort |
 | printf.c | Simple printf and sprintf formating test |
 | sieve.c | Array test. Calculate primes using sieve. |
 | sine.c | Math function test. Display a sine wave |
