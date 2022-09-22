@@ -2,15 +2,13 @@
  * mc is capable of compiling a (subset of) C source files
  * There is no preprocessor.
  *
- * The following options are supported:
- *   -s : Print source and generated representation.
+ * See C4 and AMaCC project repositories for baseline code.
+ * float, array, struct support in squint project by HPCguy.
+ * native code generation for RP Pico by lurk101.
  *
- * All modifications as of Feb 19 2022 are by HPCguy.
- * See AMaCC project repository for baseline code prior to that date.
- *
- * Further modifications by lurk101 for RP Pico
  */
 
+// clib functions
 #include <fcntl.h>
 #include <limits.h>
 #include <math.h>
@@ -19,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
+// pico SDK hardware support functions
 #include <hardware/adc.h>
 #include <hardware/clocks.h>
 #include <hardware/gpio.h>
@@ -28,47 +27,48 @@
 #include <hardware/spi.h>
 #include <hardware/sync.h>
 
+// pico SDK accellerated functions
 #include <pico/stdio.h>
 #include <pico/time.h>
 
+// disassembler, compiler, and file system functions
 #include "armdisasm.h"
 #include "cc.h"
 #include "fs.h"
 
-#define EXE_DBG 0
+#define EXE_DBG                                                                                    \
+    0 // for compiler debug only,
+      // limited and not for normal use
 
+// Uninitialized global data section
 #define UDATA __attribute__((section(".ccudata")))
 
-#define K 1024
+#define K 1024 // one kilobyte
 
-#define DATA_BYTES (16 * K)
-#define TEXT_BYTES (16 * K)
-#define SYM_TBL_BYTES (16 * K)
-#define SYM_TEXT_SIZE (4 * K)
-#define TS_TBL_BYTES (2 * K)
-#define AST_TBL_BYTES (32 * K)
-#define MEMBER_DICT_BYTES (4 * K)
+#define DATA_BYTES (16 * K)       // data segment size
+#define TEXT_BYTES (16 * K)       // code segment size
+#define SYM_TBL_BYTES (16 * K)    // symbol table size (released at run time)
+#define TS_TBL_BYTES (2 * K)      // type size table size (released at run time)
+#define AST_TBL_BYTES (32 * K)    // abstract syntax table size (released at run time)
+#define MEMBER_DICT_BYTES (4 * K) // struct member table size (released at run time)
 
-#define CTLC 3
+#define CTLC 3 // control C ascii character
+
+// VT100 escape sequences
 #define VT_BOLD "\033[1m"
 #define VT_NORMAL "\033[m"
 
+// Number of bits for parameter count
 #define ADJ_BITS 5
 #define ADJ_MASK ((1 << ADJ_BITS) - 1)
 
-#if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
-#define SDK14 1
-#else
-#define SDK14 0
-#endif
+extern char* full_path(char* name);                  // expand file name to full path name
+extern int cc_printf(void* stk, int wrds, int prnt); // shim for printf and sprintf
+extern void get_screen_xy(int* x, int* y);           // retrieve screem dimensions
+extern void cc_exit(int rc);                         // C exit function
+extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 
-extern char* full_path(char* name);
-extern int cc_printf(void* stk, int wrds, int prnt);
-extern void get_screen_xy(int* x, int* y);
-extern void cc_exit(int rc);
-
-extern char __StackLimit[TEXT_BYTES + DATA_BYTES];
-
+// accellerated SDK floating point functions
 extern void __wrap___aeabi_idiv();
 extern void __wrap___aeabi_i2f();
 extern void __wrap___aeabi_f2iz();
@@ -81,6 +81,7 @@ extern void __wrap___aeabi_fcmpgt();
 extern void __wrap___aeabi_fcmplt();
 extern void __wrap___aeabi_fcmpge();
 
+// accellerate SDK trig functions
 extern void __wrap_sinf();
 extern void __wrap_cosf();
 extern void __wrap_tanf();
@@ -122,21 +123,23 @@ static void (*fops[])() = { //
     __wrap___aeabi_fcmplt,
     __wrap___aeabi_fcmpge};
 
+// patch list entry
 struct patch_s {
-    struct patch_s* next;
-    struct patch_s* locs;
-    uint16_t* addr;
-    int val;
-    int ext;
+    struct patch_s* next; // list link
+    struct patch_s* locs; // list of patch locations for this address
+    uint16_t* addr;       // patched address
+    int val;              // patch value
+    int ext;              // is external function address
 };
 
+// relocation list entry
 struct reloc_s {
-    struct reloc_s* next;
-    int addr;
+    struct reloc_s* next; // list link
+    int addr;             // address
 };
 
-static struct reloc_s* relocs UDATA;
-static int nrelocs UDATA;
+static struct reloc_s* relocs UDATA; // relocation list root
+static int nrelocs UDATA;            // relocation list size
 
 static char *p UDATA, *lp UDATA;                       // current position in source code
 static char* data UDATA;                               // data/bss pointer
@@ -158,8 +161,8 @@ static int* tsize UDATA;                               // array (indexed by type
 static int tnew UDATA;                                 // next available type
 static int tk UDATA;                                   // current token
 static union conv {                  //
-    int i;                           //
-    float f;                         //
+    int i;                           // integer value
+    float f;                         // floating point value
 } tkv UDATA;                         // current token value
 static int ty UDATA;                 // current expression type
                                      // bit 0:1 - tensor rank, eg a[4][4][4]
@@ -184,38 +187,39 @@ static int ld UDATA;                 // local variable depth
 static int pplev UDATA, pplevt UDATA; // preprocessor conditional level
 static int* ast UDATA;                // abstract syntax tree
 static ARMSTATE state UDATA;          // disassembler state
-int exit_sp UDATA;
-static char* ofn UDATA;
-static int indef UDATA;
-static char* src_base UDATA;
+int exit_sp UDATA;                    // stack at entry to main
+static char* ofn UDATA;               // output file (executable) name
+static int indef UDATA;               // parsing in define statement
+static char* src_base UDATA;          // source code region
 
 // identifier
 struct ident_s {
-    int tk; // type-id or keyword
-    int hash;
-    char* name; // name of this identifier
+    int tk;     // type-id or keyword
+    int hash;   // keyword hash
+    char* name; // name of this identifier (not NULL terminated)
     /* fields starting with 'h' were designed to save and restore
      * the global class/type/val in order to handle the case if a
      * function declares a local with the same name as a global.
      */
-    int class, hclass; // FUNC, GLO (global var), LOC (local var), Syscall
-    int type, htype;   // data type such as char and int
-    int val, hval;
+    int class, hclass;    // FUNC, GLO (global var), LOC (local var), Syscall
+    int type, htype;      // data type such as char and int
+    int val, hval;        // address of symbol
     int etype, hetype;    // extended type info. different meaning for funcs.
     uint16_t* forward;    // forward call patch address
     uint8_t inserted : 1; // inserted in disassembler table
 };
 
+// symbol table
 static struct ident_s *id UDATA, // currently parsed identifier
-    *sym UDATA,                  // symbol table (simple list of identifiers)
-    *sym_base UDATA;
+    *sym_base UDATA;             // symbol table (simple list of identifiers)
 
+// struct member list entry
 struct member_s {
-    struct member_s* next;
-    struct ident_s* id;
-    int offset;
-    int type;
-    int etype;
+    struct member_s* next; // list link
+    struct ident_s* id;    // identifier name
+    int offset;            // offset within struct
+    int type;              // type
+    int etype;             // extended type
 };
 
 static struct member_s** members UDATA; // array (indexed by type) of struct member lists
@@ -234,18 +238,19 @@ enum {
 // 4 type ids are scalars: 0 = char/void, 1 = int, 2 = float, 3 = reserved
 enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000 };
 
-// (library) external functions
+// library help for external functions
 
 struct define_grp {
-    const char* name;
-    const int val;
+    const char* name; // function group name
+    const int val;    // index of 1st function in group
 };
 
 #include "cc_defs.h"
 
-static jmp_buf done_jmp UDATA;
-static int* malloc_list UDATA;
+static jmp_buf done_jmp UDATA; // fatal error jump address
+static int* malloc_list UDATA; // list of allocated memory blocks
 
+// fata erro message and exit
 #define fatal(fmt, ...) fatal_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
 static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, const char* fmt,
@@ -280,6 +285,7 @@ static __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
     longjmp(done_jmp, 1);
 }
 
+// local memory management functions
 static void* cc_malloc(int l, int die) {
     int* p = malloc(l + 8);
     if (!p) {
@@ -312,18 +318,20 @@ static void cc_free(void* p) {
     fatal("corrupted memory");
 }
 
-// stubs for now
+// user malloc shim
 static void* wrap_malloc(int len) { return cc_malloc(len, 0); };
 
+// file control block
 static struct file_handle {
-    struct file_handle* next;
-    bool is_dir;
+    struct file_handle* next; // list link
+    bool is_dir;              // bool, is a directory file
     union {
-        lfs_file_t file;
-        lfs_dir_t dir;
+        lfs_file_t file; // LFS file control block
+        lfs_dir_t dir;   // LFS directory control block
     } u;
-} * file_list;
+} * file_list UDATA; // file list root
 
+// user function shims
 static int wrap_open(char* name, int mode) {
     struct file_handle* h = cc_malloc(sizeof(struct file_handle), 1);
     h->is_dir = false;
@@ -435,20 +443,22 @@ static int x_printf(int etype);
 static int x_sprintf(int etype);
 static char* x_strdup(char* s);
 
+// external function table entry
 struct externs_s {
-    const char* name;
-    const int etype;
-    const struct define_grp* grp;
-    const void* extrn;
-    const int ret_float : 1;
-    const int is_printf : 1;
-    const int is_sprintf : 1;
+    const char* name;             // function name
+    const int etype;              // function return and parameter type
+    const struct define_grp* grp; // help group
+    const void* extrn;            // function address
+    const int ret_float : 1;      // returns float
+    const int is_printf : 1;      // printf function
+    const int is_sprintf : 1;     // sprintf function
 };
 
 static const struct externs_s externs[] = {
 #include "cc_extrns.h"
 };
 
+// help group definitions
 static const struct {
     const char* name;
     const struct define_grp* grp;
@@ -479,6 +489,8 @@ static int extern_search(char* name) // get cache index of external function
     }
     return -1;
 }
+
+// Abstract syntax tree entry creation
 
 static void push_ast(int l) {
     n -= l;
@@ -779,7 +791,7 @@ static void next() {
             tk = (tk << 6) + (p - pp); // hash plus symbol length
             // hash value is used for fast comparison. Since it is inaccurate,
             // we have to validate the memory content as well.
-            for (id = sym; id->tk; ++id) { // find one free slot in table
+            for (id = sym_base; id->tk; ++id) { // find one free slot in table
                 if (tk == id->hash &&      // if token is found (hash match), overwrite
                     !memcmp(id->name, pp, p - pp)) {
                     tk = id->tk;
@@ -2091,6 +2103,7 @@ static void expr(int lev) {
     }
 }
 
+// global array initialization
 static void init_array(struct ident_s* tn, int extent[], int dim) {
     int i, cursor, match, coff = 0, off, empty, *vi;
     int inc[3];
@@ -2183,6 +2196,8 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
             next();
     } while (1);
 }
+
+// peep hole optimizer
 
 // FROM:		   	  TO:
 // mov  r0, r7		  mov  r3,r7
@@ -2312,6 +2327,8 @@ static void peep(void) {
         if (peep_hole(&segments[i]))
             return;
 }
+
+// ARM CM0+ code emitters
 
 static void emit(uint16_t n) {
     if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 1)
@@ -3563,7 +3580,7 @@ static void stmt(int ctx) {
                         printf("%s\n", state.text);
                     }
                 }
-                id = sym;
+                id = sym_base;
                 while (id->tk) { // unwind symbol table locals
                     if (id->class == Loc || id->class == Par) {
                         id->class = id->hclass;
@@ -3922,6 +3939,8 @@ static int f_as_i(float f) {
     return u.i;
 }
 
+// printf/sprintf support
+
 static int common_vfunc(int etype, int prntf, int* sp) {
     int stack[ADJ_MASK + ADJ_MASK + 2];
     int stkp = 0;
@@ -3947,6 +3966,7 @@ static int common_vfunc(int etype, int prntf, int* sp) {
     return r;
 }
 
+// More shims
 static char* x_strdup(char* s) {
     int l = strlen(s);
     char* c = cc_malloc(l + 1, 0);
@@ -3967,6 +3987,8 @@ static int x_sprintf(int etype) {
     sp += 2;
     common_vfunc(etype, 0, sp);
 }
+
+// Help display
 
 static void show_defines(const struct define_grp* grp) {
     if (grp->name == 0)
@@ -4089,7 +4111,7 @@ int cc(int mode, int argc, char** argv) {
         goto done;
 
     if (mode == 0) {
-        sym_base = sym = cc_malloc(SYM_TBL_BYTES, 1);
+        sym_base = cc_malloc(SYM_TBL_BYTES, 1);
 
         // Register keywords in symbol stack. Must match the sequence of enum
         p = "enum char int float struct union sizeof return goto break continue "
@@ -4232,9 +4254,9 @@ int cc(int mode, int argc, char** argv) {
             next();
         }
         // check for unpatched forward JMPs
-        for (struct ident_s* scan = sym; scan->tk; ++scan)
-            if (scan->class == Func && scan->forward)
-                fatal("undeclared forward function %.*s", scan->hash & 0x3f, scan->name);
+        for (id = sym_base; id->tk; ++id)
+            if (id->class == Func && id->forward)
+                fatal("undeclared forward function %.*s", id->hash & 0x3f, id->name);
 
         cc_free(src_base);
         src_base = NULL;
