@@ -65,6 +65,7 @@
 extern char* full_path(char* name);
 extern int cc_printf(void* stk, int wrds, int prnt);
 extern void get_screen_xy(int* x, int* y);
+extern void cc_exit(int rc);
 
 extern char __StackLimit[TEXT_BYTES + DATA_BYTES];
 
@@ -183,7 +184,7 @@ static int ld UDATA;                 // local variable depth
 static int pplev UDATA, pplevt UDATA; // preprocessor conditional level
 static int* ast UDATA;                // abstract syntax tree
 static ARMSTATE state UDATA;          // disassembler state
-static int exit_sp UDATA;
+int exit_sp UDATA;
 static char* ofn UDATA;
 static int indef UDATA;
 static char* src_base UDATA;
@@ -433,7 +434,6 @@ static void wrap_wfi(void) { __wfi(); };
 static int x_printf(int etype);
 static int x_sprintf(int etype);
 static char* x_strdup(char* s);
-static void x_exit(int rc);
 
 struct externs_s {
     const char* name;
@@ -2449,10 +2449,6 @@ static void emit_leave(void) {
 }
 
 static void emit_load_addr(int n) {
-    if (n == -1) {
-        emit(0x4638); // mov r0,r7
-        return;
-    }
     emit_load_immediate(0, (n)*4);
     emit(0x4438); // add r0,r7
 }
@@ -3949,14 +3945,6 @@ static int common_vfunc(int etype, int prntf, int* sp) {
     if (prntf)
         fflush(stdout);
     return r;
-}
-
-static void x_exit(int rc) {
-    asm(" mov sp, %1 \n"
-        " mov r0, %0 \n"
-        " pop {r7, pc} \n"
-        :
-        : "r"(rc), "r"(exit_sp));
 }
 
 static char* x_strdup(char* s) {
