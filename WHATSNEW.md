@@ -1,3 +1,11 @@
+What's new in version 1.2.16
+
+    optimize function calls. save/restore fewer registers
+    adjust exit function
+    update peep-hole optimizer, add array indexing optimization
+    add quicksort example
+    line buffering serves no purpose, remove it.
+
 What's new in version 1.2.15
 
 - Another critical printf fix
