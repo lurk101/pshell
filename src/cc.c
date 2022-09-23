@@ -4092,14 +4092,19 @@ void __not_in_flash_func(dummy)(void) {
 }
 #endif
 
+// executable file header
 struct exe_s {
-    int entry;
-    int tsize;
-    int dsize;
-    int nreloc;
+    int entry;  // entry point
+    int tsize;  // text segment size
+    int dsize;  // data segment size
+    int nreloc; // # of external function relocation entries
 };
 
+// compiler can be invoked in compile mode (mode = 0)
+// or loader mode (mode = 1)
 int cc(int mode, int argc, char** argv) {
+
+    // clear uninitialized global variables
     extern char __ccudata_start__, __ccudata_end__;
     memset(&__ccudata_start__, 0, &__ccudata_end__ - &__ccudata_start__);
 
@@ -4107,13 +4112,16 @@ int cc(int mode, int argc, char** argv) {
     int rslt = -1;
     struct exe_s exe;
 
+    // set the abort jump
     if (setjmp(done_jmp))
         goto done;
 
+    // compile mode
     if (mode == 0) {
+        // allocate the symbol table
         sym_base = cc_malloc(SYM_TBL_BYTES, 1);
 
-        // Register keywords in symbol stack. Must match the sequence of enum
+        // Register keywords in symbol table. Must match the sequence of enum
         p = "enum char int float struct union sizeof return goto break continue "
             "if do while for switch case default else void main";
 
@@ -4124,27 +4132,32 @@ int cc(int mode, int argc, char** argv) {
             id->tk = i;
             id->class = Keyword; // add keywords to symbol table
         }
-
         next();
 
+        // add the void type symbol
         id->tk = Char;
         id->class = Keyword; // handle void type
         next();
+
+        // add the main symbol
         struct ident_s* idmain = id;
         id->class = Main; // keep track of main
 
+        // set data segment bases
         data_base = data = __StackLimit + TEXT_BYTES;
         memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
+        // allocate the type size and abstract syntax tree
         tsize = cc_malloc(TS_TBL_BYTES, 1);
         ast = cc_malloc(AST_TBL_BYTES, 1);
         n = ast + (AST_TBL_BYTES / 4) - 1;
 
-        // add primitive types
+        // add primitive type sizes
         tsize[tnew++] = sizeof(char);
         tsize[tnew++] = sizeof(int);
         tsize[tnew++] = sizeof(float);
         tsize[tnew++] = 0; // reserved for another scalar type
 
+        // parse the command line arguments
         --argc;
         ++argv;
         char* lib_name = NULL;
@@ -4189,11 +4202,13 @@ int cc(int mode, int argc, char** argv) {
             --argc;
             ++argv;
         }
+        // input file name is mandatory parameter
         if (argc < 1) {
             help(NULL);
             goto done;
         }
 
+        // optionally enable and add known symbols to disassembler tables
         if (src_opt) {
             disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
             disasm_symbol(&state, "idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
@@ -4208,6 +4223,8 @@ int cc(int mode, int argc, char** argv) {
             disasm_symbol(&state, "fcmpgt", (uint32_t)__wrap___aeabi_fcmpgt, ARMMODE_THUMB);
             disasm_symbol(&state, "fcmplt", (uint32_t)__wrap___aeabi_fcmplt, ARMMODE_THUMB);
         }
+
+        // add SDK and clib symbols
         add_defines(stdio_defines);
         add_defines(gpio_defines);
         add_defines(pwm_defines);
@@ -4216,27 +4233,35 @@ int cc(int mode, int argc, char** argv) {
         add_defines(spi_defines);
         add_defines(irq_defines);
 
+        // make a copy of the full path and append .c if necessary
         char* fn = cc_malloc(strlen(full_path(*argv)) + 3, 1);
         strcpy(fn, full_path(*argv));
         if (strrchr(fn, '.') == NULL)
             strcat(fn, ".c");
+        // allocate a file descriptor and open the input file
         fd = cc_malloc(sizeof(lfs_file_t), 1);
         if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
             cc_free(fd);
             fd = NULL;
             fatal("could not open %s \n", fn);
         }
+        // don't need the filename anymore
         cc_free(fn);
+        // get the file size
         int fl = fs_file_seek(fd, 0, SEEK_END);
         fs_file_seek(fd, 0, SEEK_SET);
+        // allocate the source buffer, terminate it, then close the file
         src_base = p = lp = cc_malloc(fl + 1, 1);
+        // move the file contents to the source buffer
         if (fs_file_read(fd, src_base, fl) != fl)
             fatal("error reading source");
         src_base[fl] = 0;
         fs_file_close(fd);
+        // free the file descriptor
         cc_free(fd);
         fd = 0;
 
+        // set the code base
 #if EXE_DBG
         text_base = le = (uint16_t*)((int)dummy & ~1);
 #else
@@ -4244,20 +4269,22 @@ int cc(int mode, int argc, char** argv) {
 #endif
         e = text_base - 1;
 
+        // allocate the structure member table
         members = cc_malloc(MEMBER_DICT_BYTES, 1);
 
-        // parse the program
+        // compile the program
         pplevt = -1;
         next();
         while (tk) {
             stmt(Glo);
             next();
         }
-        // check for unpatched forward JMPs
+        // check for undeclared forward functions
         for (id = sym_base; id->tk; ++id)
             if (id->class == Func && id->forward)
                 fatal("undeclared forward function %.*s", id->hash & 0x3f, id->name);
 
+        // free all the compiler buffers
         cc_free(src_base);
         src_base = NULL;
         cc_free(ast);
@@ -4267,12 +4294,16 @@ int cc(int mode, int argc, char** argv) {
         cc_free(tsize);
         tsize = NULL;
 
+        // entry point main must be declared
         if (!idmain->val)
             fatal("main() not defined\n");
 
+        // save the entry point address
         exe.entry = idmain->val;
 
+        // optionally create executable output file
         if (ofn) {
+            // allocate output file descriptor and create the file
             fd = cc_malloc(sizeof(lfs_file_t), 1);
             char* cp = full_path(ofn);
             if (fs_file_open(fd, cp, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
@@ -4280,6 +4311,7 @@ int cc(int mode, int argc, char** argv) {
                 fd = NULL;
                 fatal("could not create %s\n", full_path(ofn));
             }
+            // initialize the header and write it
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
             exe.dsize = data - data_base;
             exe.nreloc = nrelocs;
@@ -4287,14 +4319,17 @@ int cc(int mode, int argc, char** argv) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
             }
+            // write the code segment
             if (fs_file_write(fd, text_base, exe.tsize) != exe.tsize) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
             }
+            // write the data segment
             if (exe.dsize && fs_file_write(fd, data_base, exe.dsize) != exe.dsize) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
             }
+            // write the external function relocation list
             while (relocs) {
                 if (fs_file_write(fd, &relocs->addr, sizeof(relocs->addr)) !=
                     sizeof(relocs->addr)) {
@@ -4305,6 +4340,7 @@ int cc(int mode, int argc, char** argv) {
                 cc_free(relocs);
                 relocs = r;
             }
+            // done. close the file and set the executable attribute
             fs_file_close(fd);
             cc_free(fd);
             fd = NULL;
@@ -4316,33 +4352,41 @@ int cc(int mode, int argc, char** argv) {
         }
         if (src_opt)
             goto done;
-    } else {
+    } else { // loader mode
+             // output file name is not optional
         if (argc < 1)
             fatal("specify executable file name");
         ofn = argv[0];
+        // check file attribute
         char buf[4];
         if (fs_getattr(ofn, 1, buf, sizeof(buf)) != 4)
             fatal("file %s not found or not executable", ofn);
         if (memcmp(buf, "exe", 4))
             fatal("file %s not found or not executable", ofn);
+        // allocate file descriptor and open binary executable file
         fd = cc_malloc(sizeof(lfs_file_t), 1);
         if (fs_file_open(fd, ofn, LFS_O_RDONLY) < LFS_ERR_OK)
             fatal("can't open file %s", ofn);
+        // read the exe header
         if (fs_file_read(fd, &exe, sizeof(exe)) != sizeof(exe)) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
+        // clear the code segment for good measure though not necessary
         memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
+        // read in the code segment
         if (fs_file_read(fd, __StackLimit, exe.tsize) != exe.tsize) {
             fs_file_close(fd);
             fd = NULL;
             fatal("error reading %s", ofn);
         }
+        // read in the data segment
         if (exe.dsize && fs_file_read(fd, __StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
             fs_file_close(fd);
             fd = NULL;
             fatal("error reading %s", ofn);
         }
+        // set all the relocatable external function calls
         for (int i = 0; i < exe.nreloc; i++) {
             int addr;
             if (fs_file_read(fd, &addr, sizeof(addr)) != sizeof(addr)) {
@@ -4362,11 +4406,13 @@ int cc(int mode, int argc, char** argv) {
                     *((int*)addr) = (int)externs[v].extrn;
             }
         }
+        // close the file and free its descriptor
         fs_file_close(fd);
         cc_free(fd);
         fd = NULL;
     }
 
+    // launch the user code
     printf("\n");
     int ep = exe.entry | 1;
     asm volatile("mov  %0, sp \n" : "=r"(exit_sp));
@@ -4381,12 +4427,15 @@ int cc(int mode, int argc, char** argv) {
                  "mov  %0, r0 \n"
                  : "=r"(rslt)
                  : "r"(ep));
+    // display the return code
     printf("\nCC = %d\n", rslt);
-done:
+
+done: // clean up and return
     if (src_opt)
         disasm_cleanup(&state);
     if (fd)
         fs_file_close(fd);
+    // unclosed files
     while (file_list) {
         if (file_list->is_dir)
             fs_dir_close(&file_list->u.dir);
@@ -4394,6 +4443,7 @@ done:
             fs_file_close(&file_list->u.file);
         file_list = file_list->next;
     }
+    // unfreed memory
     while (malloc_list)
         cc_free(malloc_list + 2);
 
