@@ -3533,6 +3533,7 @@ static void stmt(int ctx) {
                 dd->etype = ddetype;
                 uint16_t* se;
                 if (tk == ';') { // check for prototype
+                    se = e;
                     if (!((int)e & 2))
                         emit(0x46c0); // nop
                     emit(0x4800);     // ldr r0, [pc, #0]
@@ -4414,7 +4415,6 @@ int cc(int mode, int argc, char** argv) {
 
     // launch the user code
     printf("\n");
-    int ep = exe.entry | 1;
     asm volatile("mov  %0, sp \n" : "=r"(exit_sp));
     asm volatile("mov  r0, %1 \n"
                  "push {r0}   \n"
@@ -4424,7 +4424,7 @@ int cc(int mode, int argc, char** argv) {
                  "add  sp, #8 \n"
                  "mov  %0, r0 \n"
                  : "=r"(rslt)
-                 : "r"(ep), "r"(argc), "r"(argv)
+                 : "r"(exe.entry | 1), "r"(argc), "r"(argv)
                  : "r0", "r1", "r2", "r3");
     // display the return code
     printf("\nCC = %d\n", rslt);
