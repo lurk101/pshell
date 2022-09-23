@@ -84,6 +84,6 @@ cc_exit:
         subs r1,#16
         mov sp, r1
         pop {r7, pc}
-        .align 4
+        .align 2
 esp:    .word exit_sp
 

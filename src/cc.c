@@ -4416,17 +4416,16 @@ int cc(int mode, int argc, char** argv) {
     printf("\n");
     int ep = exe.entry | 1;
     asm volatile("mov  %0, sp \n" : "=r"(exit_sp));
-    asm volatile("mov  r0, %0 \n"
+    asm volatile("mov  r0, %1 \n"
                  "push {r0}   \n"
-                 "mov  r0, %1 \n"
+                 "mov  r0, %2 \n"
                  "push {r0}   \n"
-                 :
-                 : "r"(argc), "r"(argv));
-    asm volatile("blx  %1     \n"
+                 "blx  %1     \n"
                  "add  sp, #8 \n"
                  "mov  %0, r0 \n"
                  : "=r"(rslt)
-                 : "r"(ep));
+                 : "r"(ep), "r"(argc), "r"(argv)
+                 : "r0", "r1", "r2", "r3");
     // display the return code
     printf("\nCC = %d\n", rslt);
 
