@@ -2268,12 +2268,9 @@ static void patch_pc_relative(int brnch) {
     int rel_count = pcrel_count;
     pcrel_count = 0;
     if (brnch) {
-        if (!((int)e & 2))
-            emit_branch(e + 2 * rel_count);
-        else {
+        if ((int)e & 2)
             emit(0x46c0); // nop ; (mov r8, r8)
-            emit_branch(e + 2 * rel_count);
-        }
+        emit_branch(e + 2 * rel_count);
     } else {
         if (!((int)e & 2))
             emit(0x46c0); // nop ; (mov r8, r8)

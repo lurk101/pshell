@@ -100,7 +100,6 @@ static char* xvsnprintf(const char* format, ...) {
     va_start(va, format);
     int n = vsnprintf(&c, sizeof c, format, va);
     va_end(va);
-    va_list p;
     char* buf = malloc(n + 1);
     va_start(va, format);
     vsnprintf(buf, n + 1, format, va);
@@ -3723,22 +3722,21 @@ int vi(int ac, char* argv[]) {
     // undo_q = 0; - already is
 
     if (setjmp(die_jmp))
-        goto shell;
+        goto done;
 
-    {
-        char* cmds = NULL;
-        char* exrc = "/.exrc";
-        struct lfs_info st;
+    char* cmds = NULL;
+    char* exrc = "/.exrc";
+    struct lfs_info st;
 
-        if (fs_stat(exrc, &st) >= 0)
-            cmds = xmalloc_open_read_close(exrc);
+    if (fs_stat(exrc, &st) >= 0)
+        cmds = xmalloc_open_read_close(exrc);
 
-        if (cmds) {
-            init_text_buffer(NULL);
-            run_cmds(cmds);
-            free(cmds);
-        }
+    if (cmds) {
+        init_text_buffer(NULL);
+        run_cmds(cmds);
+        free(cmds);
     }
+
     // "Save cursor, use alternate screen buffer, clear screen"
     puts_no_eol(ESC "[?1049h");
     fflush(stdout);
@@ -3751,7 +3749,8 @@ int vi(int ac, char* argv[]) {
             edit_file(full_path(argv[optind]));
         else
             edit_file(NULL); // might be NULL on 1st iteration
-shell:
+done:
+    flush_undo_data();
     if (text)
         free(text);
     if (screen)
@@ -3760,5 +3759,6 @@ shell:
         free(last_search_pattern);
     // "Use normal screen buffer, restore cursor"
     puts_no_eol(ESC "[?1049l");
+    fflush(stdout);
     return 0;
 }

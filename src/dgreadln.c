@@ -21,18 +21,18 @@ static int dgleft() {
     return 0;
 }
 
-static int dgputs(char* s) {
+static void dgputs(char* s) {
     int n = 0;
     while (s[n])
         if (putchar(s[n++]) < 0)
-            return -1;
-    return n;
+            break;
 }
 
-static int cookputc(int c) {
+static void cookputc(int c) {
     if (c < '\040' || c >= '\177')
-        return putchar('^');
-    return putchar(c);
+        putchar('^');
+    else
+        putchar(c);
 }
 
 #define DOGSIZE 33
@@ -107,7 +107,7 @@ static const char *nextfil(){
     return 0;
 }
 
-static const char *openfil(char *p){
+static void openfil(char* p) {
     lfs_dir_t fd;
     if (dgiter.isopen) {
         fs_dir_close(&dgiter.fd);
@@ -116,7 +116,7 @@ static const char *openfil(char *p){
     if (fs_dir_open(&dgiter.fd, p) < LFS_ERR_OK) {
         putchar('\007');
         twotabs = 1;
-        return 0;
+        return;
     }
     dgiter.isopen = 1;
 }
@@ -145,7 +145,7 @@ default:
     }
 }
 
-static const char *openpath(){
+static void openpath() {
     dgiter.st = 0;
     opencmd();
 }
@@ -287,19 +287,16 @@ static void dotab() {
     }
     p = findit(j);
     int n = strlen(p);
-    for (j = cmdlb - 1; j >= cmdli; j--) {
+    for (j = cmdlb - 1; j >= cmdli; j--)
         cmdline[j + n] = cmdline[j];
-    }
     while (*p)
         cookputc(cmdline[cmdli++] = (*p++));
     cmdlb += n;
     cmdline[cmdlb] = 0;
-    for (j = cmdli; j < cmdlb; j++) {
+    for (j = cmdli; j < cmdlb; j++)
         cookputc(cmdline[j]);
-    }
-    for (j = cmdli; j < cmdlb; j++) {
+    for (j = cmdli; j < cmdlb; j++)
         putchar('\b');
-    }
     return;
 }
 
@@ -343,9 +340,8 @@ static void addhist(char* s){
 
 static void resthist(){
     lfs_file_t fp;
-    if(fs_file_open(&fp,"/.history",LFS_O_RDONLY) < 0) {
+    if (fs_file_open(&fp, "/.history", LFS_O_RDONLY) < 0)
         return;
-    }
     int j = 0;
     for (;;) {
         char c;
@@ -417,12 +413,10 @@ static void flushesc() {
 }
 
 static void eschp(char* hp) {
-    if (hp) {
-        for (cmdlb = 0; hp[cmdlb]; cmdlb++) {
+    if (hp)
+        for (cmdlb = 0; hp[cmdlb]; cmdlb++)
             cmdline[cmdlb] = hp[cmdlb];
-        }
         cmdli = cmdlb;
-    }
     flushesc();
     return;
 }
@@ -450,19 +444,17 @@ static int matchkey(int c) {
         esceb = 0;
         r = matchwork(c);
     }
-    if (r > 0) {
+    if (r > 0)
         while (esceb > 0)
             escbuf[--esceb] = 0;
-    }
     return r;
 }
 
 static void cmdinsert(int c) {
     int j;
     for (;;) {
-        for (j = cmdlb; j >= cmdli; j--) {
+        for (j = cmdlb; j >= cmdli; j--)
             cmdline[j] = cmdline[j - 1];
-        }
         cmdlb++;
         cmdline[cmdli++] = c;
         cookputc(c);
@@ -476,12 +468,10 @@ static void cmdinsert(int c) {
             break;
         }
     }
-    for (j = cmdli; j < cmdlb; j++) {
+    for (j = cmdli; j < cmdlb; j++)
         cookputc(cmdline[j]);
-    }
-    for (j = cmdli; j < cmdlb; j++) {
+    for (j = cmdli; j < cmdlb; j++)
         putchar('\b');
-    }
 }
 
 char* dgreadln(char* buffer, int mnt, char* prom) {
@@ -511,17 +501,15 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                 hp2 = findhist(cmdline, hi);
                 if (hp2) {
                     if (hp) {
-                        for (j = 0; hp[j]; j++) {
+                        for (j = 0; hp[j]; j++)
                             dgputs("\b \b");
-                        }
                     } else {
                         for (j = cmdli; j < cmdlb; j++)
                             putchar(' ');
                         for (j = cmdli; j < cmdlb; j++)
                             putchar('\b');
-                        for (j = 0; j < cmdli; j++) {
+                        for (j = 0; j < cmdli; j++)
                             dgputs("\b \b");
-                        }
                     }
                     hp = hp2;
                     for (j = 0; hp[j]; j++)
@@ -530,15 +518,13 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                         hi++;
                     else
                         hi--;
-                } else {
+                } else
                     putchar('\007');
-                }
             } else
                 switch (eschp(hp), hp = 0, hi = 0, ky) {
                 case 2: // rubout
-                    if (cmdli < cmdlb) {
+                    if (cmdli < cmdlb)
                         cookputc(cmdline[cmdli++]);
-                    }
                 case 1: // backspace
                     if (cmdli > 0) {
                         int j;
@@ -550,49 +536,41 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                             cookputc(cmdline[j]);
                         }
                         putchar(' ');
-                        for (j = cmdli; j <= cmdlb; j++) {
+                        for (j = cmdli; j <= cmdlb; j++)
                             putchar('\b');
-                        }
-                    } else {
+                    } else
                         putchar('\007');
-                    }
                     break;
                 case 3: // erase line
                     if (cmdli > 0) {
                         int j;
-                        for (j = cmdli; j > 0; j--) {
+                        for (j = cmdli; j > 0; j--)
                             putchar('\b');
-                        }
                         for (j = cmdli; j < cmdlb; j++) {
                             cmdline[j - cmdli] = cmdline[j];
                             cookputc(cmdline[j]);
                         }
-                        for (j = 0; j < cmdli; j++) {
+                        for (j = 0; j < cmdli; j++)
                             putchar(' ');
-                        }
-                        for (j = 0; j < cmdlb; j++) {
+                        for (j = 0; j < cmdlb; j++)
                             putchar('\b');
-                        }
                         cmdlb -= cmdli;
                         cmdli = 0;
-                    } else {
+                    } else
                         putchar('\007');
-                    }
                     break;
                 case 6: // right arrow
-                    if (cmdli < cmdlb) {
+                    if (cmdli < cmdlb)
                         cookputc(cmdline[cmdli++]);
-                    } else {
+                    else
                         putchar('\007');
-                    }
                     break;
                 case 7: // left arrow
                     if (cmdli > 0) {
                         dgputs("\b");
                         cmdli--;
-                    } else {
+                    } else
                         putchar('\007');
-                    }
                     break;
                 case 8: // home
                 case 9: // home2
@@ -619,10 +597,9 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                 case 15: // next word2
                     while (cmdli < cmdlb) {
                         cookputc(cmdline[cmdli++]);
-                        if (cmdli < cmdlb) {
+                        if (cmdli < cmdlb)
                             if (separator(cmdline[cmdli]))
                                 break;
-                        }
                     }
                     break;
                 case 16: // insert space
@@ -631,12 +608,10 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                 case 17: // erase EOL
                     if (cmdli < cmdlb) {
                         int j;
-                        for (j = cmdli; j < cmdlb; j++) {
+                        for (j = cmdli; j < cmdlb; j++)
                             putchar(' ');
-                        }
-                        for (j = cmdli; j < cmdlb; j++) {
+                        for (j = cmdli; j < cmdlb; j++)
                             putchar('\b');
-                        }
                         cmdlb = cmdli;
                     }
                 }
@@ -648,9 +623,8 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
             cmdline[cmdlb++] = '\n';
             cmdline[cmdlb] = 0;
             return cmdline;
-        } else {
+        } else
             cmdinsert(c);
-        }
         if (cmdlb >= CMDFULL) {
             cmdline[cmdlb++] = '\n';
             cmdline[cmdlb] = 0;
