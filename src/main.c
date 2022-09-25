@@ -611,6 +611,12 @@ static void usbboot_cmd(void) {
 #endif
 
 static void quit_cmd(void) {
+    printf("\nare you sure (Y/n) ? ");
+    fflush(stdout);
+    char c = getchar();
+    putchar('\n');
+    if (c != 'y' && c != 'Y' && c != '\r')
+        return;
     // release any resources we were using
     if (mounted) {
         savehist();
@@ -716,7 +722,7 @@ cmd_t cmd_table[] = {
     {"mount",   mount_cmd,      "mount the filesystem"},
     {"mv",      mv_cmd,         "rename a file or directory"},
     {"quit",    quit_cmd,       "shutdown the system"},
-    {"reboot",  reboot_cmd,     "Restart the system"},
+    {"reboot",  reboot_cmd,     "restart the system"},
     {"resize",  resize_cmd,     "establish screen dimensions"},
     {"rm",      rm_cmd,         "remove a file or directory. -r for recursive"},
     {"status",  status_cmd,     "display the filesystem status"},
@@ -857,8 +863,10 @@ int main(void) {
         result[0] = 0;
         bool found = false;
         if (argc) {
-            if (!strcmp(argv[0], "q"))
+            if (!strcmp(argv[0], "q")) {
                 quit_cmd();
+                continue;
+            }
             for (i = 0; cmd_table[i].name; i++)
                 if (strcmp(argv[0], cmd_table[i].name) == 0) {
                     cmd_table[i].func();
