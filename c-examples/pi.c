@@ -1,9 +1,5 @@
 /* Test floats and recursion */
 
-float F(int i) {
-    if (i > 20)
-        return 1.0;
-    return 1.0 + (float)i / (2.0 * (float)i + 1.0) * F(i + 1);
-}
+float F(float f) { return (f > 20.0) ? 1.0 : 1.0 + f / (2.0 * f + 1.0) * F(f + 1.0); }
 
-int main() { return printf("The value of Pi is %f\n", 2.0 * F(1)); }
+int main() { return printf("The value of Pi is %f\n", 2.0 * F(1.0)); }

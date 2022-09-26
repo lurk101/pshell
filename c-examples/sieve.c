@@ -15,11 +15,10 @@ int main() {
     sieve();
     start = time_us_32() - start;
     int i;
-    while (i < sizeof(s)) {
+    for (i = 2; i < sizeof(s); ++i)
         if (!s[i])
             printf("%d ", i);
-        i++;
-    }
     printf("\n\n");
-    return printf("calculation time %f milliseconds\n", (float)start / 1000.0);
+    printf("calculation time %d microseconds\n", start);
+    return 0;
 }

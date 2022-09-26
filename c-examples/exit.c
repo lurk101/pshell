@@ -1,3 +1,5 @@
+// exit test
+
 void suba() { exit(0); }
 
 void subb() {

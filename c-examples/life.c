@@ -1,22 +1,17 @@
 // Gosper glider gun
 
-char esc[16];
 int x_max, y_max;
 char *l0, *l1, *count;
 int scr_size;
 
-void putchar_xy(int x, int y, char c) {
-    sprintf(esc + 1, "[%d;%dH", y + 1, x + 1);
-    printf("%s%c", esc, c);
-}
+void putchar_xy(int x, int y, char c) { printf("\033[%d;%dH%c", y + 1, x + 1, c); }
 
-void clear() {
-    strcpy(esc + 1, "[H");
-    printf(esc);
-    esc[2] = 'J';
-    printf(esc);
-    strcpy(esc + 1, "[?25l");
-    printf(esc);
+void clear(int on) {
+    printf("\033[H\033[J");
+    if (on)
+        printf("\033[?25h");
+    else
+        printf("\033[?25l");
 }
 
 void set(int x, int y) {
@@ -25,6 +20,11 @@ void set(int x, int y) {
 }
 
 void next_gen() {
+    int ch = getchar_timeout_us(0);
+    if (ch == 3) {
+        clear(1);
+        exit(0);
+    }
     int x, y, x2, y2;
     memset((int)count, 0, scr_size);
     // count neighbors
@@ -55,9 +55,13 @@ void next_gen() {
     memcpy((int)l0, (int)l1, scr_size);
 }
 
+// gosper glider gun
+int xy[72] = {0,  4, 0,  5, 1,  4, 1,  5, 10, 4, 10, 5, 10, 6, 11, 3, 11, 7, 12, 2, 12, 8, 13, 2,
+              13, 8, 14, 5, 15, 3, 15, 7, 16, 4, 16, 5, 16, 6, 17, 5, 20, 2, 20, 3, 20, 4, 21, 2,
+              21, 3, 21, 4, 22, 1, 22, 5, 24, 0, 24, 1, 24, 5, 24, 6, 34, 2, 34, 3, 35, 2, 35, 3};
+
 int main() {
-    esc[0] = 27;
-    clear();
+    clear(0);
     x_max = screen_width();
     y_max = screen_height();
     scr_size = x_max * y_max;
@@ -65,42 +69,9 @@ int main() {
     memset((int)l0, 0, scr_size);
     l1 = (char*)malloc(scr_size);
     count = (char*)malloc(scr_size);
-    set(0, 4);
-    set(0, 5);
-    set(1, 4);
-    set(1, 5);
-    set(10, 4);
-    set(10, 5);
-    set(10, 6);
-    set(11, 3);
-    set(11, 7);
-    set(12, 2);
-    set(12, 8);
-    set(13, 2);
-    set(13, 8);
-    set(14, 5);
-    set(15, 3);
-    set(15, 7);
-    set(16, 4);
-    set(16, 5);
-    set(16, 6);
-    set(17, 5);
-    set(20, 2);
-    set(20, 3);
-    set(20, 4);
-    set(21, 2);
-    set(21, 3);
-    set(21, 4);
-    set(22, 1);
-    set(22, 5);
-    set(24, 0);
-    set(24, 1);
-    set(24, 5);
-    set(24, 6);
-    set(34, 2);
-    set(34, 3);
-    set(35, 2);
-    set(35, 3);
+    int i;
+    for (i = 0; i < sizeof(xy) / sizeof(int); i += 2)
+        set(xy[i], xy[i + 1]);
     while (true)
         next_gen();
     return 0;

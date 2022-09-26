@@ -7,7 +7,8 @@ int main(int ac, char* av[]) {
     int tic = 0;
     while (1) {
         printf("%s\n", (tic ^= 1) ? "tic" : "toc");
-        sleep_ms(intvl * 1000);
+        if (getchar_timeout_us(intvl * 1000000) == 3)
+            break;
     }
     return intvl;
 }

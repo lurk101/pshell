@@ -4,7 +4,7 @@ int main(int ac, char* av[]) {
 
     int rc = -1;
 
-    int fin = 0, fout = open("test.txt", O_WRONLY + O_CREAT);
+    int fin = 0, fout = open("test.txt", O_WRONLY | O_CREAT | O_TRUNC);
     if (fout < 0) {
         printf("error opening test.txt\n");
         goto exit;
@@ -36,10 +36,12 @@ int main(int ac, char* av[]) {
     printf("file seeked\n");
 
     char buf[32];
-    if (read(fin, buf, sizeof(buf)) < 0) {
+    int l = read(fin, buf, sizeof(buf));
+    if (l < 0) {
         printf("error reading test.txt\n");
         goto exit_close;
     }
+    buf[l] = 0;
     printf("read: %s\n", buf);
     if (strcmp(buf, "part 2")) {
         printf("expected part2!");
@@ -59,6 +61,6 @@ exit_close:
         close(fout);
     if (fin)
         close(fin);
-exit:;
+exit:
     return rc;
 }

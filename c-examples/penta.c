@@ -1,25 +1,17 @@
 // Pentamino
 
-char esc[16];
 int x_max, y_max;
 char *l0, *l1, *count;
 int scr_size;
 
-void putchar_xy(int x, int y, char c) {
-    sprintf(esc + 1, "[%d;%dH", y + 1, x + 1);
-    printf("%s%c", esc, c);
-}
+void putchar_xy(int x, int y, char c) { printf("\033[%d;%dH%c", y + 1, x + 1, c); }
 
 void clear(int on) {
-    strcpy(esc + 1, "[H");
-    printf(esc);
-    esc[2] = 'J';
-    printf(esc);
-	if (on)
-    	strcpy(esc + 2, "?25h");
-	else
-    	strcpy(esc + 2, "?25l");
-    printf(esc);
+    printf("\033[H\033[J");
+    if (on)
+        printf("\033[?25h");
+    else
+        printf("\033[?25l");
 }
 
 void set(int x, int y) {
@@ -28,11 +20,11 @@ void set(int x, int y) {
 }
 
 void next_gen() {
-	int ch = getchar_timeout_us(0);
-	if (ch == 3) {
-		clear(1);
-		exit(0);
-	}
+    int ch = getchar_timeout_us(0);
+    if (ch == 3) {
+        clear(1);
+        exit(0);
+    }
     int x, y, x2, y2;
     memset((int)count, 0, scr_size);
     // count neighbors
@@ -64,10 +56,9 @@ void next_gen() {
 }
 
 // pentamino
-int xy[10] = { 1, 0, 2, 0,  0, 1, 1, 1,  1, 2};
+int xy[5][2] = {{1, 0}, {2, 0}, {0, 1}, {1, 1}, {1, 2}};
 
 int main() {
-    esc[0] = 27;
     clear(0);
     x_max = screen_width();
     y_max = screen_height();
@@ -77,9 +68,9 @@ int main() {
     l1 = (char*)malloc(scr_size);
     count = (char*)malloc(scr_size);
     int i;
-    for (i = 0; i < sizeof(xy) / sizeof(int); i += 2)
-        set(xy[i], xy[i + 1]);
+    for (i = 0; i < 5; ++i)
+        set(xy[i][0], xy[i][1]);
     while (true)
         next_gen();
-	return 0;
+    return 0;
 }

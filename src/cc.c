@@ -36,9 +36,9 @@
 #include "cc.h"
 #include "fs.h"
 
-#define EXE_DBG                                                                                    \
-    0 // for compiler debug only,
-      // limited and not for normal use
+// for compiler debug only,
+// limited and not for normal use
+#define EXE_DBG 0
 
 // Uninitialized global data section
 #define UDATA __attribute__((section(".ccudata")))
@@ -228,10 +228,8 @@ static struct member_s** members UDATA; // array (indexed by type) of struct mem
 // ( >= 128 so not to collide with ASCII-valued tokens)
 #include "cc_tokns.h"
 
-// opcodes
-enum {
+// operations
 #include "cc_ops.h"
-};
 
 // types -- 4 scalar types, 1020 aggregate types, 4 tensor ranks, 8 ptr levels
 // bits 0-1 = tensor rank, 2-11 = type id, 12-14 = ptr level
@@ -245,12 +243,13 @@ struct define_grp {
     const int val;    // index of 1st function in group
 };
 
+// predefined external functions
 #include "cc_defs.h"
 
 static jmp_buf done_jmp UDATA; // fatal error jump address
 static int* malloc_list UDATA; // list of allocated memory blocks
 
-// fata erro message and exit
+// fatal erro message and exit
 #define fatal(fmt, ...) fatal_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
 static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, const char* fmt,
@@ -272,7 +271,7 @@ static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, 
         p = strchr(lp, '\n');
         printf("\n" VT_BOLD "%d:" VT_NORMAL " %.*s\n", lineno, p - lp, lp);
     }
-    longjmp(done_jmp, 1);
+    longjmp(done_jmp, 1); // bail out
 }
 
 static __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
@@ -282,7 +281,7 @@ static __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
     vprintf(fmt, ap);
     va_end(ap);
     printf("\n");
-    longjmp(done_jmp, 1);
+    longjmp(done_jmp, 1); // bail out
 }
 
 // local memory management functions
@@ -294,7 +293,8 @@ static void* cc_malloc(int l, int die) {
         else
             return 0;
     }
-    memset(p + 2, 0, l);
+    if (die)
+        memset(p + 2, 0, l);
     p[0] = (int)malloc_list;
     malloc_list = p;
     return p + 2;
@@ -381,7 +381,7 @@ static void wrap_close(int handle) {
         last_h = h;
         h = h->next;
     }
-    fatal("closing unopened file!");
+    run_fatal("closing unopened file!");
 }
 
 static int wrap_read(int handle, void* buf, int len) {
@@ -2585,17 +2585,13 @@ static void emit_float_oper(int op) {
     }
 }
 
-static void emit_ftoi() { emit_fop((int)aeabi_f2iz); }
-
-static void emit_itof() { emit_fop((int)aeabi_i2f); }
-
 static void emit_cast(int n) {
     switch (n) {
     case ITOF:
-        emit_itof();
+        emit_fop((int)aeabi_i2f);
         break;
     case FTOI:
-        emit_ftoi();
+        emit_fop((int)aeabi_f2iz);
         break;
     default:
         fatal("unexpected compiler error");
@@ -2635,13 +2631,13 @@ static void emit_syscall(int n, int np) {
         if (!ofn)
             emit_load_long_imm(3, (int)x_printf, 0);
         else
-            emit_load_long_imm(3, 1000, 1);
+            emit_load_long_imm(3, n, 1);
     } else if (p->is_sprintf) {
         emit_load_immediate(0, np);
         if (!ofn)
             emit_load_long_imm(3, (int)x_sprintf, 0);
         else
-            emit_load_long_imm(3, 1001, 1);
+            emit_load_long_imm(3, n, 1);
     } else {
         int nparm = np & ADJ_MASK;
         if (nparm > 4)
@@ -2711,9 +2707,9 @@ static void gen(int* n) {
         if (l > ATOM_TYPE && l < PTR)
             fatal("struct assign not yet supported");
         if ((Num_entry(n).val >> 16) == FLOAT && l == INT)
-            emit_ftoi();
+            emit_fop((int)aeabi_f2iz);
         else if ((Num_entry(n).val >> 16) == INT && l == FLOAT)
-            emit_itof();
+            emit_fop((int)aeabi_i2f);
         emit_store((l >= PTR) ? SI : SC + (l >> 2));
         break;
     case Inc: // increment or decrement variables
@@ -4267,9 +4263,9 @@ int cc(int mode, int argc, char** argv) {
             if (v < 0)
                 *((int*)addr) = (int)fops[-v];
             else {
-                if (v == 1000)
+                if (externs[v].is_printf)
                     *((int*)addr) = (int)x_printf;
-                else if (v == 1001)
+                else if (externs[v].is_sprintf)
                     *((int*)addr) = (int)x_sprintf;
                 else
                     *((int*)addr) = (int)externs[v].extrn;
