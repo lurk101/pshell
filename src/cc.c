@@ -266,7 +266,7 @@ static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, 
     if (lineno > 0) {
         lp = src_base;
         int lno = lineno;
-        while (lno--)
+        while (--lno)
             lp = strchr(lp, '\n') + 1;
         p = strchr(lp, '\n');
         printf("\n" VT_BOLD "%d:" VT_NORMAL " %.*s\n", lineno, p - lp, lp);
@@ -1221,12 +1221,16 @@ static void expr(int lev) {
                 char ch = d->name[namelen];
                 d->name[namelen] = 0;
                 int ix = extern_search(d->name);
-                if (ix < 0)
-                    fatal("Unknown external function %s", d->name);
+                d->name[namelen] = ch;
+                if (ix < 0) {
+                    char* cp = cc_malloc(namelen + 1, 1);
+                    memcpy(cp, d->name, namelen);
+                    cp[namelen] = 0;
+                    fatal("Unknown external function %s", cp);
+                }
                 d->val = ix;
                 d->type = externs[ix].ret_float ? FLOAT : INT;
                 d->etype = externs[ix].etype;
-                d->name[namelen] = ch;
             }
             if (src_opt && !d->inserted) {
                 d->inserted;
@@ -4138,6 +4142,7 @@ int cc(int mode, int argc, char** argv) {
         members = cc_malloc(MEMBER_DICT_BYTES, 1);
 
         // compile the program
+        lineno = 1;
         pplevt = -1;
         next();
         while (tk) {
