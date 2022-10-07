@@ -4285,9 +4285,9 @@ int cc(int mode, int argc, char** argv) {
     // launch the user code
     printf("\n");
     asm volatile("mov  %0, sp \n" : "=r"(exit_sp));
-    asm volatile("mov  r0, %1 \n"
+    asm volatile("mov  r0, %2 \n"
                  "push {r0}   \n"
-                 "mov  r0, %2 \n"
+                 "mov  r0, %3 \n"
                  "push {r0}   \n"
                  "blx  %1     \n"
                  "add  sp, #8 \n"
