@@ -1,3 +1,14 @@
+What's new in version 1.2.17
+
+- fix command line parameter setup, broken by new invocation code
+- fix missing source line in error msg
+- update examples
+- fix potential vi memory leak
+- drop peep hole, does more harm than good
+- fix forward function declaration disassembly
+- robust user code invocation
+- add compiler source comments
+
 What's new in version 1.2.16
 
 - optimize function calls. save/restore fewer registers
