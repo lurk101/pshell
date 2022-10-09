@@ -65,7 +65,6 @@ Git branches
 - master: stable release branch
 - dev: development and fix branch
 - vm: legacy virtual machine branch (no longer under active development)
-- long: long integer (64-bit) support
 
 If you want to build from a different branch you can switch to it with
 ```

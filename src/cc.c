@@ -176,6 +176,7 @@ static int rtf UDATA, rtt UDATA;     // return flag and return type for current 
 static int loc UDATA;                // local variable offset
 static int lineno UDATA;             // current line number
 static int src_opt UDATA;            // print source and assembly flag
+static int nopeep_opt UDATA;         // turn off peep-hole optimization
 static int uchar_opt UDATA;          // use unsigned character variables
 static int* n UDATA;                 // current position in emitted abstract syntax tree
                                      // With an AST, the compiler is not limited to generate
@@ -2329,9 +2330,10 @@ static int peep_hole(const struct segs* s) {
 }
 
 static void peep(void) {
+restart:
     for (int i = 0; i < numof(segments); ++i)
         if (peep_hole(&segments[i]))
-            return;
+            goto restart;
 }
 
 // ARM CM0+ code emitters
@@ -2340,7 +2342,8 @@ static void emit(uint16_t n) {
     if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 1)
         fatal("code segment exceeded, program is too big");
     *++e = n;
-    peep();
+    if (!nopeep_opt)
+        peep();
 }
 
 static void emit_branch(uint16_t* to);
@@ -4042,11 +4045,12 @@ static void show_externals(int i) {
 static void help(char* lib) {
     if (!lib) {
         printf("\n"
-               "usage: cc [-s] [-u] [-h [lib]] [-D [symbol[ = value]]]\n"
+               "usage: cc [-s] [-u] [-n] [-h [lib]] [-D [symbol[ = value]]]\n"
                "          [-o filename] filename\n"
                "    -s      display disassembly and quit.\n"
                "    -o      name of executable output file.\n"
                "    -u      treat char type as unsigned.\n"
+               "    -n      turn off peep-hole optimization\n"
                "    -D symbol [= value]\n"
                "            define symbol for limited pre-processor, can repeat.\n"
                "    -h      Compiler help. lib lists externals.\n"
@@ -4171,6 +4175,8 @@ int cc(int mode, int argc, char** argv) {
                 goto done;
             } else if ((*argv)[1] == 's') {
                 src_opt = 1;
+            } else if ((*argv)[1] == 'n') {
+                nopeep_opt = 1;
             } else if ((*argv)[1] == 'o') {
                 --argc;
                 ++argv;
