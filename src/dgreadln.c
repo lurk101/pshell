@@ -78,9 +78,9 @@ static struct {
     struct lfs_info nbuf;
 } dgiter;
 
-static const char *nextcmd(){
-    const char *s=cmd_table[dgiter.i].name;
-    if(s){
+static const char* nextcmd() {
+    const char* s = cmd_table[dgiter.i].name;
+    if (s) {
         dgiter.nbuf.type = LFS_TYPE_REG;
         dgiter.i++;
         return s;
@@ -88,17 +88,16 @@ static const char *nextcmd(){
     return 0;
 }
 
-static const char *opencmd(){
-    dgiter.i=0;
-}
+static const char* opencmd() { dgiter.i = 0; }
 
-static const char *firstcmd(){
+static const char* firstcmd() {
     opencmd();
     return nextcmd();
 }
 
-static const char *nextfil(){
-    if (!dgiter.isopen) return 0;
+static const char* nextfil() {
+    if (!dgiter.isopen)
+        return 0;
     if (fs_dir_read(&dgiter.fd, &dgiter.nbuf) > 0) {
         return dgiter.nbuf.name;
     }
@@ -121,26 +120,28 @@ static void openfil(char* p) {
     dgiter.isopen = 1;
 }
 
-static const char *firstfil(char *p){
+static const char* firstfil(char* p) {
     dgiter.st = 1;
     openfil(p);
     return nextfil();
 }
 
-static const char *nextpath(){
-    const char *s;
-    switch(dgiter.st){
-case 0:
+static const char* nextpath() {
+    const char* s;
+    switch (dgiter.st) {
+    case 0:
         s = nextcmd();
-        if(s) return s;
+        if (s)
+            return s;
         dgiter.st = 1;
         openfil(full_path(""));
-case 1:
+    case 1:
         s = nextfil();
-        if(s) return s;
+        if (s)
+            return s;
         dgiter.st = 2;
         openfil("/bin");
-default:
+    default:
         return nextfil();
     }
 }
@@ -150,7 +151,7 @@ static void openpath() {
     opencmd();
 }
 
-static const char *firstpath(char *p){
+static const char* firstpath(char* p) {
     openpath();
     return nextpath();
 }
@@ -177,29 +178,30 @@ static char* findit(int patha) {
     } else {
         p = full_path("");
     }
-    const char *(*first)(char *p),*(*next)();
-    if(!j) {
-        first=firstpath;
-        next=nextpath;
+    const char* (*first)(char* p), *(*next)();
+    if (!j) {
+        first = firstpath;
+        next = nextpath;
     } else {
-        first=firstfil;
-        next=nextfil;
+        first = firstfil;
+        next = nextfil;
     }
 
     int c = 0;
     int rmin = 0, rtyp = 0, nmax = 0;
-    const char *nbname;
-    char attrbf[4],attrfn[128];
-    for (nbname=first(p); nbname; nbname=next()) {
-        if (!strcmp(nbname,".") || !strcmp(nbname,"..")) continue;
+    const char* nbname;
+    char attrbf[4], attrfn[128];
+    for (nbname = first(p); nbname; nbname = next()) {
+        if (!strcmp(nbname, ".") || !strcmp(nbname, ".."))
+            continue;
         if (!patha && dgiter.st > 0 && dgiter.nbuf.type != LFS_TYPE_DIR) {
-            if (j>0 || dgiter.st==1) {
-                snprintf(attrfn,sizeof(attrfn),"%s/%s",p,nbname);
+            if (j > 0 || dgiter.st == 1) {
+                snprintf(attrfn, sizeof(attrfn), "%s/%s", p, nbname);
             } else {
-                snprintf(attrfn,sizeof(attrfn),"/bin/%s",nbname);
+                snprintf(attrfn, sizeof(attrfn), "/bin/%s", nbname);
             }
-            if (fs_getattr(attrfn,1,attrbf,4) != 4 
-                || memcmp(attrbf,"exe",4) != 0) continue;
+            if (fs_getattr(attrfn, 1, attrbf, 4) != 4 || memcmp(attrbf, "exe", 4) != 0)
+                continue;
         }
         if (dgscmp(&cmdline[j], nbname, l) == l) {
             int nlen = strlen(nbname);
@@ -240,16 +242,17 @@ static char* findit(int patha) {
     nmax = 72 / nmod;
 
     dgputs("\r\n");
-    for (nbname=first(p); nbname; nbname=next()) {
-        if (!strcmp(nbname,".") || !strcmp(nbname,"..")) continue;
+    for (nbname = first(p); nbname; nbname = next()) {
+        if (!strcmp(nbname, ".") || !strcmp(nbname, ".."))
+            continue;
         if (!patha && dgiter.st > 0 && dgiter.nbuf.type != LFS_TYPE_DIR) {
-            if (j>0 || dgiter.st==1) {
-                snprintf(attrfn,sizeof(attrfn),"%s/%s",p,nbname);
+            if (j > 0 || dgiter.st == 1) {
+                snprintf(attrfn, sizeof(attrfn), "%s/%s", p, nbname);
             } else {
-                snprintf(attrfn,sizeof(attrfn),"/bin/%s",nbname);
+                snprintf(attrfn, sizeof(attrfn), "/bin/%s", nbname);
             }
-            if (fs_getattr(attrfn,1,attrbf,4) != 4 
-                || memcmp(attrbf,"exe",4) != 0) continue;
+            if (fs_getattr(attrfn, 1, attrbf, 4) != 4 || memcmp(attrbf, "exe", 4) != 0)
+                continue;
         }
         if (dgscmp(&cmdline[j], nbname, l) == l) {
             printf("%*s", nmax, nbname);
@@ -300,17 +303,18 @@ static void dotab() {
     return;
 }
 
-void savehist(){
+void savehist() {
     lfs_file_t fp;
-    if(fs_file_open(&fp,"/.history",
-        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0) {
+    if (fs_file_open(&fp, "/.history", LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0) {
         return;
     }
     int j = hista;
     while (j != histb) {
         char c = history[j];
-        if (c == 0) fs_file_write(&fp,"\n",1);
-        else fs_file_write(&fp,&c,1);
+        if (c == 0)
+            fs_file_write(&fp, "\n", 1);
+        else
+            fs_file_write(&fp, &c, 1);
         j = (j + 1) % HSTSIZE;
     }
     fs_file_close(&fp);
@@ -332,21 +336,23 @@ static void addhistw(char* s) {
     }
 }
 
-static void addhist(char* s){
+static void addhist(char* s) {
     int oldhistb = histb;
     addhistw(s);
-    if (histb < oldhistb) savehist();
+    if (histb < oldhistb)
+        savehist();
 }
 
-static void resthist(){
+static void resthist() {
     lfs_file_t fp;
     if (fs_file_open(&fp, "/.history", LFS_O_RDONLY) < 0)
         return;
     int j = 0;
     for (;;) {
         char c;
-        if (fs_file_read(&fp,&c,1) <= 0) break;
-        if(c == '\n') {
+        if (fs_file_read(&fp, &c, 1) <= 0)
+            break;
+        if (c == '\n') {
             cmdline[j] = 0;
             addhistw(cmdline);
             j = 0;
@@ -359,7 +365,7 @@ static void resthist(){
             }
         }
     }
-    if (j > 0){
+    if (j > 0) {
         cmdline[j] = 0;
         addhist(cmdline);
     }
@@ -370,8 +376,8 @@ static int hstprefix(int j, char* p) {
     while (*p) {
         if (history[j++] != *p++)
             return -1;
-		j = j % HSTSIZE;
-	}
+        j = j % HSTSIZE;
+    }
     return j;
 }
 
@@ -414,14 +420,12 @@ static void flushesc() {
     return;
 }
 
-static char histch(int j){
-	return history[j % HSTSIZE];
-}
+static char histch(int j) { return history[j % HSTSIZE]; }
 
 static void eschp(int hp) {
     if (hp >= 0) {
-        for (cmdlb = 0; histch(hp+cmdlb); cmdlb++)
-            cmdline[cmdlb] = histch(hp+cmdlb);
+        for (cmdlb = 0; histch(hp + cmdlb); cmdlb++)
+            cmdline[cmdlb] = histch(hp + cmdlb);
         cmdli = cmdlb;
     }
     flushesc();
@@ -498,7 +502,8 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
     cmdlb = 0;
     cmdli = 0;
     twotabs = 0;
-    if(hista==0&&histb==0) resthist();
+    if (hista == 0 && histb == 0)
+        resthist();
     for (;;) {
         int c = getchar();
         if (c == '\t') {
@@ -514,7 +519,7 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                 hp2 = findhist(cmdline, hi);
                 if (hp2 >= 0) {
                     if (hp >= 0) {
-                        for (j = 0; histch(hp+j); j++)
+                        for (j = 0; histch(hp + j); j++)
                             dgputs("\b \b");
                     } else {
                         for (j = cmdli; j < cmdlb; j++)
@@ -525,8 +530,8 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                             dgputs("\b \b");
                     }
                     hp = hp2;
-                    for (j = 0; histch(hp+j); j++)
-                        cookputc(histch(hp+j));
+                    for (j = 0; histch(hp + j); j++)
+                        cookputc(histch(hp + j));
                     if (ky == 4)
                         hi++;
                     else
