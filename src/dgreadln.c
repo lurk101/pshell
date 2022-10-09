@@ -378,7 +378,7 @@ static int hstprefix(int j, char* p) {
 static int findhist(char* s, int n) {
     int j = histb, k = 0;
     if (hista == j)
-        return 0;
+        return -1;
     j = (j - 1 + HSTSIZE) % HSTSIZE;
     for (;;) {
         int jn = (j - 1 + HSTSIZE) % HSTSIZE;
@@ -389,7 +389,7 @@ static int findhist(char* s, int n) {
             }
         }
         if (jn == hista) {
-            if (hstprefix(jn, s) >=0) {
+            if (hstprefix(jn, s) >= 0) {
                 if (k++ == n)
                     return jn;
             }
@@ -419,7 +419,7 @@ static char histch(int j){
 }
 
 static void eschp(int hp) {
-    if (hp>=0) {
+    if (hp >= 0) {
         for (cmdlb = 0; histch(hp+cmdlb); cmdlb++)
             cmdline[cmdlb] = histch(hp+cmdlb);
         cmdli = cmdlb;
