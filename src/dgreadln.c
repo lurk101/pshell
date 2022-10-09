@@ -366,33 +366,35 @@ static void resthist(){
     fs_file_close(&fp);
 }
 
-static const char* strprefix(const char* s, char* p) {
-    while (*p)
-        if (*s++ != *p++)
-            return 0;
-    return s;
+static int hstprefix(int j, char* p) {
+    while (*p) {
+        if (history[j++] != *p++)
+            return -1;
+		j = j % HSTSIZE;
+	}
+    return j;
 }
 
-static char* findhist(char* s, int n) {
+static int findhist(char* s, int n) {
     int j = histb, k = 0;
     if (hista == j)
-        return 0;
+        return -1;
     j = (j - 1 + HSTSIZE) % HSTSIZE;
     for (;;) {
         int jn = (j - 1 + HSTSIZE) % HSTSIZE;
         if (!history[jn]) {
-            if (strprefix(&history[j], s)) {
+            if (hstprefix(j, s) >= 0) {
                 if (k++ == n)
-                    return &history[j];
+                    return j;
             }
         }
         if (jn == hista) {
-            if (strprefix(&history[jn], s)) {
+            if (hstprefix(jn, s) >= 0) {
                 if (k++ == n)
-                    return &history[jn];
+                    return jn;
             }
             if (k == 0)
-                return 0;
+                return -1;
             n = (n % k + k) % k;
             k = 0;
             jn = (histb - 1 + HSTSIZE) % HSTSIZE;
@@ -412,13 +414,25 @@ static void flushesc() {
     return;
 }
 
-static void eschp(char* hp) {
-    if (hp)
-        for (cmdlb = 0; hp[cmdlb]; cmdlb++)
-            cmdline[cmdlb] = hp[cmdlb];
+static char histch(int j){
+	return history[j % HSTSIZE];
+}
+
+static void eschp(int hp) {
+    if (hp >= 0) {
+        for (cmdlb = 0; histch(hp+cmdlb); cmdlb++)
+            cmdline[cmdlb] = histch(hp+cmdlb);
         cmdli = cmdlb;
+    }
     flushesc();
     return;
+}
+
+static const char* strprefix(const char* s, char* p) {
+    while (*p)
+        if (*s++ != *p++)
+            return 0;
+    return s;
 }
 
 static int matchwork(int c) {
@@ -475,7 +489,7 @@ static void cmdinsert(int c) {
 }
 
 char* dgreadln(char* buffer, int mnt, char* prom) {
-    char* hp = 0;
+    int hp = -1;
     int hi = 0, ky;
     cmdline = buffer;
     dgmnt = mnt;
@@ -488,20 +502,19 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
     for (;;) {
         int c = getchar();
         if (c == '\t') {
-            eschp(hp), hp = 0, hi = 0;
+            eschp(hp), hp = -1, hi = 0;
             dotab();
         } else if ((twotabs = 0, ky = matchkey(c))) {
             if (ky < 0) {
                 //  look for more rabbits
             } else if (ky == 4 || ky == 5) {
                 //  history is a special case
-                int j;
-                char* hp2;
+                int j, hp2;
                 cmdline[cmdlb] = 0;
                 hp2 = findhist(cmdline, hi);
-                if (hp2) {
-                    if (hp) {
-                        for (j = 0; hp[j]; j++)
+                if (hp2 >= 0) {
+                    if (hp >= 0) {
+                        for (j = 0; histch(hp+j); j++)
                             dgputs("\b \b");
                     } else {
                         for (j = cmdli; j < cmdlb; j++)
@@ -512,8 +525,8 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                             dgputs("\b \b");
                     }
                     hp = hp2;
-                    for (j = 0; hp[j]; j++)
-                        cookputc(hp[j]);
+                    for (j = 0; histch(hp+j); j++)
+                        cookputc(histch(hp+j));
                     if (ky == 4)
                         hi++;
                     else
@@ -521,7 +534,7 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                 } else
                     putchar('\007');
             } else
-                switch (eschp(hp), hp = 0, hi = 0, ky) {
+                switch (eschp(hp), hp = -1, hi = 0, ky) {
                 case 2: // rubout
                     if (cmdli < cmdlb)
                         cookputc(cmdline[cmdli++]);
@@ -615,7 +628,7 @@ char* dgreadln(char* buffer, int mnt, char* prom) {
                         cmdlb = cmdli;
                     }
                 }
-        } else if (eschp(hp), hp = 0, hi = 0, c == '\r' || c == '\n') {
+        } else if (eschp(hp), hp = -1, hi = 0, c == '\r' || c == '\n') {
             dgputs("\r\n");
             cmdline[cmdlb] = 0;
             if (cmdlb > 0)
