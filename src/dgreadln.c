@@ -135,12 +135,14 @@ static const char* nextpath() {
             return s;
         dgiter.st = 1;
         openfil(full_path(""));
+        /* fallthrough */
     case 1:
         s = nextfil();
         if (s)
             return s;
         dgiter.st = 2;
         openfil("/bin");
+        /* fallthrough */
     default:
         return nextfil();
     }
