@@ -3577,7 +3577,7 @@ static void stmt(int ctx) {
                     printf("%d: %.*s\n", lineno, p - lp, lp);
                     lp = p;
                     disasm_address(&state, (int)(se + 1));
-                    while (state.address < (int)e - 2) {
+                    while (state.address < (int)e - 1) {
                         uint16_t* nxt = (uint16_t*)(state.address + state.size);
                         disasm_thumb(&state, *nxt, *(nxt + 1));
                         printf("%s\n", state.text);
