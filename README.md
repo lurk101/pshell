@@ -142,127 +142,133 @@ changed to /src
 
 CC=0
 
-/src/: cc -s sine.c
-
-0: /* Math function test. Display a sine wave */
-1:
-2: int main() {
-3:     int angle, incr;
-4:     for (incr = 16, angle = 0; angle <= 360; angle += incr) {
-5:         float rad = (float)angle * 0.01745329252;
-6:         int pos = 30 + (int)(sinf(rad) * 25.0);
-7:         while (--pos)
-8:             printf(" ");
-9:         printf("*\n");
-10:     }
-11:     return 0;
-12: }
-20038000    b5c0        push    {r6, r7, lr}
+/src/: cc -s sine
+1: /* Math function test. Display a sine wave */
+2:
+3: int main() {
+4:     int angle, incr;
+5:     for (incr = 16, angle = 0; angle <= 360; angle += incr) {
+6:         float rad = (float)angle * 0.01745329252;
+7:         int pos = 30 + (int)(sinf(rad) * 25.0);
+8:         while (--pos)
+9:             printf(" ");
+10:         printf("*\n");
+11:     }
+12:     return 0;
+13: }
+20038000    b580        push    {r7, lr}
 20038002    466f        mov     r7, sp
 20038004    b084        sub     sp, #16         ; 0x10
-20038006    463e        mov     r6, r7
-20038008    3e04        subs    r6, #4
+20038006    463b        mov     r3, r7
+20038008    3b08        subs    r3, #8
 2003800a    2010        movs    r0, #16         ; 0x10
-2003800c    6030        str     r0, [r6, #0]
-2003800e    463e        mov     r6, r7
+2003800c    6018        str     r0, [r3, #0]
+2003800e    1f3b        subs    r3, r7, #4
 20038010    2000        movs    r0, #0
-20038012    6030        str     r0, [r6, #0]
-20038014    f000 f843   bl      2003809e
+20038012    6018        str     r0, [r3, #0]
+20038014    f000 f848   bl      200380a8
 20038018    4638        mov     r0, r7
-2003801a    3808        subs    r0, #8
+2003801a    380c        subs    r0, #12         ; 0xc
 2003801c    b401        push    {r0}
-2003801e    6838        ldr     r0, [r7, #0]
-20038020    4e27        ldr     r6, [pc, #156]  ; 0x200380c0
-20038022    47b0        blx     r6
-20038024    b401        push    {r0}
-20038026    4827        ldr     r0, [pc, #156]  ; 0x200380c4
-20038028    bc02        pop     {r1}
-2003802a    4e27        ldr     r6, [pc, #156]  ; 0x200380c8
-2003802c    47b0        blx     r6
-2003802e    bc40        pop     {r6}
-20038030    6030        str     r0, [r6, #0]
-20038032    4638        mov     r0, r7
-20038034    380c        subs    r0, #12         ; 0xc
-20038036    b401        push    {r0}
-20038038    201e        movs    r0, #30         ; 0x1e
+2003801e    4638        mov     r0, r7
+20038020    3804        subs    r0, #4
+20038022    6800        ldr     r0, [r0, #0]
+20038024    4b29        ldr     r3, [pc, #164]  ; 0x200380cc
+20038026    4798        blx     r3
+20038028    b401        push    {r0}
+2003802a    4829        ldr     r0, [pc, #164]  ; 0x200380d0
+2003802c    bc02        pop     {r1}
+2003802e    4b29        ldr     r3, [pc, #164]  ; 0x200380d4
+20038030    4798        blx     r3
+20038032    bc08        pop     {r3}
+20038034    6018        str     r0, [r3, #0]
+20038036    4638        mov     r0, r7
+20038038    3810        subs    r0, #16         ; 0x10
 2003803a    b401        push    {r0}
-2003803c    4638        mov     r0, r7
-2003803e    3808        subs    r0, #8
-20038040    6800        ldr     r0, [r0, #0]
-20038042    4e22        ldr     r6, [pc, #136]  ; 0x200380cc
-20038044    47b0        blx     r6
-20038046    b401        push    {r0}
-20038048    4821        ldr     r0, [pc, #132]  ; 0x200380d0
-2003804a    bc02        pop     {r1}
-2003804c    4e1e        ldr     r6, [pc, #120]  ; 0x200380c8
-2003804e    47b0        blx     r6
-20038050    4e20        ldr     r6, [pc, #128]  ; 0x200380d4
-20038052    47b0        blx     r6
-20038054    bc40        pop     {r6}
-20038056    1980        adds    r0, r0, r6
-20038058    bc40        pop     {r6}
-2003805a    6030        str     r0, [r6, #0]
-2003805c    f000 f805   bl      2003806a
-20038060    481d        ldr     r0, [pc, #116]  ; 0x200380d8
-20038062    b401        push    {r0}
-20038064    2001        movs    r0, #1
-20038066    4e1d        ldr     r6, [pc, #116]  ; 0x200380dc
-20038068    47b0        blx     r6
-2003806a    4638        mov     r0, r7
-2003806c    380c        subs    r0, #12         ; 0xc
-2003806e    b401        push    {r0}
-20038070    6806        ldr     r6, [r0, #0]
-20038072    2001        movs    r0, #1
-20038074    1a30        subs    r0, r6, r0
-20038076    bc40        pop     {r6}
-20038078    6030        str     r0, [r6, #0]
-2003807a    2800        cmp     r0, #0
-2003807c    d1f0        bne     20038060
-2003807e    4818        ldr     r0, [pc, #96]   ; 0x200380e0
-20038080    b401        push    {r0}
-20038082    2001        movs    r0, #1
-20038084    4e15        ldr     r6, [pc, #84]   ; 0x200380dc
-20038086    47b0        blx     r6
-20038088    4638        mov     r0, r7
-2003808a    b401        push    {r0}
-2003808c    6800        ldr     r0, [r0, #0]
-2003808e    b401        push    {r0}
+2003803c    201e        movs    r0, #30         ; 0x1e
+2003803e    b401        push    {r0}
+20038040    4638        mov     r0, r7
+20038042    380c        subs    r0, #12         ; 0xc
+20038044    6800        ldr     r0, [r0, #0]
+20038046    4b24        ldr     r3, [pc, #144]  ; 0x200380d8
+20038048    4798        blx     r3
+2003804a    b401        push    {r0}
+2003804c    4823        ldr     r0, [pc, #140]  ; 0x200380dc
+2003804e    bc02        pop     {r1}
+20038050    4b20        ldr     r3, [pc, #128]  ; 0x200380d4
+20038052    4798        blx     r3
+20038054    4b22        ldr     r3, [pc, #136]  ; 0x200380e0
+20038056    4798        blx     r3
+20038058    bc08        pop     {r3}
+2003805a    18c0        adds    r0, r0, r3
+2003805c    bc08        pop     {r3}
+2003805e    6018        str     r0, [r3, #0]
+20038060    f000 f806   bl      20038070
+20038064    481f        ldr     r0, [pc, #124]  ; 0x200380e4
+20038066    b401        push    {r0}
+20038068    2001        movs    r0, #1
+2003806a    4b1f        ldr     r3, [pc, #124]  ; 0x200380e8
+2003806c    4798        blx     r3
+2003806e    b001        add     sp, #4
+20038070    4638        mov     r0, r7
+20038072    3810        subs    r0, #16         ; 0x10
+20038074    b401        push    {r0}
+20038076    6803        ldr     r3, [r0, #0]
+20038078    2001        movs    r0, #1
+2003807a    1a18        subs    r0, r3, r0
+2003807c    bc08        pop     {r3}
+2003807e    6018        str     r0, [r3, #0]
+20038080    2800        cmp     r0, #0
+20038082    d1ef        bne     20038064
+20038084    4819        ldr     r0, [pc, #100]  ; 0x200380ec
+20038086    b401        push    {r0}
+20038088    2001        movs    r0, #1
+2003808a    4b17        ldr     r3, [pc, #92]   ; 0x200380e8
+2003808c    4798        blx     r3
+2003808e    b001        add     sp, #4
 20038090    4638        mov     r0, r7
 20038092    3804        subs    r0, #4
-20038094    6800        ldr     r0, [r0, #0]
-20038096    bc40        pop     {r6}
-20038098    1980        adds    r0, r0, r6
-2003809a    bc40        pop     {r6}
-2003809c    6030        str     r0, [r6, #0]
-2003809e    6838        ldr     r0, [r7, #0]
-200380a0    b401        push    {r0}
-200380a2    4810        ldr     r0, [pc, #64]   ; 0x200380e4
-200380a4    bc40        pop     {r6}
-200380a6    4286        cmp     r6, r0
-200380a8    dd01        ble     200380ae
-200380aa    2000        movs    r0, #0
-200380ac    e000        b       200380b0
-200380ae    2001        movs    r0, #1
-200380b0    2800        cmp     r0, #0
-200380b2    d1b1        bne     20038018
-200380b4    2000        movs    r0, #0
-200380b6    46bd        mov     sp, r7
-200380b8    bdc0        pop     {r6, r7, pc}
-200380ba    46bd        mov     sp, r7
-200380bc    bdc0        pop     {r6, r7, pc}
-200380be    46c0        mov     r8, r8
-200380c0    1001 abdd   .word   0x1001abdd      ; i2f
-200380c4    3c8e fa35   .word   0x3c8efa35
-200380c8    1001 ab13   .word   0x1001ab13      ; fmul
-200380cc    1001 ad05   .word   0x1001ad05      ; sinf
-200380d0    41c8 0000   .word   0x41c80000
-200380d4    1001 ac21   .word   0x1001ac21      ; f2i
-200380d8    2003 c000   .word   0x2003c000
-200380dc    1000 710f   .word   0x1000710f      ; printf
-200380e0    2003 c004   .word   0x2003c004
-200380e4    0000 0168   .word   0x00000168
-200380e8    0000 0000   .word   0x00000000      ; "\0\0\0\0"
-12: }
+20038094    b401        push    {r0}
+20038096    6800        ldr     r0, [r0, #0]
+20038098    b401        push    {r0}
+2003809a    4638        mov     r0, r7
+2003809c    3808        subs    r0, #8
+2003809e    6800        ldr     r0, [r0, #0]
+200380a0    bc08        pop     {r3}
+200380a2    18c0        adds    r0, r0, r3
+200380a4    bc08        pop     {r3}
+200380a6    6018        str     r0, [r3, #0]
+200380a8    4638        mov     r0, r7
+200380aa    3804        subs    r0, #4
+200380ac    6800        ldr     r0, [r0, #0]
+200380ae    b401        push    {r0}
+200380b0    480f        ldr     r0, [pc, #60]   ; 0x200380f0
+200380b2    bc02        pop     {r1}
+200380b4    0003        movs    r3, r0
+200380b6    0fc8        lsrs    r0, r1, #31
+200380b8    17da        asrs    r2, r3, #31
+200380ba    428b        cmp     r3, r1
+200380bc    4150        adcs    r0, r2
+200380be    2800        cmp     r0, #0
+200380c0    d1aa        bne     20038018
+200380c2    2000        movs    r0, #0
+200380c4    46bd        mov     sp, r7
+200380c6    bd80        pop     {r7, pc}
+200380c8    46bd        mov     sp, r7
+200380ca    bd80        pop     {r7, pc}
+200380cc    1001 a815   .word   0x1001a815      ; i2f
+200380d0    3c8e fa35   .word   0x3c8efa35
+200380d4    1001 a74b   .word   0x1001a74b      ; fmul
+200380d8    1001 a93d   .word   0x1001a93d      ; sinf
+200380dc    41c8 0000   .word   0x41c80000
+200380e0    1001 a859   .word   0x1001a859      ; f2i
+200380e4    2003 c000   .word   0x2003c000
+200380e8    1000 6f9f   .word   0x10006f9f      ; printf
+200380ec    2003 c004   .word   0x2003c004
+200380f0    0000 0168   .word   0x00000168
+200380f4    0000 0000   .word   0x00000000      ; "\0\0\0\0"
+13:
+
 /src/:
 
     cat - display text file
