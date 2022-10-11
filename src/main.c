@@ -89,10 +89,10 @@ char* full_path(const char* name) {
         strcpy(path, name);
         return path;
     }
-    if (memcmp(name, "./", 2) == 0)
+    if (strncmp(name, "./", 2) == 0)
         name += 2;
     strcpy(path, curdir);
-    if (memcmp(name, "../", 3) != 0) {
+    if (strncmp(name, "../", 3) != 0) {
         if (name[0])
             strcat(path, name);
     } else {
@@ -287,7 +287,7 @@ static void cp_cmd(void) {
     if (out_ok)
         fs_file_close(&out);
     if (buf) {
-        if (out_ok && fs_getattr(from, 1, buf, 4) == 4 && memcmp(buf, "exe", 4) == 0)
+        if (out_ok && fs_getattr(from, 1, buf, 4) == 4 && strcmp(buf, "exe") == 0)
             fs_setattr(to, 1, buf, 4);
         free(buf);
     }
@@ -790,7 +790,7 @@ static bool run_as_cmd(const char* dir) {
         free(fn);
         return false;
     }
-    if (memcmp(buf, "exe", 4)) {
+    if (strcmp(buf, "exe")) {
         free(fn);
         return false;
     }

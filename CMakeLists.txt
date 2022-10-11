@@ -30,7 +30,6 @@ execute_process(
   OUTPUT_VARIABLE PSHELL_VERSION
 )
 
-add_compile_options("-Wno-stringop-overflow")
 add_compile_options("-DPICO_MALLOC_PANIC=0")
 add_compile_options("-DLFS_NO_ERROR")
 add_compile_options("-DLFS_NO_DEBUG")
