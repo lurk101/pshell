@@ -35,8 +35,8 @@
 #define SDK14 0
 #endif
 
-#define COPYRIGHT "\u00a9" // for UTF8
-//#define COPYRIGHT "(c)" // for ASCII
+//#define COPYRIGHT "\u00a9" // for UTF8
+#define COPYRIGHT "(c)" // for ASCII
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)

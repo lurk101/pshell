@@ -50,13 +50,15 @@ static bool tar_file(struct lfs_info* info) {
         printf("can't open %s\n", path);
         return false;
     }
+    char buf[4];
+    int exec = fs_getattr(path, 1, buf, 4) == 4 && strcmp(buf, "exe") == 0;
     memset(hdr, 0, BLK_SZ);
     strcpy(hdr->name, path + root_len);
     sprintf(hdr->size, "%011o", info->size);
     memset(hdr->chksum, ' ', 8);
     memcpy(hdr->magic, "ustar ", 6);
     strcpy(hdr->version, " ");
-    strcpy(hdr->mode, "0777");
+    strcpy(hdr->mode, exec ? "0755" : "0644");
     hdr->typeflag = '0';
     unsigned cks = 0;
     for (int i = 0; i < BLK_SZ; i++)
@@ -210,26 +212,34 @@ void tar(int ac, char* av[]) {
                 printf("extracting %s\n", hdr->name);
                 if (!create_directories(hdr->name))
                     goto bail1;
+                int exec = strtol(hdr->mode, NULL, 8) & 0100;
+                char* fname = strdup(full_path(hdr->name));
                 lfs_file_t out_f;
-                if (fs_file_open(&out_f, full_path(hdr->name),
-                                 LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
+                if (fs_file_open(&out_f, fname, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) <
+                    LFS_ERR_OK) {
                     printf("could not create file %s\n", hdr->name);
+                    free(fname);
                     goto bail1;
                 }
                 while (l > 0) {
                     if (fs_file_read(&tar_f, hdr, BLK_SZ) < LFS_ERR_OK) {
                         printf("error reading tar file\n");
                         fs_file_close(&out_f);
+                        free(fname);
                         goto bail1;
                     }
                     if (fs_file_write(&out_f, hdr, l >= BLK_SZ ? BLK_SZ : l) < LFS_ERR_OK) {
                         printf("error writing file\n");
                         fs_file_close(&out_f);
+                        free(fname);
                         goto bail1;
                     }
                     l -= BLK_SZ;
                 }
                 fs_file_close(&out_f);
+                if (exec)
+                    fs_setattr(fname, 1, "exe", 4);
+                free(fname);
             }
         }
         break;
