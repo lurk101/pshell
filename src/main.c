@@ -499,8 +499,15 @@ static void status_cmd(void) {
 static void ls_cmd(void) {
     if (check_mount(true))
         return;
+    int show_all = 0;
+    char** av = argv;
+    if ((argc > 1) && (strcmp(av[1], "-a") == 0)) {
+        argc--;
+        av++;
+        show_all = 1;
+    }
     if (argc > 1)
-        full_path(argv[1]);
+        full_path(av[1]);
     else
         full_path("");
     lfs_dir_t dir;
@@ -513,12 +520,14 @@ static void ls_cmd(void) {
     while (fs_dir_read(&dir, &info) > 0)
         if (strcmp(info.name, ".") && strcmp(info.name, ".."))
             if (info.type == LFS_TYPE_DIR)
-                printf(" %7d [%s]\n", info.size, info.name);
+                if ((info.name[0] != '.') || show_all)
+                    printf(" %7d [%s]\n", info.size, info.name);
     fs_dir_rewind(&dir);
     while (fs_dir_read(&dir, &info) > 0)
         if (strcmp(info.name, ".") && strcmp(info.name, ".."))
             if (info.type == LFS_TYPE_REG)
-                printf(" %7d %s\n", info.size, info.name);
+                if ((info.name[0] != '.') || show_all)
+                    printf(" %7d %s\n", info.size, info.name);
     fs_dir_close(&dir);
 }
 
@@ -717,7 +726,7 @@ cmd_t cmd_table[] = {
     {"clear",   clear_cmd,      "clear the screen"},
     {"cp",      cp_cmd,         "copy a file"},
     {"format",  format_cmd,     "format the filesystem"},
-    {"ls",      ls_cmd,         "list a directory"},
+    {"ls",      ls_cmd,         "list a directory, -a to show hidden files"},
     {"mkdir",   mkdir_cmd,      "create a directory"},
     {"mount",   mount_cmd,      "mount the filesystem"},
     {"mv",      mv_cmd,         "rename a file or directory"},
@@ -786,7 +795,7 @@ static bool run_as_cmd(const char* dir) {
     strcpy(fn, dir);
     strcat(fn, tfn);
     char buf[4];
-    if (fs_getattr(fn, 1, buf, sizeof(buf)) != 4) {
+    if (fs_getattr(fn, 1, buf, sizeof(buf)) != sizeof(buf)) {
         free(fn);
         return false;
     }
@@ -859,7 +868,6 @@ int main(void) {
         printf("\n" VT_BOLD "%s: " VT_NORMAL, full_path(""));
         fflush(stdout);
         parse_cmd();
-        int i;
         result[0] = 0;
         bool found = false;
         if (argc) {
@@ -867,7 +875,7 @@ int main(void) {
                 quit_cmd();
                 continue;
             }
-            for (i = 0; cmd_table[i].name; i++)
+            for (int i = 0; cmd_table[i].name; i++)
                 if (strcmp(argv[0], cmd_table[i].name) == 0) {
                     cmd_table[i].func();
                     if (result[0])

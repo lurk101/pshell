@@ -212,7 +212,7 @@ void tar(int ac, char* av[]) {
                 printf("extracting %s\n", hdr->name);
                 if (!create_directories(hdr->name))
                     goto bail1;
-                int exec = strtol(hdr->mode, NULL, 8) & 0100;
+                int exec = strtol(hdr->mode, NULL, 8) & 0111;
                 char* fname = strdup(full_path(hdr->name));
                 lfs_file_t out_f;
                 if (fs_file_open(&out_f, fname, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) <
