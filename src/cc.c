@@ -2283,9 +2283,40 @@ static uint16_t pat8[] = {0x4638, 0x3804, 0xb401, 0x2000, 0xbc08};
 static uint16_t msk8[] = {0xffff, 0xffff, 0xffff, 0xff00, 0xffff};
 static uint16_t rep8[] = {0x1f3b, 0x2000};
 
+// mov  r0, r7         sub r0,r7,#4
+// subs r0, #4
+
+static uint16_t pat9[] = {0x4638, 0x3804};
+static uint16_t msk9[] = {0xffff, 0xffff};
+static uint16_t rep9[] = {0x1f38};
+
+// push {r0}            mov  r1,r0
+// movs r0,#n           movs r0,#n
+// pop  {r1}
+
+static uint16_t pat10[] = {0xb401, 0x2000, 0xbc02};
+static uint16_t msk10[] = {0xffff, 0xff00, 0xffff};
+static uint16_t rep10[] = {0x4601, 0x2000};
+
+// push {r0}            mov r1,r0
+// pop  {r1}
+
+static uint16_t pat11[] = {0xb401, 0xbc02};
+static uint16_t msk11[] = {0xffff, 0xffff};
+static uint16_t rep11[] = {0x4601};
+
+// movs r0,#n           ldr r0,[r7,#n]
+// add  r0,r7
+// ldr  r0,[r0,#0]
+
+static uint16_t pat12[] = {0x2000, 0x4438, 0x6800};
+static uint16_t msk12[] = {0xff83, 0xffff, 0xffff};
+static uint16_t rep12[] = {0x6838};
+
 struct subs {
     int8_t from;
     int8_t to;
+    int8_t lshft;
 };
 
 static const struct segs {
@@ -2294,16 +2325,20 @@ static const struct segs {
     uint16_t* pat;
     uint16_t* msk;
     uint16_t* rep;
-    const struct subs map[2];
-} segments[] = {{numof(pat0), numof(rep0), pat0, msk0, rep0, {{2, 1}, {-1, -1}}},
-                {numof(pat1), numof(rep1), pat1, msk1, rep1, {{0, 0}, {2, 1}}},
-                {numof(pat2), numof(rep2), pat2, msk2, rep2, {{0, 1}, {-1, -1}}},
-                {numof(pat3), numof(rep3), pat3, msk3, rep3, {{-1, -1}, {-1, -1}}},
-                {numof(pat4), numof(rep4), pat4, msk4, rep4, {{0, 0}, {-1, -1}}},
-                {numof(pat8), numof(rep8), pat8, msk8, rep8, {{3, 1}, {-1, -1}}},
-                {numof(pat5), numof(rep5), pat5, msk5, rep5, {{1, 1}, {3, 2}}},
-                {numof(pat6), numof(rep6), pat6, msk6, rep6, {{-1, -1}, {-1, -1}}},
-                {numof(pat7), numof(rep7), pat7, msk7, rep7, {{-1, -1}, {-1, -1}}}};
+    struct subs map[2];
+} segments[] = {{numof(pat0), numof(rep0), pat0, msk0, rep0, {{2, 1, 0}, {-1, -1, 0}}},
+                {numof(pat1), numof(rep1), pat1, msk1, rep1, {{0, 0, 0}, {2, 1, 0}}},
+                {numof(pat2), numof(rep2), pat2, msk2, rep2, {{0, 1, 0}, {-1, -1, 0}}},
+                {numof(pat3), numof(rep3), pat3, msk3, rep3, {{-1, -1, 0}, {-1, -1, 0}}},
+                {numof(pat4), numof(rep4), pat4, msk4, rep4, {{0, 0, 0}, {-1, -1, 0}}},
+                {numof(pat8), numof(rep8), pat8, msk8, rep8, {{3, 1, 0}, {-1, -1, 0}}},
+                {numof(pat5), numof(rep5), pat5, msk5, rep5, {{1, 1, 0}, {3, 2, 0}}},
+                {numof(pat6), numof(rep6), pat6, msk6, rep6, {{-1, -1, 0}, {-1, -1, 0}}},
+                {numof(pat7), numof(rep7), pat7, msk7, rep7, {{-1, -1, 0}, {-1, -1, 0}}},
+                {numof(pat9), numof(rep9), pat9, msk9, rep9, {{-1, -1, 0}, {-1, -1, 0}}},
+                {numof(pat10), numof(rep10), pat10, msk10, rep10, {{1, 1, 0}, {-1, -1, 0}}},
+                {numof(pat11), numof(rep11), pat11, msk11, rep11, {{-1, -1, 0}, {-1, -1, 0}}},
+                {numof(pat12), numof(rep12), pat12, msk12, rep12, {{0, 0, 4}, {-1, -1, 0}}}};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[8];
@@ -2323,7 +2358,7 @@ static int peep_hole(const struct segs* s) {
     for (int i = 0; i < 2; ++i) {
         if (s->map[i].from < 0)
             break;
-        pe[s->map[i].to] |= rslt[s->map[i].from];
+        pe[s->map[i].to] |= rslt[s->map[i].from] << s->map[i].lshft;
     }
     e += l;
     return 1;
