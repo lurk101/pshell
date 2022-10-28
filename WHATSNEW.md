@@ -1,3 +1,12 @@
+What's new in version 1.2.18
+
+- a few more peep hole optimizations
+- hide hidden files, add -a option to ls command
+- update tar to preserve executable attribute
+- restore missing instruction at end of function disassembly (cosmetic)
+- add cmd line option to disable peep hole optimizer
+- Fix bugs with dgreadln
+
 What's new in version 1.2.17
 
 - fix command line parameter setup, broken by new invocation code
