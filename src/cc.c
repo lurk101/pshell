@@ -160,31 +160,31 @@ static int cntc UDATA;                                 // !0 -> in a continue-st
 static int* tsize UDATA;                               // array (indexed by type) of type sizes
 static int tnew UDATA;                                 // next available type
 static int tk UDATA;                                   // current token
-static union conv {                  //
-    int i;                           // integer value
-    float f;                         // floating point value
-} tkv UDATA;                         // current token value
-static int ty UDATA;                 // current expression type
-                                     // bit 0:1 - tensor rank, eg a[4][4][4]
-                                     // 0=scalar, 1=1d, 2=2d, 3=3d
-                                     //   1d etype -- bit 0:30)
-                                     //   2d etype -- bit 0:15,16:30 [32768,65536]
-                                     //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
-                                     // bit 2:9 - type
-                                     // bit 10:11 - ptr level
-static int rtf UDATA, rtt UDATA;     // return flag and return type for current function
-static int loc UDATA;                // local variable offset
-static int lineno UDATA;             // current line number
-static int src_opt UDATA;            // print source and assembly flag
-static int nopeep_opt UDATA;         // turn off peep-hole optimization
-static int uchar_opt UDATA;          // use unsigned character variables
-static int* n UDATA;                 // current position in emitted abstract syntax tree
-                                     // With an AST, the compiler is not limited to generate
-                                     // code on the fly with parsing.
-                                     // This capability allows function parameter code to be
-                                     // emitted and pushed on the stack in the proper
-                                     // right-to-left order.
-static int ld UDATA;                 // local variable depth
+static union conv {                                    //
+    int i;                                             // integer value
+    float f;                                           // floating point value
+} tkv UDATA;                                           // current token value
+static int ty UDATA;                                   // current expression type
+                                                       // bit 0:1 - tensor rank, eg a[4][4][4]
+                                                       // 0=scalar, 1=1d, 2=2d, 3=3d
+                                                       //   1d etype -- bit 0:30)
+                                                       //   2d etype -- bit 0:15,16:30 [32768,65536]
+                     //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
+                     // bit 2:9 - type
+                     // bit 10:11 - ptr level
+static int rtf UDATA, rtt UDATA;      // return flag and return type for current function
+static int loc UDATA;                 // local variable offset
+static int lineno UDATA;              // current line number
+static int src_opt UDATA;             // print source and assembly flag
+static int nopeep_opt UDATA;          // turn off peep-hole optimization
+static int uchar_opt UDATA;           // use unsigned character variables
+static int* n UDATA;                  // current position in emitted abstract syntax tree
+                                      // With an AST, the compiler is not limited to generate
+                                      // code on the fly with parsing.
+                                      // This capability allows function parameter code to be
+                                      // emitted and pushed on the stack in the proper
+                                      // right-to-left order.
+static int ld UDATA;                  // local variable depth
 static int pplev UDATA, pplevt UDATA; // preprocessor conditional level
 static int* ast UDATA;                // abstract syntax tree
 static ARMSTATE state UDATA;          // disassembler state
@@ -793,7 +793,7 @@ static void next() {
             // hash value is used for fast comparison. Since it is inaccurate,
             // we have to validate the memory content as well.
             for (id = sym_base; id->tk; ++id) { // find one free slot in table
-                if (tk == id->hash &&      // if token is found (hash match), overwrite
+                if (tk == id->hash &&           // if token is found (hash match), overwrite
                     !memcmp(id->name, pp, p - pp)) {
                     tk = id->tk;
                     return;
@@ -3661,7 +3661,7 @@ static void stmt(int ctx) {
                         dd->name[len] = ch;
                     }
                     dd->val = (int)data;
-                    if (data + sz >= data_base + (DATA_BYTES / 4))
+                    if ((data + sz) > (data_base + DATA_BYTES))
                         fatal("program data exceeds data segment");
                     data += sz;
                 } else if (ctx == Loc) {
