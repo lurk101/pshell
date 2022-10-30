@@ -595,16 +595,14 @@ static void vi_cmd(void) {
     vi(argc - 1, argv + 1);
 }
 
-static void clear_cmd(void) {
-    strcpy(result, VT_CLEAR "\n");
-}
+static void clear_cmd(void) { strcpy(result, VT_CLEAR "\n"); }
 
 static void reboot_cmd(void) {
     // release any resources we were using
-    if (mounted){
-		savehist();
+    if (mounted) {
+        savehist();
         fs_unmount();
-	}
+    }
     watchdog_reboot(0, 0, 1);
 }
 
