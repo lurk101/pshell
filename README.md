@@ -42,9 +42,8 @@ Building from source.
 
 ```
 # NOTE: Requires sdk 1.4 or later
-git clone https://github.com/lurk101/pshell.git
+git clone --recursive https://github.com/lurk101/pshell.git
 cd pshell
-git submodule update --init
 mkdir build
 cd build
 cmake ..
