@@ -56,7 +56,7 @@ add_executable(${PSHELL}
     src/cc_printf.S
 )
 
-pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/pshell.ld)
+pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/src/pshell.ld)
 
 if (USB_CONSOLE)
   pico_enable_stdio_uart(${PSHELL} 0)

@@ -6,11 +6,11 @@ This project explores to what extent a reasonably competent self-hosted programm
 [amacc compiler]: https://github.com/jserv/amacc.git
 [c4 virtual machine]: https://github.com/rswier/c4.git
 [Squint]: https://github.com/HPCguy/Squint.git
-[list of implemented functions]: FUNCTIONS.md
-[What's new]: WHATSNEW.md
+[list of implemented functions]: docs/FUNCTIONS.md
+[What's new]: docs/WHATSNEW.md
 [examples]: c-examples
 [thread]: https://forums.raspberrypi.com/viewtopic.php?t=336843
-[Getting Started]: GETTING-STARTED.md
+[Getting Started]: docs/GETTING-STARTED.md
 [area]: https://github.com/lurk101/pshell/discussions
 
 Credit where credit is due...
