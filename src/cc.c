@@ -195,6 +195,7 @@ static char* src_base UDATA;          // source code region
 
 // identifier
 struct ident_s {
+    struct ident_s* next;
     int tk;     // type-id or keyword
     int hash;   // keyword hash
     char* name; // name of this identifier (not NULL terminated)
@@ -792,7 +793,8 @@ static void next() {
             tk = (tk << 6) + (p - pp); // hash plus symbol length
             // hash value is used for fast comparison. Since it is inaccurate,
             // we have to validate the memory content as well.
-            for (id = sym_base; id->tk; ++id) { // find one free slot in table
+            id = sym_base;
+            for (id = sym_base; id; id = id->next) { // find one free slot in table
                 if (tk == id->hash &&           // if token is found (hash match), overwrite
                     !memcmp(id->name, pp, p - pp)) {
                     tk = id->tk;
@@ -802,13 +804,14 @@ static void next() {
             /* At this point, existing symbol name is not found.
              * "id" points to the first unused symbol table entry.
              */
-            if ((id + 1) > (sym_base + (SYM_TBL_BYTES / sizeof(*id))))
-                fatal("symbol table overflow");
+            id = cc_malloc(sizeof(struct ident_s), 1);
             id->name = pp;
             id->hash = tk;
             id->forward = 0;
             id->inserted = 0;
             tk = id->tk = Id; // token type identifier
+            id->next = sym_base;
+            sym_base = id;
             return;
         }
         /* Calculate the constant */
@@ -3619,19 +3622,26 @@ static void stmt(int ctx) {
                     }
                 }
                 id = sym_base;
-                while (id->tk) { // unwind symbol table locals
+                struct ident_s* id2 = (struct ident_s*)&sym_base;
+                while (id) { // unwind symbol table locals
                     if (id->class == Loc || id->class == Par) {
                         id->class = id->hclass;
                         id->type = id->htype;
                         id->val = id->hval;
                         id->etype = id->hetype;
+                        id2 = id;
+                        id = id->next;
                     } else if (id->class == Label) { // clear id for next func
-                        id->class = 0;
-                        id->val = 0;
-                        id->type = 0;
+                        struct ident_s* id3 = id;
+                        id = id->next;
+                        cc_free(id3);
+                        id2->next = id;
                     } else if (id->class == 0 && id->type == -1)
                         fatal("%d: label %.*s not defined\n", lineno, id->hash & 0x3f, id->name);
-                    id++;
+                    else {
+                        id2 = id;
+                        id = id->next;
+                    }
                 }
             } else {
                 if (ty > ATOM_TYPE && ty < PTR && tsize[bt >> 2] == 0)
@@ -4157,9 +4167,6 @@ int cc(int mode, int argc, char** argv) {
 
     // compile mode
     if (mode == 0) {
-        // allocate the symbol table
-        sym_base = cc_malloc(SYM_TBL_BYTES, 1);
-
         // Register keywords in symbol table. Must match the sequence of enum
         p = "enum char int float struct union sizeof return goto break continue "
             "if do while for switch case default else void main";
@@ -4322,7 +4329,7 @@ int cc(int mode, int argc, char** argv) {
             next();
         }
         // check for undeclared forward functions
-        for (id = sym_base; id->tk; ++id)
+        for (id = sym_base; id; id = id->next)
             if (id->class == Func && id->forward)
                 fatal("undeclared forward function %.*s", id->hash & 0x3f, id->name);
 
@@ -4331,8 +4338,11 @@ int cc(int mode, int argc, char** argv) {
         src_base = NULL;
         cc_free(ast);
         ast = NULL;
-        cc_free(sym_base);
-        sym_base = NULL;
+        while (sym_base) {
+            id = sym_base->next;
+            cc_free(sym_base);
+            sym_base = id;
+        }
         cc_free(tsize);
         tsize = NULL;
 
