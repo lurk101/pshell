@@ -65,10 +65,9 @@ static const char* esckeys[] = {
 
 static int dgscmp(const char* p, const char* q, int n) {
     int i;
-    for (i = 0; i < n; i++) {
+    for (i = 0; i < n; i++)
         if (p[i] != q[i] || !p[i] || !q[i])
             return i;
-    }
     return n;
 }
 
@@ -98,9 +97,8 @@ static const char* firstcmd() {
 static const char* nextfil() {
     if (!dgiter.isopen)
         return 0;
-    if (fs_dir_read(&dgiter.fd, &dgiter.nbuf) > 0) {
+    if (fs_dir_read(&dgiter.fd, &dgiter.nbuf) > 0)
         return dgiter.nbuf.name;
-    }
     fs_dir_close(&dgiter.fd);
     dgiter.isopen = 0;
     return 0;
@@ -162,10 +160,9 @@ static char* findit(int patha) {
     int i, j, l;
     char* p;
     namebuf[0] = 0;
-    for (i = j = patha; i < cmdli; i++) {
+    for (i = j = patha; i < cmdli; i++)
         if (cmdline[i] == '/')
             j = i + 1;
-    }
     l = cmdli - j;
     if (l > DOGSIZE)
         l = DOGSIZE;
@@ -177,9 +174,8 @@ static char* findit(int patha) {
         cmdline[k] = 0;
         p = full_path(&cmdline[patha]);
         cmdline[k] = t;
-    } else {
+    } else
         p = full_path("");
-    }
     const char* (*first)(char* p), *(*next)();
     if (!j) {
         first = firstpath;
@@ -197,11 +193,10 @@ static char* findit(int patha) {
         if (!strcmp(nbname, ".") || !strcmp(nbname, ".."))
             continue;
         if (!patha && dgiter.st > 0 && dgiter.nbuf.type != LFS_TYPE_DIR) {
-            if (j > 0 || dgiter.st == 1) {
+            if (j > 0 || dgiter.st == 1)
                 snprintf(attrfn, sizeof(attrfn), "%s/%s", p, nbname);
-            } else {
+            else
                 snprintf(attrfn, sizeof(attrfn), "/bin/%s", nbname);
-            }
             if (fs_getattr(attrfn, 1, attrbf, 4) != 4 || memcmp(attrbf, "exe", 4) != 0)
                 continue;
         }
@@ -248,11 +243,10 @@ static char* findit(int patha) {
         if (!strcmp(nbname, ".") || !strcmp(nbname, ".."))
             continue;
         if (!patha && dgiter.st > 0 && dgiter.nbuf.type != LFS_TYPE_DIR) {
-            if (j > 0 || dgiter.st == 1) {
+            if (j > 0 || dgiter.st == 1)
                 snprintf(attrfn, sizeof(attrfn), "%s/%s", p, nbname);
-            } else {
+            else
                 snprintf(attrfn, sizeof(attrfn), "/bin/%s", nbname);
-            }
             if (fs_getattr(attrfn, 1, attrbf, 4) != 4 || memcmp(attrbf, "exe", 4) != 0)
                 continue;
         }
@@ -268,9 +262,8 @@ static char* findit(int patha) {
     if (dgprom)
         dgputs(dgprom);
     dgputs(cmdline);
-    for (i = cmdli; i < cmdlb; i++) {
+    for (i = cmdli; i < cmdlb; i++)
         putchar('\b');
-    }
     namebuf[0] = 0;
     return namebuf;
 }
@@ -307,9 +300,8 @@ static void dotab() {
 
 void savehist() {
     lfs_file_t fp;
-    if (fs_file_open(&fp, "/.history", LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0) {
+    if (fs_file_open(&fp, "/.history", LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0)
         return;
-    }
     int j = hista;
     while (j != histb) {
         char c = history[j];

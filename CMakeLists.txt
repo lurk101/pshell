@@ -27,14 +27,14 @@ execute_process(
   COMMAND git describe
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE PSHELL_VERSION
+  OUTPUT_VARIABLE PSHELL_GIT_TAG
 )
 
 add_compile_options("-DPICO_MALLOC_PANIC=0")
 add_compile_options("-DLFS_NO_ERROR")
 add_compile_options("-DLFS_NO_DEBUG")
 add_compile_options("-DLFS_NO_WARN")
-add_compile_options("-DPSHELL_VERSION=${PSHELL_VERSION}")
+add_compile_options("-DPSHELL_GIT_TAG=${PSHELL_GIT_TAG}")
 if (FORCE_TESTS)
 add_compile_options("-DPSHELL_TESTS")
 endif()

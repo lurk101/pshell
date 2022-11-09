@@ -634,7 +634,7 @@ static void quit_cmd(void) {
     exit(0);
 }
 
-const char* pshell_version = STRINGIZE_VALUE_OF(PSHELL_VERSION);
+const char* pshell_version = STRINGIZE_VALUE_OF(PSHELL_GIT_TAG);
 
 static void version_cmd(void) {
     printf("\nPico Shell %s, LittleFS v%d.%d, Vi " VI_VER ", SDK v%d.%d.%d\n", pshell_version,
