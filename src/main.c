@@ -20,8 +20,8 @@
 #include "pico/sync.h"
 
 #include "cc.h"
-#include "dgreadln.h"
 #include "fs.h"
+#include "readln.h"
 #include "tar.h"
 #include "vi.h"
 #include "xmodem.h"

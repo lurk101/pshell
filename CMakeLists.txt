@@ -47,7 +47,7 @@ add_executable(${PSHELL}
     src/main.c
     src/xmodem.c src/xmodem.h
     src/crc16.c src/crc16.h
-    src/dgreadln.c src/dgreadln.h
+    src/readln.c src/readln.h
     src/fs.c src/fs.h
     src/vi.c src/vi.h
     src/cc.c src/cc.h src/cc_extrns.h src/cc_tokns.h src/cc_ops.h src/cc_defs.h
