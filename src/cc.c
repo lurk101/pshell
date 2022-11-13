@@ -920,6 +920,12 @@ static void next() {
                     fatal("preprocessor context nesting error");
                 if (pplev == pplevt)
                     return;
+            } else if (!strncmp(p, "pragma", 6)) {
+                p += 6;
+                while ((*p == ' ') || (*p == '\t'))
+                    ++p;
+                if (!strncmp(p, "uchar", 5))
+                    uchar_opt = 1;
             }
             while (*p != 0 && *p != '\n')
                 ++p; // discard until end-of-line
