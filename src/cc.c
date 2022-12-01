@@ -172,6 +172,7 @@ static int ty UDATA;                                   // current expression typ
                      //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
                      // bit 2:9 - type
                      // bit 10:11 - ptr level
+static int compound UDATA;            // manage precedence of compound assign expressions
 static int rtf UDATA, rtt UDATA;      // return flag and return type for current function
 static int loc UDATA;                 // local variable offset
 static int lineno UDATA;              // current line number
@@ -1204,9 +1205,11 @@ static void check_pc_relative(void);
  * Bracket [
  */
 
+#define COMPOUND 0x10000
+
 static void expr(int lev) {
     int t, tc, tt, nf, *b, sz, *c;
-    int otk, memsub = 0;
+    int memsub = 0;
     struct ident_s* d;
     struct member_s* m;
 
@@ -1546,7 +1549,10 @@ static void expr(int lev) {
     case 0:
         fatal("unexpected EOF in expression");
     default:
-        fatal("bad expression");
+        if (tk & COMPOUND)
+            tk ^= COMPOUND;
+        else
+            fatal("bad expression");
     }
 
     // "precedence climbing" or "Top Down Operator Precedence" method
@@ -1586,27 +1592,21 @@ static void expr(int lev) {
                 fatal("Cannot assign to array type lvalue");
             if (ast_Tk(n) != Load)
                 fatal("bad lvalue in assignment");
-            otk = tk;
             n += Load_words;
             b = n;
             ast_End();
             ast_Load(t);
-            sz = (t >= PTR2) ? sizeof(int) : ((t >= PTR) ? tsize[(t - PTR) >> 2] : 1);
-            next();
-            c = n;
-            expr(otk);
-            if (ast_Tk(n) == Num)
-                Num_entry(n).val *= sz;
-            if (otk < ShlAssign)
-                ast_Oper((int)c, Or + (otk - OrAssign));
+            if (tk < ShlAssign)
+                tk = Or + (tk - OrAssign);
             else
-                ast_Oper((int)c, Shl + (otk - ShlAssign));
-            if (t == FLOAT && (otk >= AddAssign && otk <= DivAssign))
-                ast_Tk(n) += AddF - Add; // move to float
-            typecheck(ast_Tk(n), t, ty);
+                tk = Shl + (tk - ShlAssign);
+            tk |= COMPOUND;
+            ty = t;
+            compound = 1;
+            expr(Assign);
             ast_Assign((int)b, (ty << 16) | t);
             ty = t;
-            break;
+            return;
         case Cond: // `x?a:b` is similar to if except that it relies on else
             next();
             expr(Assign);
@@ -1642,7 +1642,11 @@ static void expr(int lev) {
             break;
         case Or: // push the current value, calculate the right value
             next();
-            expr(Xor);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Xor);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 Num_entry(b).val = Num_entry(b).val | Num_entry(n).val;
@@ -1653,7 +1657,11 @@ static void expr(int lev) {
             break;
         case Xor:
             next();
-            expr(And);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(And);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 Num_entry(b).val = Num_entry(b).val ^ Num_entry(n).val;
@@ -1664,7 +1672,11 @@ static void expr(int lev) {
             break;
         case And:
             next();
-            expr(Eq);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Eq);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 Num_entry(b).val = Num_entry(b).val & Num_entry(n).val;
@@ -1801,7 +1813,11 @@ static void expr(int lev) {
             break;
         case Shl:
             next();
-            expr(Add);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Add);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 Num_entry(b).val = (Num_entry(n).val < 0) ? Num_entry(b).val >> -Num_entry(n).val
@@ -1813,7 +1829,11 @@ static void expr(int lev) {
             break;
         case Shr:
             next();
-            expr(Add);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Add);
             bitopcheck(t, ty);
             if (ast_Tk(n) == Num && ast_Tk(b) == Num) {
                 Num_entry(b).val = (Num_entry(n).val < 0) ? Num_entry(b).val << -Num_entry(n).val
@@ -1825,7 +1845,11 @@ static void expr(int lev) {
             break;
         case Add:
             next();
-            expr(Mul);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Mul);
             typecheck(Add, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
@@ -1860,7 +1884,11 @@ static void expr(int lev) {
             break;
         case Sub:
             next();
-            expr(Mul);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Mul);
             typecheck(Sub, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
@@ -1924,7 +1952,11 @@ static void expr(int lev) {
             break;
         case Mul:
             next();
-            expr(Inc);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Inc);
             typecheck(Mul, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
@@ -1963,7 +1995,11 @@ static void expr(int lev) {
             break;
         case Div:
             next();
-            expr(Inc);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Inc);
             typecheck(Div, t, ty);
             if (ty == FLOAT) {
                 if (ast_Tk(n) == NumF && ast_Tk(b) == NumF) {
@@ -1989,7 +2025,11 @@ static void expr(int lev) {
             break;
         case Mod:
             next();
-            expr(Inc);
+            if (compound) {
+                compound = 0;
+                expr(Assign);
+            } else
+                expr(Inc);
             typecheck(Mod, t, ty);
             if (ty == FLOAT)
                 fatal("use fmodf() for float modulo");
