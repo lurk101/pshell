@@ -1,3 +1,10 @@
+What's new in version 1.2.19
+
+- fix compound assignment bug
+- implement #pragma uchar, tells compiler to use unsigned char variables
+- grow symbol table dynamically
+- fix global greater than 4K bug
+
 What's new in version 1.2.18
 
 - a few more peep hole optimizations
