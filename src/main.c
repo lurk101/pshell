@@ -29,12 +29,6 @@
 #include "tests.h"
 #endif
 
-#if PICO_SDK_VERSION_MAJOR > 1 || (PICO_SDK_VERSION_MAJOR == 1 && PICO_SDK_VERSION_MINOR >= 4)
-#define SDK14 1
-#else
-#define SDK14 0
-#endif
-
 //#define COPYRIGHT "\u00a9" // for UTF8
 #define COPYRIGHT "(c)" // for ASCII
 
@@ -152,7 +146,7 @@ static bool check_name(void) {
     return true;
 }
 
-static void put_cmd(void) {
+static void xput_cmd(void) {
     if (check_mount(true))
         return;
     if (check_name())
@@ -165,9 +159,9 @@ static void put_cmd(void) {
     set_translate_crlf(false);
     xmodemReceive(xmodem_rx_cb);
     set_translate_crlf(true);
-    int pos = fs_file_seek(&file, 0, LFS_SEEK_END);
+    busy_wait_ms(3000);
+    sprintf(result, "\nfile transfered, size: %d", fs_file_seek(&file, 0, LFS_SEEK_END));
     fs_file_close(&file);
-    sprintf(result, "\nfile transfered, size: %d\n", pos);
 }
 
 int check_from_to_parms(char** from, char** to, int copy) {
@@ -324,7 +318,7 @@ static void cat_cmd(void) {
     fs_file_close(&file);
 }
 
-static void get_cmd(void) {
+static void xget_cmd(void) {
     if (check_mount(true))
         return;
     if (check_name())
@@ -740,8 +734,8 @@ cmd_t cmd_table[] = {
     {"unmount", unmount_cmd,    "unmount the filesystem"},
 	{"version", version_cmd,    "display pico shell's version"},
     {"vi",      vi_cmd,         "edit file(s) with vi"},
-    {"xget",    get_cmd,        "get a file (xmodem)"},
-    {"xput",    put_cmd,        "put a file (xmodem)"},
+    {"xget",    xget_cmd,       "get a file (xmodem)"},
+    {"xput",    xput_cmd,       "put a file (xmodem)"},
 	{0}
 };
 // clang-format on
