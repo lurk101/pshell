@@ -4411,7 +4411,7 @@ int cc(int mode, int argc, char** argv) {
             }
             // initialize the header and write it
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
-            exe.dsize = data - data_base;
+            exe.dsize = (data - data_base) | 0x40000000;
             exe.nreloc = nrelocs;
             if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
                 fs_file_close(fd);
@@ -4423,7 +4423,8 @@ int cc(int mode, int argc, char** argv) {
                 fatal("error writing executable file");
             }
             // write the data segment
-            if (exe.dsize && fs_file_write(fd, data_base, exe.dsize) != exe.dsize) {
+            int ds = exe.dsize & 0x3fffffff;
+            if (ds && fs_file_write(fd, data_base, ds) != ds) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
             }
@@ -4444,7 +4445,7 @@ int cc(int mode, int argc, char** argv) {
             fd = NULL;
             if (fs_setattr(full_path(ofn), 1, "exe", 4) < LFS_ERR_OK)
                 fatal("unable to set executable attribute");
-            printf("\ntext  %06x\ndata  %06x\nentry %06x\nreloc %06x\n", exe.tsize, exe.dsize,
+            printf("\ntext  %06x\ndata  %06x\nentry %06x\nreloc %06x\n", exe.tsize, ds,
                    exe.entry - (int)__StackLimit, exe.nreloc);
             goto done;
         }
@@ -4479,7 +4480,10 @@ int cc(int mode, int argc, char** argv) {
             fatal("error reading %s", ofn);
         }
         // read in the data segment
-        if (exe.dsize && fs_file_read(fd, __StackLimit + TEXT_BYTES, exe.dsize) != exe.dsize) {
+        if ((exe.dsize & 0xc0000000) != 0x40000000)
+            fatal("executable compiled with earlier version not compatible, please recompile");
+        int ds = exe.dsize & 0x3fffffff;
+        if (ds && fs_file_read(fd, __StackLimit + TEXT_BYTES, ds) != ds) {
             fs_file_close(fd);
             fd = NULL;
             fatal("error reading %s", ofn);

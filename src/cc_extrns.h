@@ -209,6 +209,7 @@
     {"strncmp", 3, string_defines, strncmp, 0, 0, 0},
     {"strncpy", 3, string_defines, strncpy, 0, 0, 0},
     {"strrchr", 2, string_defines, strrchr, 0, 0, 0},
+    {"strtol", 3, string_defines, strtol, 0, 0, 0},
     {"tanf", 1 | (1 << 5) | (1 << 10), math_defines, __wrap_tanf, 1, 0, 0},
     {"tanhf", 1 | (1 << 5) | (1 << 10), math_defines, __wrap_tanhf, 1, 0, 0},
     {"time_us_32", 0, time_defines, time_us_32, 0, 0, 0},
