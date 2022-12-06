@@ -2560,7 +2560,7 @@ static void emit_enter(int n) {
         if (n < 128)          //
             emit(0xb080 | n); // sub  sp, #n
         else {                //
-            emit_load_immediate(3, loc - ld);
+            emit_load_immediate(3, -n * 4);
             emit(0x449d); // add sp, r3
         }
     }
@@ -3737,7 +3737,7 @@ static void stmt(int ctx) {
                         fatal("program data exceeds data segment");
                     data += sz;
                 } else if (ctx == Loc) {
-                    dd->val = (ld += sz / sizeof(int));
+                    dd->val = (ld += (sz + 3) / sizeof(int));
                 } else if (ctx == Par) {
                     if (ty > ATOM_TYPE && ty < PTR) // local struct decl
                         fatal("struct parameters must be pointers");
