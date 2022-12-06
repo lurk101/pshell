@@ -995,7 +995,7 @@ static void next() {
                 // if it is double quotes (string literal), it is considered as
                 // a string, copying characters to data
                 if (tk == '"') {
-                    if (data >= data_base + (DATA_BYTES / 4))
+                    if (data >= data_base + DATA_BYTES)
                         fatal("program data exceeds data segment");
                     *data++ = tkv.i;
                 }
@@ -1343,11 +1343,11 @@ static void expr(int lev) {
         next();
         // continuous `"` handles C-style multiline text such as `"abc" "def"`
         while (tk == '"') {
-            if (data >= data_base + (DATA_BYTES / 4))
+            if (data >= data_base + DATA_BYTES)
                 fatal("program data exceeds data segment");
             next();
         }
-        if (data >= data_base + (DATA_BYTES / 4))
+        if (data >= data_base + DATA_BYTES)
             fatal("program data exceeds data segment");
         data = (char*)(((int)data + sizeof(int)) & (-sizeof(int)));
         ty = CHAR + PTR;
