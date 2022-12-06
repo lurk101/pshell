@@ -29,12 +29,6 @@
 #include "tests.h"
 #endif
 
-// fake functions to avoid gcc 12 newlib linker warnings
-void _close_r(){};
-void _fstat_r(){};
-void _isatty_r(){};
-void _lseek_r(){};
-
 //#define COPYRIGHT "\u00a9" // for UTF8
 #define COPYRIGHT "(c)" // for ASCII
 

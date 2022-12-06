@@ -3339,7 +3339,7 @@ static void gen(int* n) {
     case Enter:
         emit_enter(Num_entry(n).val);
         gen(n + Enter_words);
-        emit_leave(); // don't issue it again if already emitted by return stmt
+        emit_leave();
         patch_pc_relative(0);
         break;
     case Label: // target of goto
