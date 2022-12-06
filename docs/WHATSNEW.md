@@ -1,3 +1,11 @@
+What's new in version 1.2.20
+
+- fix stack allocation for local multi dimensional arrays
+- fix sizeof for multi dimensional arrays, was limited to 1 dimension
+- fix small global data limit for strings literals
+- add strtol string function and compiler version flag in executable's header
+- suppress gcc12 newlib linker warnings
+
 What's new in version 1.2.19
 
 - fix compound assignment bug
