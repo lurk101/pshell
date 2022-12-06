@@ -1398,8 +1398,24 @@ static void expr(int lev) {
         ast_Num((ty & 3) ? (((ty - PTR) >= PTR) ? sizeof(int) : tsize[(ty - PTR) >> 2])
                          : ((ty >= PTR) ? sizeof(int) : tsize[ty >> 2]));
         // just one dimension supported at the moment
-        if (d != 0 && (ty & 3))
-            Num_entry(n).val *= (id->etype + 1);
+        //   1d etype -- bit 0:30)
+        //   2d etype -- bit 0:15,16:30 [32768,65536]
+        //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
+        // bit 2:9 - type
+        // bit 10:11 - ptr level
+        if ((d != 0) && (ty & 3))
+            switch (ty & 3) {
+            case 1:
+                Num_entry(n).val *= (id->etype & 0x7fffffff) + 1;
+                break;
+            case 2:
+                Num_entry(n).val *= ((id->etype & 0xffff) + 1) * (((id->etype >> 16) & 0x7fff) + 1);
+                break;
+            case 3:
+                Num_entry(n).val *= ((id->etype & 0x3ff) + 1) * (((id->etype >> 11) & 0x3ff) + 1) *
+                                    (((id->etype >> 21) & 0x7ff) + 1);
+                break;
+            }
         ty = INT;
         break;
     // Type cast or parenthesis
