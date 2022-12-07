@@ -23,14 +23,13 @@ the [Squint] project. Native code generation by yours truly.
 
 [What's new] in pshell
 
-About the compiler, briefly…
+About the compiler, briefly:
 
 - Data types: integer, float, char and pointer.
-- Aggregate types: array, struct and union.
+- Aggregate types: array (up to 3 dimensions), struct and union.
 - Flow control: for, while, if then else, break, continue and goto.
-- Memory, math and SDK functions. ([list of implemented functions])
+- Memory, mathi, newlib and SDK functions. ([list of implemented functions])
 - Native code generation for the Pico's cm0+ core
-- Predefined stdio, stdlib, and SDK functions.
 
 Raspberry Pi Forums [thread].
 
