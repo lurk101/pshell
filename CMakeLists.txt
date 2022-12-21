@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 option(USB_CONSOLE "build for USB console, otherwise UART" ON)
 option(FORCE_TESTS "build release with tests cmd" OFF)
+option(SD_IO "build for SD card instead of built-in flash" OFF)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -43,18 +44,25 @@ endif()
 add_subdirectory(littlefs)
 add_subdirectory(disassembler)
 
+if (SD_IO)
+  add_subdirectory(sdio)
+else()
+  add_subdirectory(flashio)
+endif()
+
 add_executable(${PSHELL}
     src/main.c
     src/xmodem.c src/xmodem.h
     src/crc16.c src/crc16.h
     src/readln.c src/readln.h
-    src/fs.c src/fs.h
     src/vi.c src/vi.h
     src/cc.c src/cc.h src/cc_extrns.h src/cc_tokns.h src/cc_ops.h src/cc_defs.h
     src/tar.c src/tar.h
     src/tests.c src/tests.h
     src/cc_printf.S
 )
+
+target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src/${FS_DIR})
 
 pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/src/pshell.ld)
 
@@ -67,7 +75,7 @@ else()
 endif()
 
 target_link_libraries(${PSHELL} PUBLIC
-    littlefs disassembler
+    littlefs disassembler io
     pico_stdlib
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
@@ -82,6 +90,11 @@ if (USB_CONSOLE)
 message("-- USB_CONSOLE ${USB_CONSOLE}, using USB")
 else()
 message("-- USB_CONSOLE ${USB_CONSOLE}, using UART")
+endif()
+if (SD_IO)
+message("-- SD_IO ${SD_IO}, using SD card file system")
+else()
+message("-- SD_IO ${SD_IO}, using internal flash file system")
 endif()
 message("-----------------------------------------------------")
 
