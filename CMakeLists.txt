@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.13)
 option(USB_CONSOLE "build for USB console, otherwise UART" ON)
 option(FORCE_TESTS "build release with tests cmd" OFF)
 option(SD_IO "build for SD card instead of built-in flash" OFF)
+option(USE_UART1 "use UART 1" OFF)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -39,16 +40,21 @@ add_compile_options("-DPSHELL_GIT_TAG=${PSHELL_GIT_TAG}")
 if (FORCE_TESTS)
 add_compile_options("-DPSHELL_TESTS")
 endif()
+if (USE_UART1)
+  add_compile_options("-DPICO_DEFAULT_UART=1")
+  add_compile_options("-DPICO_DEFAULT_UART_TX_PIN=20")
+  add_compile_options("-DPICO_DEFAULT_UART_RX_PIN=21")
+endif()
 
 
 add_subdirectory(littlefs)
 add_subdirectory(disassembler)
-
 if (SD_IO)
   add_subdirectory(sdio)
 else()
   add_subdirectory(flashio)
 endif()
+
 
 add_executable(${PSHELL}
     src/main.c
@@ -95,6 +101,11 @@ if (SD_IO)
 message("-- SD_IO ${SD_IO}, using SD card file system")
 else()
 message("-- SD_IO ${SD_IO}, using internal flash file system")
+endif()
+if (USE_UART1)
+message("-- USE_UART1 ${USE_UART1}, using UART1")
+else()
+message("-- USE_UART1 ${USE_UART1}, using UART0")
 endif()
 message("-----------------------------------------------------")
 
