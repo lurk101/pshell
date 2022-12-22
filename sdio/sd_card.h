@@ -21,37 +21,22 @@ specific language governing permissions and limitations under the License.
 #include <stdint.h>
 //
 #include "hardware/gpio.h"
-#include "pico/mutex.h"
-//
-#include "ff.h"
 //
 #include "spi.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 // "Class" representing SD Cards
 typedef struct {
     const char* pcName;
     spi_t* spi;
-    // Slave select is here in sd_card_t because multiple SDs can share an SPI
     uint ss_gpio; // Slave select for this SD card
     bool use_card_detect;
     uint card_detect_gpio;   // Card detect; ignored if !use_card_detect
     uint card_detected_true; // Varies with card socket; ignored if !use_card_detect
-    // Drive strength levels for GPIO outputs.
-    // enum gpio_drive_strength { GPIO_DRIVE_STRENGTH_2MA = 0, GPIO_DRIVE_STRENGTH_4MA = 1,
-    // GPIO_DRIVE_STRENGTH_8MA = 2, GPIO_DRIVE_STRENGTH_12MA = 3 }
     bool set_drive_strength;
     enum gpio_drive_strength ss_gpio_drive_strength;
-
-    // Following fields are used to keep track of the state of the card:
     int m_Status;     // Card status
     uint64_t sectors; // Assigned dynamically
     int card_type;    // Assigned dynamically
-    mutex_t mutex;
-    FATFS fatfs;
     bool mounted;
 } sd_card_t;
 
@@ -68,14 +53,6 @@ typedef struct {
 #define SD_BLOCK_DEVICE_ERROR_ERASE -5010           /*!< Erase error: reset/sequence */
 #define SD_BLOCK_DEVICE_ERROR_WRITE -5011           /*!< SPI Write error: !SPI_DATA_ACCEPTED */
 
-///* Disk Status Bits (DSTATUS) */
-// See diskio.h.
-// enum {
-//    STA_NOINIT = 0x01, /* Drive not initialized */
-//    STA_NODISK = 0x02, /* No medium in the drive */
-//    STA_PROTECT = 0x04 /* Write protected */
-//};
-
 bool sd_init_driver();
 int sd_init(sd_card_t* pSD);
 int sd_write_blocks(sd_card_t* pSD, const uint8_t* buffer, uint64_t ulSectorNumber,
@@ -85,9 +62,4 @@ int sd_read_blocks(sd_card_t* pSD, uint8_t* buffer, uint64_t ulSectorNumber,
 bool sd_card_detect(sd_card_t* pSD);
 uint64_t sd_sectors(sd_card_t* pSD);
 
-#ifdef __cplusplus
-}
 #endif
-
-#endif
-/* [] END OF FILE */
