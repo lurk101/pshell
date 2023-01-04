@@ -32,9 +32,6 @@
 //#define COPYRIGHT "\u00a9" // for UTF8
 #define COPYRIGHT "(c)" // for ASCII
 
-#define STRINGIZE(x) #x
-#define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
-
 #define MAX_ARGS 16
 
 #define VT_ESC "\033"
@@ -628,10 +625,8 @@ static void quit_cmd(void) {
     exit(0);
 }
 
-const char* pshell_version = STRINGIZE_VALUE_OF(PSHELL_GIT_TAG);
-
 static void version_cmd(void) {
-    printf("\nPico Shell %s, LittleFS v%d.%d, Vi " VI_VER ", SDK v%d.%d.%d\n", pshell_version,
+    printf("\nPico Shell " PSHELL_GIT_TAG ", LittleFS v%d.%d, Vi " VI_VER ", SDK v%d.%d.%d\n",
            LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR, PICO_SDK_VERSION_MINOR,
            PICO_SDK_VERSION_REVISION);
 }
@@ -820,10 +815,25 @@ int main(void) {
            "This program comes with ABSOLUTELY NO WARRANTY.\n"
            "This is free software, and you are welcome to redistribute it\n"
            "under certain conditions. See LICENSE file for details.\n");
+    char buf[16];
+#if defined(VGABOARD_SD_CLK_PIN)
+    strcpy(buf, "sd card");
+#else
+    strcpy(buf, "internal flash");
+#endif
     version_cmd();
-    printf("\nconsole on %s [%u X %u]\n\n"
+    char console[8];
+    if (uart) {
+#if defined(PICO_DEFAULT_UART)
+        sprintf(console, "UART%d", PICO_DEFAULT_UART);
+#else
+        strcpy(console, "UART");
+#endif
+    } else
+        strcpy(console, "USB");
+    printf("\nboard: " PICO_BOARD ", console: %s [%u X %u], filesystem: %s\n\n"
            "enter command or hit ENTER for help\n\n",
-           uart ? "UART" : "USB", screen_x, screen_y);
+           console, screen_x, screen_y, buf);
     if (!detected) {
         printf("\nYour terminal does not respond to standard VT100 escape sequences"
                "\nsequences. The editor will likely not work at all!");
