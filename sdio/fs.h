@@ -34,7 +34,6 @@ struct fs_fsstat_t {
 };
 
 // implemented
-int fs_flash_base(void);
 
 extern lfs_t fs_lfs;
 extern struct lfs_config fs_cfg;

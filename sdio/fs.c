@@ -107,5 +107,3 @@ int fs_fsstat(struct fs_fsstat_t* stat) {
 #endif
     return LFS_ERR_OK;
 }
-
-int fs_flash_base(void) { return FS_BASE; }
