@@ -2,8 +2,8 @@
 #include "hardware/clocks.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
+#include "hardware/pio.h"
 #include "pico/stdlib.h"
-#include "sd_spi.pio.h"
 
 #define SD_CS_PIN 22
 #define SD_CLK_PIN VGABOARD_SD_CLK_PIN
@@ -16,6 +16,22 @@ static int dma_tx = -1;
 static int dma_rx = -1;
 SD_TYPE sd_type = sdtpUnk;
 
+#define sd_spi_wrap_target 0
+#define sd_spi_wrap 1
+
+static const uint16_t sd_spi_program_instructions[] = {
+            //     .wrap_target
+    0x6301, //  0: out    pins, 1         side 0 [3]
+    0x5301, //  1: in     pins, 1         side 1 [3]
+            //     .wrap
+};
+
+static const struct pio_program sd_spi_program = {
+    .instructions = sd_spi_program_instructions,
+    .length = sizeof(sd_spi_program_instructions) / sizeof(uint16_t),
+    .origin = -1,
+};
+
 bool sd_spi_load(void) {
     dma_tx = dma_claim_unused_channel(true);
     dma_rx = dma_claim_unused_channel(true);
@@ -27,7 +43,9 @@ bool sd_spi_load(void) {
     gpio_put(SD_CS_PIN, 1);
     uint offset = pio_add_program(pio_sd, &sd_spi_program);
     sd_sm = pio_claim_unused_sm(pio_sd, true);
-    pio_sm_config c = sd_spi_program_get_default_config(offset);
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, offset + sd_spi_wrap_target, offset + sd_spi_wrap);
+    sm_config_set_sideset(&c, 1, false, false);
     sm_config_set_out_pins(&c, SD_MOSI_PIN, 1);
     sm_config_set_in_pins(&c, SD_MISO_PIN);
     sm_config_set_sideset_pins(&c, SD_CLK_PIN);
