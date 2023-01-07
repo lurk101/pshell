@@ -6,9 +6,9 @@
 #include "sd_spi.pio.h"
 
 #define SD_CS_PIN 22
-#define SD_CLK_PIN 5
-#define SD_MOSI_PIN 18
-#define SD_MISO_PIN 19
+#define SD_CLK_PIN VGABOARD_SD_CLK_PIN
+#define SD_MOSI_PIN VGABOARD_SD_CMD_PIN
+#define SD_MISO_PIN VGABOARD_SD_DAT0_PIN
 
 static PIO pio_sd = pio1;
 static int sd_sm = -1;

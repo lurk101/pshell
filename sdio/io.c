@@ -50,11 +50,6 @@ struct lfs_config fs_cfg = {
 
 lfs_t fs_lfs;
 
-// bool sd_spi_init(void);
-// void sd_spi_term(void);
-// bool sd_spi_read(uint32_t lba, uint8_t* buff);
-// bool sd_spi_write(uint32_t lba, const uint8_t* buff);
-
 // Pico specific hardware abstraction functions
 
 int fs_load(void) {
@@ -79,6 +74,7 @@ static int fs_hal_read(const struct lfs_config* c, lfs_block_t block, lfs_off_t 
         if (!sd_spi_read(block++, buffer))
             return LFS_ERR_IO;
         buf += c->block_size;
+        size -= c->block_size;
     }
     return LFS_ERR_OK;
 }
@@ -93,6 +89,7 @@ static int fs_hal_prog(const struct lfs_config* c, lfs_block_t block, lfs_off_t 
         if (!sd_spi_write(block++, buffer))
             return LFS_ERR_IO;
         buf += c->block_size;
+        size -= c->block_size;
     }
     return LFS_ERR_OK;
 }

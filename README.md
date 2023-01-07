@@ -53,6 +53,11 @@ For UART console, substitute the following cmake command
 cmake .. -DUSB_CONSOLE=OFF
 ```
 
+For vgaboard with filesystem on microSD card
+```
+cmake .. -DPICO_BOARD=vgaboard
+```
+
 Starting with version 1.0.4 all development will occur on the dev branch. To build it:
 ```
 git checkout dev

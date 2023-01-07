@@ -1,3 +1,7 @@
+What's new in version 1.2.21
+
+- support builing for vgaboard with filesystem on microSD
+
 What's new in version 1.2.20
 
 - fix stack allocation for local multi dimensional arrays

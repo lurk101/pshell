@@ -469,21 +469,34 @@ static void format_cmd(void) {
     strcpy(result, "formatted");
 }
 
+static void disk_space(uint64_t n, char* buf) {
+    double d = n;
+    static const char* suffix[] = {"B", "KB", "MB", "GB", "TB"};
+    char** sfx = (char**)suffix;
+    while (d >= 1000.0) {
+        d /= 1000.0;
+        sfx++;
+    }
+    sprintf(buf, "%.1f%s", d, *sfx);
+}
+
 static void status_cmd(void) {
     if (check_mount(true))
         return;
     struct fs_fsstat_t stat;
     fs_fsstat(&stat);
     const char percent = 37;
-    int total_size = stat.block_count * stat.block_size;
+    char total_size[32], used_size[32];
+    disk_space((int64_t)stat.block_count * stat.block_size, total_size);
+    disk_space((int64_t)stat.blocks_used * stat.block_size, used_size);
 #ifndef NDEBUG
     printf("\ntext size 0x%x (%d), bss size 0x%x (%d)", stat.text_size, stat.text_size,
            stat.bss_size, stat.bss_size);
 #endif
     sprintf(result,
-            "\ntotal blocks %d, block size %d, used %d (%dK), %1.1f%c "
+            "\ntotal blocks %d, block size %d, used %s (%s), %1.1f%c "
             "used.\n",
-            (int)stat.block_count, (int)stat.block_size, (int)stat.blocks_used, total_size / 1024,
+            (int)stat.block_count, (int)stat.block_size, used_size, total_size,
             stat.blocks_used * 100.0 / stat.block_count, percent);
 }
 
