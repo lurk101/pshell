@@ -34,7 +34,7 @@
 // disassembler, compiler, and file system functions
 #include "armdisasm.h"
 #include "cc.h"
-#include "fs.h"
+#include "io.h"
 
 // for compiler debug only,
 // limited and not for normal use

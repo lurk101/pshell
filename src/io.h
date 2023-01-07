@@ -38,6 +38,9 @@ struct fs_fsstat_t {
 extern lfs_t fs_lfs;
 extern struct lfs_config fs_cfg;
 
+int fs_load(void);
+int fs_unload(void);
+
 static inline int fs_format(void) { return lfs_format(&fs_lfs, &fs_cfg); }
 
 static inline int fs_mount(void) { return lfs_mount(&fs_lfs, &fs_cfg); }

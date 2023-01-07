@@ -5,7 +5,7 @@
 #include "pico/stdlib.h"
 
 #include "cc.h"
-#include "fs.h"
+#include "io.h"
 #include "tests.h"
 
 extern char* full_path(char* name);

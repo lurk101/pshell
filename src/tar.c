@@ -2,7 +2,7 @@
 
 #include "stdio.h"
 
-#include "fs.h"
+#include "io.h"
 #include "tar.h"
 
 extern char* full_path(char* name);

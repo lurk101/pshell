@@ -16,7 +16,7 @@
 #include "hardware/regs/addressmap.h"
 #include "hardware/sync.h"
 
-#include "fs.h"
+#include "io.h"
 
 // file system offset in flash
 #define FS_BASE (256 * 1024)
@@ -51,6 +51,9 @@ struct lfs_config fs_cfg = {
     .lookahead_size = 32,
     .block_cycles = 256,
 };
+
+int fs_load(void) { return LFS_ERR_OK; }
+int fs_unload(void) { return LFS_ERR_OK; }
 
 lfs_t fs_lfs;
 
@@ -107,3 +110,5 @@ int fs_fsstat(struct fs_fsstat_t* stat) {
 #endif
     return LFS_ERR_OK;
 }
+
+int fs_flash_base(void) { return FS_BASE; }

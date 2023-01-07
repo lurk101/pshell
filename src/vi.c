@@ -21,7 +21,7 @@
 #include "pico/stdio.h"
 #include "pico/time.h"
 
-#include "fs.h"
+#include "io.h"
 #include "vi.h"
 
 extern char* full_path(const char* name);

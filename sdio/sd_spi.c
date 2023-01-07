@@ -136,6 +136,7 @@ uint8_t sd_spi_clk(size_t len) {
 
 static uint8_t cmd0[] = {0xFF, 0x40 | 0, 0x00, 0x00, 0x00, 0x00, 0x95};   // Go Idle
 static uint8_t cmd8[] = {0xFF, 0x40 | 8, 0x00, 0x00, 0x01, 0xAA, 0x87};   // Set interface condition
+static uint8_t cmd9[] = {0xFF, 0x40 | 9, 0x00, 0x00, 0x00, 0xad, 0x00};   // Read CSD
 static uint8_t cmd17[] = {0xFF, 0x40 | 17, 0x00, 0x00, 0x00, 0x00, 0x00}; // Read single block
 static uint8_t cmd24[] = {0xFF, 0x40 | 24, 0x00, 0x00, 0x00, 0x00, 0x00}; // Write single block
 static uint8_t cmd55[] = {0xFF, 0x40 | 55, 0x00, 0x00,
@@ -318,4 +319,39 @@ bool sd_spi_write(uint32_t lba, const uint8_t* buff) {
             break;
     }
     return bResp;
+}
+
+int sd_spi_sectors(void) {
+    unsigned char csd[16];
+    uint8_t chk[2];
+    uint8_t resp = sd_spi_cmd(cmd9);
+    if (resp != SD_R1_OK) {
+        return 0;
+    }
+    while (true) {
+        resp = sd_spi_clk(1);
+        if (resp == SDBT_START)
+            break;
+        if (resp < SDBT_ECLIP) {
+            return false;
+        }
+    }
+    sd_spi_get(csd, 16);
+    uint16_t crc = dma_hw->sniff_data;
+    sd_spi_get(chk, 2);
+    if ((chk[0] != (crc >> 8)) || (chk[1] != (crc & 0xFF))) {
+        return 0;
+    }
+    int cap;
+    unsigned short csize;
+    if ((csd[0] & 0xC0) == 0x40) { // V2.00 card
+        csize = csd[9] + ((unsigned short)csd[8] << 8) + 1;
+        cap = (unsigned short)csize << 10; // Get the number of sectors
+    } else {                               // V1.XX card
+        unsigned char n = (csd[5] & 15) + ((csd[10] & 128) >> 7) + ((csd[9] & 3) << 1) + 2;
+        csize = (csd[8] >> 6) + ((unsigned short)csd[7] << 2) +
+                ((unsigned short)(csd[6] & 3) << 10) + 1;
+        cap = (unsigned short)csize << (n - 9); // Get the number of sectors
+    }
+    return cap;
 }

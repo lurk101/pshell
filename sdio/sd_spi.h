@@ -10,6 +10,7 @@ typedef enum { sdtpUnk, sdtpVer1, sdtpVer2, sdtpHigh } SD_TYPE;
 extern SD_TYPE sd_type;
 
 bool sd_spi_init(void);
+int sd_spi_sectors(void);
 void sd_spi_term(void);
 bool sd_spi_read(uint32_t lba, uint8_t* buff);
 bool sd_spi_write(uint32_t lba, const uint8_t* buff);

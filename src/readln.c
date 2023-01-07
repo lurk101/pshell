@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "fs.h"
+#include "io.h"
 #include "readln.h"
 
 extern char* full_path(const char* name);

@@ -20,7 +20,7 @@
 #include "pico/sync.h"
 
 #include "cc.h"
-#include "fs.h"
+#include "io.h"
 #include "readln.h"
 #include "tar.h"
 #include "vi.h"
@@ -840,6 +840,10 @@ int main(void) {
         fflush(stdout);
     }
 
+    if (fs_load() != LFS_ERR_OK) {
+        printf("Can't access filesystem device! Aborting.\n");
+        exit(-1);
+    }
     if (fs_mount() != LFS_ERR_OK) {
         printf("The flash file system appears corrupt or unformatted!\n"
                " would you like to format it (Y/n) ? ");
@@ -892,6 +896,7 @@ int main(void) {
         } else
             help();
     }
+    fs_unload();
     printf("\ndone\n");
     sleep_ms(1000);
 }

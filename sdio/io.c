@@ -12,14 +12,10 @@
  *
  */
 
-#include "hardware/flash.h"
-#include "hardware/regs/addressmap.h"
-#include "hardware/sync.h"
-
-#include "fs.h"
+#include "io.h"
+#include "sd_spi.h"
 
 // file system offset in flash
-#define FS_BASE (256 * 1024)
 
 static int fs_hal_read(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, void* buffer,
                        lfs_size_t size);
@@ -43,46 +39,67 @@ struct lfs_config fs_cfg = {
     .erase = fs_hal_erase,
     .sync = fs_hal_sync,
     // block device configuration
-    .read_size = 1,
-    .prog_size = FLASH_PAGE_SIZE,
-    .block_size = FLASH_SECTOR_SIZE,
-    .block_count = FS_SIZE / FLASH_SECTOR_SIZE,
-    .cache_size = FLASH_SECTOR_SIZE / 4,
+    .read_size = 512,
+    .prog_size = 512,
+    .block_size = 512,
+    //  .block_count = ?,
+    .cache_size = 512,
     .lookahead_size = 32,
     .block_cycles = 256,
 };
 
 lfs_t fs_lfs;
 
+// bool sd_spi_init(void);
+// void sd_spi_term(void);
+// bool sd_spi_read(uint32_t lba, uint8_t* buff);
+// bool sd_spi_write(uint32_t lba, const uint8_t* buff);
+
 // Pico specific hardware abstraction functions
+
+int fs_load(void) {
+    if (!sd_spi_init())
+        return LFS_ERR_IO;
+    int sec = sd_spi_sectors();
+    if (sec == 0)
+        return LFS_ERR_IO;
+    fs_cfg.block_count = sec / (fs_cfg.block_size / fs_cfg.prog_size);
+    return LFS_ERR_OK;
+}
+
+int fs_unload(void) { return LFS_ERR_OK; }
 
 static int fs_hal_read(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, void* buffer,
                        lfs_size_t size) {
-    (void)c;
-    // read flash via XIP mapped space
-    uint8_t* p = (uint8_t*)(XIP_NOCACHE_NOALLOC_BASE + FS_BASE + (block * fs_cfg.block_size) + off);
-    memcpy(buffer, p, size);
+    if ((size % c->block_size) != 0)
+        return LFS_ERR_IO;
+    int lba = block;
+    char* buf = (char*)buffer;
+    while (size) {
+        if (!sd_spi_read(block++, buffer))
+            return LFS_ERR_IO;
+        buf += c->block_size;
+    }
     return LFS_ERR_OK;
 }
 
 static int fs_hal_prog(const struct lfs_config* c, lfs_block_t block, lfs_off_t off,
                        const void* buffer, lfs_size_t size) {
-    (void)c;
-    uint32_t p = (block * fs_cfg.block_size) + off;
-    // program with SDK
-    uint32_t ints = save_and_disable_interrupts();
-    flash_range_program(FS_BASE + p, buffer, size);
-    restore_interrupts(ints);
+    if ((size % c->block_size) != 0)
+        return LFS_ERR_IO;
+    int lba = block;
+    char* buf = (char*)buffer;
+    while (size) {
+        if (!sd_spi_write(block++, buffer))
+            return LFS_ERR_IO;
+        buf += c->block_size;
+    }
     return LFS_ERR_OK;
 }
 
 static int fs_hal_erase(const struct lfs_config* c, lfs_block_t block) {
-    uint32_t off = block * fs_cfg.block_size;
     (void)c;
-    // erase with SDK
-    uint32_t ints = save_and_disable_interrupts();
-    flash_range_erase(FS_BASE + off, fs_cfg.block_size);
-    restore_interrupts(ints);
+    (void)block;
     return LFS_ERR_OK;
 }
 
@@ -92,20 +109,13 @@ static int fs_hal_sync(const struct lfs_config* c) {
     return LFS_ERR_OK;
 }
 
-#ifndef NDEBUG
-extern char __HeapLimit;
-extern char __flash_binary_end;
-#endif
-
 int fs_fsstat(struct fs_fsstat_t* stat) {
     stat->block_count = fs_cfg.block_count;
     stat->block_size = fs_cfg.block_size;
     stat->blocks_used = lfs_fs_size(&fs_lfs);
 #ifndef NDEBUG
-    stat->text_size = (lfs_size_t)&__flash_binary_end - 0x10000000;
-    stat->bss_size = (lfs_size_t)&__HeapLimit - 0x20000000;
+    stat->text_size = 0;
+    stat->bss_size = 0;
 #endif
     return LFS_ERR_OK;
 }
-
-int fs_flash_base(void) { return FS_BASE; }
