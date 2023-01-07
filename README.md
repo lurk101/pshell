@@ -12,6 +12,7 @@ This project explores to what extent a reasonably competent self-hosted programm
 [thread]: https://forums.raspberrypi.com/viewtopic.php?t=336843
 [Getting Started]: docs/GETTING-STARTED.md
 [area]: https://github.com/lurk101/pshell/discussions
+[here]: docs/GPIO.md
 
 Credit where credit is due...
 
@@ -53,7 +54,7 @@ For UART console, substitute the following cmake command
 cmake .. -DUSB_CONSOLE=OFF
 ```
 
-For vgaboard with filesystem on microSD card
+For vgaboard with filesystem on microSD card. See [here] for details on differing GPIO & UART configurations.
 ```
 cmake .. -DPICO_BOARD=vgaboard
 ```
