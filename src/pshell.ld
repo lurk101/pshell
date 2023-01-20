@@ -159,14 +159,14 @@ SECTIONS
     .cc_uninitialized_data ALIGN(4) (NOLOAD): {
         *(.ccudata)
     } > RAM
-    __ccudata_start__ = ADDR(.cc_uninitialized_data);
-    __ccudata_end__ = __ccudata_start__ + SIZEOF(.cc_uninitialized_data);
+    PROVIDE_HIDDEN (__ccudata_start__ = ADDR(.cc_uninitialized_data));
+    PROVIDE_HIDDEN (__ccudata_end__ = __ccudata_start__ + SIZEOF(.cc_uninitialized_data));
 
     .vi_uninitialized_data __ccudata_start__ (NOLOAD) : {
         *(.viudata)
     } > RAM
-    __viudata_start__ = __ccudata_start__;
-    __viudata_end__ = __ccudata_start__ + SIZEOF(.vi_uninitialized_data);
+    PROVIDE_HIDDEN (__viudata_start__ = __ccudata_start__);
+    PROVIDE_HIDDEN (__viudata_end__ = __ccudata_start__ + SIZEOF(.vi_uninitialized_data));
 
     /* Start and end symbols must be word-aligned */
     .scratch_x : {
@@ -237,4 +237,11 @@ SECTIONS
 
     ASSERT( __binary_info_header_end - __logical_binary_start <= 256, "Binary info must be in first 256 bytes of the binary")
     /* todo assert on extra code */
+
+	/* assign unused never call function to panic. */
+	_close_r = panic;
+	_fstat_r = panic;
+	_isatty_r = panic;
+	_lseek_r = panic;
+
 }
