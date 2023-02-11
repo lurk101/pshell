@@ -1,3 +1,7 @@
+What's new in version 1.2.22
+
+- Recompiled with gcc 12.2, SDK 1.5, littlefs to 2.5.1
+
 What's new in version 1.2.21
 
 - support builing for vgaboard with filesystem on microSD
