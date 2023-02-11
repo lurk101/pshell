@@ -642,6 +642,9 @@ static void version_cmd(void) {
     printf("\nPico Shell " PSHELL_GIT_TAG ", LittleFS v%d.%d, Vi " VI_VER ", SDK v%d.%d.%d\n",
            LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR, PICO_SDK_VERSION_MINOR,
            PICO_SDK_VERSION_REVISION);
+#if !defined(NDEBUG)
+    printf("%s\n", __VERSION__);
+#endif
 }
 
 static bool cursor_pos(uint32_t* x, uint32_t* y) {
