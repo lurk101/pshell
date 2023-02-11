@@ -710,7 +710,8 @@ static void refresh(int full_screen) {
             memcpy(sp + cs, out_buf + cs, ce - cs + 1);
             place_cursor(li, cs);
             // write line out to terminal
-            fwrite(&sp[cs], ce - cs + 1, 1, stdout);
+            for (int i = 0; i <= ce - cs; ++i)
+                putchar(sp[cs + i]);
             fflush(stdout);
         }
     }
