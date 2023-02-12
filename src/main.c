@@ -494,7 +494,7 @@ static void status_cmd(void) {
            stat.bss_size, stat.bss_size);
 #endif
     sprintf(result,
-            "\ntotal blocks %d, block size %d, used %s (%s), %1.1f%c "
+            "\ntotal blocks %d, block size %d, used %s out of %s, %1.1f%c "
             "used.\n",
             (int)stat.block_count, (int)stat.block_size, used_size, total_size,
             stat.blocks_used * 100.0 / stat.block_count, percent);
