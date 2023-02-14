@@ -28,6 +28,7 @@
 #include <hardware/sync.h>
 
 // pico SDK accellerated functions
+#include <pico/rand.h>
 #include <pico/stdio.h>
 #include <pico/time.h>
 
@@ -4427,7 +4428,7 @@ int cc(int mode, int argc, char** argv) {
             }
             // initialize the header and write it
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
-            exe.dsize = (data - data_base) | 0x40000000;
+            exe.dsize = (data - data_base) | 0x80000000;
             exe.nreloc = nrelocs;
             if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
                 fs_file_close(fd);
@@ -4487,6 +4488,8 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
+        if ((exe.dsize & 0xc0000000) != 0x80000000)
+            fatal("executable compiled with earlier version not compatible, please recompile");
         // clear the code segment for good measure though not necessary
         memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
         // read in the code segment
@@ -4496,8 +4499,6 @@ int cc(int mode, int argc, char** argv) {
             fatal("error reading %s", ofn);
         }
         // read in the data segment
-        if ((exe.dsize & 0xc0000000) != 0x40000000)
-            fatal("executable compiled with earlier version not compatible, please recompile");
         int ds = exe.dsize & 0x3fffffff;
         if (ds && fs_file_read(fd, __StackLimit + TEXT_BYTES, ds) != ds) {
             fs_file_close(fd);

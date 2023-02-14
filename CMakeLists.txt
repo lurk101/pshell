@@ -18,8 +18,8 @@ project(${PSHELL} C CXX ASM)
 
 pico_sdk_init()
 
-if (PICO_SDK_VERSION_STRING VERSION_LESS "1.4.0")
-    message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.4.0 (or later) required.")
+if (PICO_SDK_VERSION_STRING VERSION_LESS "1.5.0")
+    message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.5.0 (or later) required.")
 endif()
 
 find_package(Git REQUIRED)
@@ -65,16 +65,16 @@ target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src/${FS_D
 pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/src/pshell.ld)
 
 if (USB_CONSOLE)
-  pico_enable_stdio_uart(${PSHELL} 0)
-  pico_enable_stdio_usb(${PSHELL} 1)
+    pico_enable_stdio_uart(${PSHELL} 0)
+    pico_enable_stdio_usb(${PSHELL} 1)
 else()
-  pico_enable_stdio_uart(${PSHELL} 1)
-  pico_enable_stdio_usb(${PSHELL} 0)
+    pico_enable_stdio_uart(${PSHELL} 1)
+    pico_enable_stdio_usb(${PSHELL} 0)
 endif()
 
 target_link_libraries(${PSHELL} PUBLIC
     littlefs disassembler io
-    pico_stdlib
+    pico_stdlib pico_rand
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
     hardware_spi hardware_irq hardware_dma)
