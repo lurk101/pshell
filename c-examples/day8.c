@@ -1,3 +1,5 @@
+#pragma uchar
+
 #define A 1 << 0
 #define B 1 << 1
 #define C 1 << 2
@@ -44,12 +46,11 @@ void parse() {
 int is_lit(int disp, int segment) { return disp & (1 << segment); }
 
 void solve() {
-    int r;
-    for (r = 0; r < 7; ++r)
-        result[r] = N[8];
-    int pp;
-    for (pp = 0; pp < n_patterns; pp++) {
-        int pattern = patterns[pp];
+    int n;
+    for (n = 0; n < 7; ++n)
+        result[n] = N[8];
+    for (n = 0; n < n_patterns; n++) {
+        int pattern = patterns[n];
         char wire_in;
         switch (popcount(pattern)) {
         case 2:
@@ -76,22 +77,20 @@ void solve() {
             break;
         }
     }
-    int w;
-    for (w = 0; w < 7; ++w) {
-        if (popcount(result[w]) != 1)
+    for (n = 0; n < 7; ++n) {
+        if (popcount(result[n]) != 1)
             continue;
         int wu;
         for (wu = 0; wu < 7; ++wu) {
             if (popcount(result[wu]) == 1)
                 continue;
-            result[wu] &= ~result[w];
+            result[wu] &= ~result[n];
         }
     }
 }
 
 int decode() {
-    int rslt = 0;
-    int np;
+    int np, rslt = 0;
     for (np = 0; np < n_numbers; ++np) {
         char digit = numbers[np];
         int display = 0;
@@ -107,8 +106,7 @@ int decode() {
 
 int main() {
     printf("--- Day 8: Seven Segment Search ---\n");
-    int start = time_us_32();
-    int fd;
+    int fd, start = time_us_32();
     if ((fd = open("day8.txt", O_RDONLY)) == 0) {
         printf("can't find day8.txt\n");
         exit(-1);
