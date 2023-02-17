@@ -1,3 +1,8 @@
+What's new in version 1.2.23
+
+- fix cat command crash
+- Add support for get_rand_32 SDK function
+
 What's new in version 1.2.22
 
 - Recompiled with gcc 12.2, SDK 1.5, littlefs to 2.5.1
