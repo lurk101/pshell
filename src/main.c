@@ -309,7 +309,8 @@ static void cat_cmd(void) {
             sprintf(result, "error reading file");
             break;
         }
-        fwrite(buf, l2, 1, stdout);
+        for (int i = 0; i < l2; ++i)
+            putchar(buf[i]);
         l -= l2;
     }
     fs_file_close(&file);
