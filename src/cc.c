@@ -35,6 +35,7 @@
 // disassembler, compiler, and file system functions
 #include "armdisasm.h"
 #include "cc.h"
+#include "cc_malloc.h"
 #include "io.h"
 
 // for compiler debug only,
@@ -251,7 +252,6 @@ struct define_grp {
 #include "cc_defs.h"
 
 static jmp_buf done_jmp UDATA; // fatal error jump address
-static int* malloc_list UDATA; // list of allocated memory blocks
 
 // fatal erro message and exit
 #define fatal(fmt, ...) fatal_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
@@ -278,7 +278,7 @@ static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, 
     longjmp(done_jmp, 1); // bail out
 }
 
-static __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
+__attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
     printf("\n" VT_BOLD "run time error : " VT_NORMAL);
     va_list ap;
     va_start(ap, fmt);
@@ -286,40 +286,6 @@ static __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
     va_end(ap);
     printf("\n");
     longjmp(done_jmp, 1); // bail out
-}
-
-// local memory management functions
-static void* cc_malloc(int l, int die) {
-    int* p = malloc(l + 8);
-    if (!p) {
-        if (die)
-            fatal("out of memory");
-        else
-            return 0;
-    }
-    if (die)
-        memset(p + 2, 0, l);
-    p[0] = (int)malloc_list;
-    malloc_list = p;
-    return p + 2;
-}
-
-static void cc_free(void* p) {
-    if (!p)
-        fatal("freeing a NULL pointer");
-    int* p2 = (int*)p - 2;
-    int* last = (int*)&malloc_list;
-    int* pi = (int*)(*last);
-    while (pi) {
-        if (pi == p2) {
-            last[0] = pi[0];
-            free(pi);
-            return;
-        }
-        last = pi;
-        pi = (int*)pi[0];
-    }
-    fatal("corrupted memory");
 }
 
 // user malloc shim
@@ -4530,6 +4496,7 @@ int cc(int mode, int argc, char** argv) {
         cc_free(fd);
         fd = NULL;
     }
+    cc_free_all();
 
     // launch the user code
     printf("\n");
@@ -4561,8 +4528,7 @@ done: // clean up and return
         file_list = file_list->next;
     }
     // unfreed memory
-    while (malloc_list)
-        cc_free(malloc_list + 2);
+    cc_free_all();
 
     return rslt;
 }

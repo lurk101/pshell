@@ -1,3 +1,8 @@
+What's new in version 1.2.24
+
+- optimize memory management
+- fix compiler memory leak
+
 What's new in version 1.2.23
 
 - fix cat command crash

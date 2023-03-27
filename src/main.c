@@ -644,7 +644,7 @@ static void version_cmd(void) {
            LFS_VERSION >> 16, LFS_VERSION & 0xffff, PICO_SDK_VERSION_MAJOR, PICO_SDK_VERSION_MINOR,
            PICO_SDK_VERSION_REVISION);
 #if !defined(NDEBUG)
-    printf("%s\n", __VERSION__);
+    printf("gcc %s\n", __VERSION__);
 #endif
 }
 
