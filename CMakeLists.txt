@@ -57,6 +57,7 @@ add_executable(${PSHELL}
     src/cc.c src/cc.h src/cc_extrns.h src/cc_tokns.h src/cc_ops.h src/cc_defs.h
     src/tar.c src/tar.h
     src/tests.c src/tests.h
+    src/cc_malloc.c src/cc_malloc.h
     src/cc_printf.S
 )
 
