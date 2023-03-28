@@ -137,17 +137,21 @@ static struct node* deletenode(struct node* root, void* key) {
     // balance the tree
     root->height = 1 + max(height(root->left), height(root->right));
     int balance = getBalance(root);
-    if (balance > 1 && getBalance(root->left) >= 0)
-        return rightRotate(root);
-    if (balance > 1 && getBalance(root->left) < 0) {
-        root->left = leftRotate(root->left);
-        return rightRotate(root);
+    if (balance > 1) {
+        if (getBalance(root->left) >= 0)
+            return rightRotate(root);
+        if (getBalance(root->left) < 0) {
+            root->left = leftRotate(root->left);
+            return rightRotate(root);
+        }
     }
-    if (balance < -1 && getBalance(root->right) <= 0)
-        return leftRotate(root);
-    if (balance < -1 && getBalance(root->right) > 0) {
-        root->right = rightRotate(root->right);
-        return leftRotate(root);
+    if (balance < -1) {
+        if (getBalance(root->right) <= 0)
+            return leftRotate(root);
+        if (getBalance(root->right) > 0) {
+            root->right = rightRotate(root->right);
+            return leftRotate(root);
+        }
     }
     return root;
 }
