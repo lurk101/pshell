@@ -85,17 +85,21 @@ static struct node* insertnode(struct node* node, void* key) {
     // Balance the tree
     node->height = 1 + max(height(node->left), height(node->right));
     int balance = getBalance(node);
-    if (balance > 1 && key < node->left->key)
-        return rightRotate(node);
-    if (balance < -1 && key > node->right->key)
-        return leftRotate(node);
-    if (balance > 1 && key > node->left->key) {
-        node->left = leftRotate(node->left);
-        return rightRotate(node);
+    if (balance > 1) {
+        if (key < node->left->key)
+            return rightRotate(node);
+        if (key > node->left->key) {
+            node->left = leftRotate(node->left);
+            return rightRotate(node);
+        }
     }
-    if (balance < -1 && key < node->right->key) {
-        node->right = rightRotate(node->right);
-        return leftRotate(node);
+    if (balance < -1) {
+        if (key > node->right->key)
+            return leftRotate(node);
+        if (key < node->right->key) {
+            node->right = rightRotate(node->right);
+            return leftRotate(node);
+        }
     }
     return node;
 }
@@ -133,8 +137,6 @@ static struct node* deletenode(struct node* root, void* key) {
     }
     if (root == NULL)
         return root;
-    // Update the balance factor of each node and
-    // balance the tree
     root->height = 1 + max(height(root->left), height(root->right));
     int balance = getBalance(root);
     if (balance > 1) {
@@ -157,14 +159,15 @@ static struct node* deletenode(struct node* root, void* key) {
 }
 
 static struct node* searchnode(struct node* node, void* key) {
-    if (node == 0)
-        return 0;
-    if (key == node->key)
-        return node;
-    if (key < node->key)
-        return searchnode(node->left, key);
-    if (key > node->key)
-        return searchnode(node->right, key);
+    struct node* n = node;
+    while (n) {
+        if (key == n->key)
+            return n;
+        if (key < n->key)
+            n = n->left;
+        else
+            n = n->right;
+    }
     return 0;
 }
 
