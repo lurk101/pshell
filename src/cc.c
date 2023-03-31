@@ -4375,6 +4375,9 @@ int cc(int mode, int argc, char** argv) {
         cc_free(tsize);
         tsize = NULL;
 
+        if (src_opt)
+            disasm_cleanup(&state);
+
         // entry point main must be declared
         if (!idmain->val)
             fatal("main() not defined\n");
@@ -4515,8 +4518,6 @@ int cc(int mode, int argc, char** argv) {
     printf("\nCC = %d\n", rslt);
 
 done: // clean up and return
-    if (src_opt)
-        disasm_cleanup(&state);
     if (fd)
         fs_file_close(fd);
     // unclosed files
