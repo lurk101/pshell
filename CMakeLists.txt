@@ -30,15 +30,6 @@ execute_process(
   OUTPUT_VARIABLE PSHELL_GIT_TAG
 )
 
-add_compile_options("-DPICO_MALLOC_PANIC=0")
-add_compile_options("-DLFS_NO_ERROR")
-add_compile_options("-DLFS_NO_DEBUG")
-add_compile_options("-DLFS_NO_WARN")
-add_compile_options("-DPSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"")
-if (FORCE_TESTS)
-add_compile_options("-DPSHELL_TESTS")
-endif()
-
 add_subdirectory(littlefs)
 add_subdirectory(disassembler)
 if ("${PICO_BOARD}" STREQUAL "vgaboard")
@@ -60,6 +51,15 @@ add_executable(${PSHELL}
     src/cc_malloc.c src/cc_malloc.h
     src/cc_printf.S
 )
+
+target_compile_definitions(${PSHELL} PUBLIC
+  PICO_MALLOC_PANIC=0
+  PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
+)
+
+if (FORCE_TESTS)
+target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
+endif()
 
 target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src/${FS_DIR})
 
