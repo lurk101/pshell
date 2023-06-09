@@ -29,7 +29,7 @@ About the compiler, briefly:
 - Data types: integer, float, char and pointer.
 - Aggregate types: array (up to 3 dimensions), struct and union.
 - Flow control: for, while, if then else, break, continue and goto.
-- Memory, mathi, newlib and SDK functions. ([list of implemented functions])
+- Memory, math, newlib and SDK functions. ([list of implemented functions])
 - Native code generation for the Pico's cm0+ core
 
 Raspberry Pi Forums [thread].
