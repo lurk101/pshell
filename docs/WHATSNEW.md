@@ -1,6 +1,6 @@
 What's new in version 1.2.25
 
-- rebuilt with SDH 1.5.1
+- rebuilt with SDK 1.5.1
 
 What's new in version 1.2.24
 
