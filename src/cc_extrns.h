@@ -39,7 +39,7 @@
     {"free", 1, stdlib_defines, cc_free, 0, 0, 0},
     {"frequency_count_khz", 1, clk_defines, frequency_count_khz, 0, 0, 0},
     {"frequency_count_mhz", 1, clk_defines, frequency_count_mhz, 0, 0, 0},
-	{"get_rand_32", 0, stdio_defines, get_rand_32, 0, 0, 0},
+    {"get_rand_32", 0, stdio_defines, get_rand_32, 0, 0, 0},
     {"getchar", 0, stdio_defines, getchar, 0, 0, 0},
     {"getchar_timeout_us", 1, stdio_defines, getchar_timeout_us, 0, 0, 0},
     {"gpio_acknowledge_irq", 2, gpio_defines, gpio_acknowledge_irq, 0, 0, 0},
