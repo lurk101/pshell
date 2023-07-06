@@ -22,6 +22,7 @@
     {"atanf", 1 | (1 << 5) | (1 << 10), math_defines, __wrap_atanf, 1, 0, 0},
     {"atanhf", 1 | (1 << 5) | (1 << 10), math_defines, __wrap_atanhf, 1, 0, 0},
     {"atoi", 1, stdlib_defines, atoi, 0, 0, 0},
+    {"calloc", 2, stdlib_defines, wrap_calloc, 0, 0, 0},
     {"clock_configure", 5, clk_defines, clock_configure, 0, 0, 0},
     {"clock_configure_gpin", 4, clk_defines, clock_configure_gpin, 0, 0, 0},
     {"clock_get_hz", 1, clk_defines, clock_get_hz, 0, 0, 0},

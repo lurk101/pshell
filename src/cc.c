@@ -290,6 +290,7 @@ __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
 
 // user malloc shim
 static void* wrap_malloc(int len) { return cc_malloc(len, 0); };
+static void* wrap_calloc(int nmemb, int siz) { return cc_malloc(nmemb * siz, 1); };
 
 // file control block
 static struct file_handle {
@@ -4397,7 +4398,7 @@ int cc(int mode, int argc, char** argv) {
             }
             // initialize the header and write it
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
-            exe.dsize = (data - data_base) | 0x80000000;
+            exe.dsize = (data - data_base) | 0xc0000000;
             exe.nreloc = nrelocs;
             if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
                 fs_file_close(fd);
@@ -4457,7 +4458,7 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
-        if ((exe.dsize & 0xc0000000) != 0x80000000)
+        if ((exe.dsize & 0xc0000000) != 0xc0000000)
             fatal("executable compiled with earlier version not compatible, please recompile");
         // clear the code segment for good measure though not necessary
         memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
