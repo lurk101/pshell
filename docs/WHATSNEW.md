@@ -1,3 +1,9 @@
+What's new in version 1.2.26
+
+- Update disassembler module
+- Update littlefs to version 2.7
+- Implement standard calloc function
+
 What's new in version 1.2.25
 
 - rebuilt with SDK 1.5.1
