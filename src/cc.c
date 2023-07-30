@@ -49,7 +49,6 @@
 
 #define DATA_BYTES (16 * K)       // data segment size
 #define TEXT_BYTES (16 * K)       // code segment size
-#define SYM_TBL_BYTES (16 * K)    // symbol table size (released at run time)
 #define TS_TBL_BYTES (2 * K)      // type size table size (released at run time)
 #define AST_TBL_BYTES (32 * K)    // abstract syntax table size (released at run time)
 #define MEMBER_DICT_BYTES (4 * K) // struct member table size (released at run time)
@@ -4364,16 +4363,10 @@ int cc(int mode, int argc, char** argv) {
                 fatal("undeclared forward function %.*s", id->hash & 0x3f, id->name);
 
         // free all the compiler buffers
-        cc_free(src_base);
+        cc_free_all();
         src_base = NULL;
-        cc_free(ast);
         ast = NULL;
-        while (sym_base) {
-            id = sym_base->next;
-            cc_free(sym_base);
-            sym_base = id;
-        }
-        cc_free(tsize);
+        sym_base = NULL;
         tsize = NULL;
 
         if (src_opt)
@@ -4497,7 +4490,6 @@ int cc(int mode, int argc, char** argv) {
         }
         // close the file and free its descriptor
         fs_file_close(fd);
-        cc_free(fd);
         fd = NULL;
     }
     cc_free_all();
