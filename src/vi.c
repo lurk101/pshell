@@ -302,7 +302,7 @@ static struct undo_object {
 #define UNDO_USE_SPOS 32
 #define UNDO_EMPTY 64
 static char* undo_queue_spos UDATA; // Start position of queued operation
-static int undo_q;
+static int undo_q UDATA;
 static char undo_queue[VI_UNDO_QUEUE_MAX] UDATA;
 
 static int argc UDATA, optind UDATA;
