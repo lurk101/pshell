@@ -170,9 +170,9 @@ static int ty UDATA;                                   // current expression typ
                                                        // 0=scalar, 1=1d, 2=2d, 3=3d
                                                        //   1d etype -- bit 0:30)
                                                        //   2d etype -- bit 0:15,16:30 [32768,65536]
-                     //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
-                     // bit 2:9 - type
-                     // bit 10:11 - ptr level
+//   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
+// bit 2:9 - type
+// bit 10:11 - ptr level
 static int compound UDATA;            // manage precedence of compound assign expressions
 static int rtf UDATA, rtt UDATA;      // return flag and return type for current function
 static int loc UDATA;                 // local variable offset
@@ -763,7 +763,7 @@ static void next() {
             // we have to validate the memory content as well.
             id = sym_base;
             for (id = sym_base; id; id = id->next) { // find one free slot in table
-                if (tk == id->hash &&           // if token is found (hash match), overwrite
+                if (tk == id->hash &&                // if token is found (hash match), overwrite
                     !memcmp(id->name, pp, p - pp)) {
                     tk = id->tk;
                     return;

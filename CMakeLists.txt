@@ -32,6 +32,8 @@ execute_process(
 
 add_subdirectory(littlefs)
 add_subdirectory(disassembler)
+add_subdirectory(vi)
+add_subdirectory(cc)
 if ("${PICO_BOARD}" STREQUAL "vgaboard")
   add_subdirectory(sdio)
 else()
@@ -44,12 +46,8 @@ add_executable(${PSHELL}
     src/xmodem.c src/xmodem.h
     src/crc16.c src/crc16.h
     src/readln.c src/readln.h
-    src/vi.c src/vi.h
-    src/cc.c src/cc.h src/cc_extrns.h src/cc_tokns.h src/cc_ops.h src/cc_defs.h
     src/tar.c src/tar.h
     src/tests.c src/tests.h
-    src/cc_malloc.c src/cc_malloc.h
-    src/cc_printf.S
 )
 
 target_compile_definitions(${PSHELL} PUBLIC
@@ -74,7 +72,7 @@ else()
 endif()
 
 target_link_libraries(${PSHELL} PUBLIC
-    littlefs disassembler io
+    littlefs disassembler io vi cc
     pico_stdlib pico_rand
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
