@@ -34,6 +34,7 @@ add_subdirectory(littlefs)
 add_subdirectory(disassembler)
 add_subdirectory(vi)
 add_subdirectory(cc)
+add_subdirectory(misc)
 if ("${PICO_BOARD}" STREQUAL "vgaboard")
   add_subdirectory(sdio)
 else()
@@ -42,12 +43,7 @@ endif()
 
 
 add_executable(${PSHELL}
-    main/main.c
-    main/xmodem.c main/xmodem.h
-    main/crc16.c main/crc16.h
-    main/readln.c main/readln.h
-    main/tar.c main/tar.h
-    main/tests.c main/tests.h
+    main.c
 )
 
 target_compile_definitions(${PSHELL} PUBLIC
@@ -59,9 +55,9 @@ if (FORCE_TESTS)
 target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
 endif()
 
-target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/main/${FS_DIR})
+target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/misc/${FS_DIR})
 
-pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/main/pshell.ld)
+pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell.ld)
 
 if (USB_CONSOLE)
     pico_enable_stdio_uart(${PSHELL} 0)
@@ -72,7 +68,7 @@ else()
 endif()
 
 target_link_libraries(${PSHELL} PUBLIC
-    littlefs disassembler io vi cc
+    littlefs disassembler io vi cc misc
     pico_stdlib pico_rand
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
