@@ -42,12 +42,12 @@ endif()
 
 
 add_executable(${PSHELL}
-    src/main.c
-    src/xmodem.c src/xmodem.h
-    src/crc16.c src/crc16.h
-    src/readln.c src/readln.h
-    src/tar.c src/tar.h
-    src/tests.c src/tests.h
+    main/main.c
+    main/xmodem.c main/xmodem.h
+    main/crc16.c main/crc16.h
+    main/readln.c main/readln.h
+    main/tar.c main/tar.h
+    main/tests.c main/tests.h
 )
 
 target_compile_definitions(${PSHELL} PUBLIC
@@ -59,9 +59,9 @@ if (FORCE_TESTS)
 target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
 endif()
 
-target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src/${FS_DIR})
+target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/main/${FS_DIR})
 
-pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/src/pshell.ld)
+pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/main/pshell.ld)
 
 if (USB_CONSOLE)
     pico_enable_stdio_uart(${PSHELL} 0)
