@@ -35,6 +35,7 @@ add_subdirectory(disassembler)
 add_subdirectory(vi)
 add_subdirectory(cc)
 add_subdirectory(misc)
+add_subdirectory(xymodem)
 if ("${PICO_BOARD}" STREQUAL "vgaboard")
   add_subdirectory(sdio)
 else()
@@ -68,7 +69,7 @@ else()
 endif()
 
 target_link_libraries(${PSHELL} PUBLIC
-    littlefs disassembler io vi cc misc
+    littlefs disassembler io vi cc misc xymodem
     pico_stdlib pico_rand
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c

@@ -25,6 +25,7 @@
 #include "tar.h"
 #include "vi.h"
 #include "xmodem.h"
+#include "ymodem.h"
 #if !defined(NDEBUG) || defined(PSHELL_TESTS)
 #include "tests.h"
 #endif
@@ -159,6 +160,34 @@ static void xput_cmd(void) {
     busy_wait_ms(3000);
     sprintf(result, "\nfile transfered, size: %d", fs_file_seek(&file, 0, LFS_SEEK_END));
     fs_file_close(&file);
+}
+
+static void yput_cmd(void) {
+    if (check_mount(true))
+        return;
+    if (argc > 1) {
+        strcpy(result, "yput doesn't take a parameter");
+        return;
+    }
+    char* tmpname = strdup(full_path("ymodem.tmp"));
+    if (fs_file_open(&file, tmpname, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) <
+        LFS_ERR_OK) {
+        strcpy(result, "Can't create file");
+        return;
+    }
+    set_translate_crlf(false);
+    char name[256];
+    int res = Ymodem_Receive(&file, 0x7fffffff, name);
+    set_translate_crlf(true);
+    fs_file_close(&file);
+    if (res >= 0) {
+        sprintf(result, "\nfile transfered, size: %d", fs_file_seek(&file, 0, LFS_SEEK_END));
+        fs_rename(tmpname, full_path(name));
+    } else {
+        strcpy(result, "File transfer failed");
+        fs_remove(tmpname);
+    }
+    free(tmpname);
 }
 
 int check_from_to_parms(char** from, char** to, int copy) {
@@ -329,6 +358,27 @@ static void xget_cmd(void) {
     xmodemTransmit(xmodem_tx_cb);
     set_translate_crlf(true);
     fs_file_close(&file);
+}
+
+static void yget_cmd(void) {
+    if (check_mount(true))
+        return;
+    if (check_name())
+        return;
+    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < LFS_ERR_OK) {
+        strcpy(result, "Can't open file");
+        return;
+    }
+    int siz = fs_file_seek(&file, 0, LFS_SEEK_END);
+    fs_file_seek(&file, 0, LFS_SEEK_SET);
+    set_translate_crlf(false);
+    int res = Ymodem_Transmit(full_path(argv[1]), siz, &file);
+    set_translate_crlf(true);
+    fs_file_close(&file);
+    if (res)
+        strcpy(result, "File transfer filed");
+    else
+        sprintf(result, "%d bytes sent", siz);
 }
 
 static void mkdir_cmd(void) {
@@ -748,6 +798,8 @@ cmd_t cmd_table[] = {
     {"vi",      vi_cmd,         "edit file(s) with vi"},
     {"xget",    xget_cmd,       "get a file (xmodem)"},
     {"xput",    xput_cmd,       "put a file (xmodem)"},
+    {"yget",    yget_cmd,       "get a file (ymodem)"},
+    {"yput",    yput_cmd,       "put a file (ymodem)"},
 	{0}
 };
 // clang-format on
