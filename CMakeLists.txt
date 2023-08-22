@@ -18,8 +18,8 @@ project(${PSHELL} C CXX ASM)
 
 pico_sdk_init()
 
-if (PICO_SDK_VERSION_STRING VERSION_LESS "1.5.0")
-    message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.5.0 (or later) required.")
+if (PICO_SDK_VERSION_STRING VERSION_LESS "1.5.1")
+    message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.5.1 (or later) required.")
 endif()
 
 find_package(Git REQUIRED)
@@ -67,6 +67,9 @@ else()
     pico_enable_stdio_uart(${PSHELL} 1)
     pico_enable_stdio_usb(${PSHELL} 0)
 endif()
+
+pico_set_program_name(${PSHELL} "pshell")
+pico_set_program_version(${PSHELL} "${PSHELL_GIT_TAG}")
 
 target_link_libraries(${PSHELL} PUBLIC
     littlefs disassembler io vi cc misc xymodem
