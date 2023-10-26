@@ -34,15 +34,6 @@ static int32_t Receive_Byte(unsigned char* c, uint32_t timeout) {
 }
 
 //------------------------
-static void uart_consume() {
-    for (int i = 0; i < 64; i++) {
-        int ch = getchar_timeout_us(100 * 1000);
-        if (ch == PICO_ERROR_TIMEOUT)
-            break;
-    }
-}
-
-//--------------------------------
 static uint32_t Send_Byte(char c) {
     putchar(c);
     return 0;
@@ -117,7 +108,6 @@ static int32_t Receive_Packet(uint8_t* data, int* length, uint32_t timeout) {
         return -2;
     default:
         sleep_ms(100);
-        uart_consume();
         return -1;
     }
 

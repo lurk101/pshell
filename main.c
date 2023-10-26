@@ -376,7 +376,7 @@ static void yget_cmd(void) {
     set_translate_crlf(true);
     fs_file_close(&file);
     if (res)
-        strcpy(result, "File transfer filed");
+        strcpy(result, "File transfer failed");
     else
         sprintf(result, "%d bytes sent", siz);
 }
