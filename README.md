@@ -21,6 +21,7 @@ Credit where credit is due...
 and the [c4 virtual machine]. Many important amacc enhancements such as
 floating point, array, struct and type checking support were taken fom
 the [Squint] project. Native code generation by yours truly.
+- Console command recall and auto completion by Eric Olson.
 
 [What's new] in pshell
 
