@@ -40,20 +40,18 @@ static inline void dq_rem(dq_entry_t* node, dq_entry_t* queue) {
         queue->prev = prev;
     else
         next->prev = prev;
-    node->next = NULL;
-    node->prev = NULL;
 }
 
 // local memory management functions
-void* cc_malloc(int l, int die) {
+void* cc_malloc(int l, int cc, int zero) {
     dq_entry_t* p = malloc(l + sizeof(dq_entry_t));
     if (!p) {
-        if (die)
+        if (cc)
             run_fatal("out of memory");
         else
             return 0;
     }
-    if (die)
+    if (zero)
         memset(p->data, 0, l);
     dq_addfirst(p, &malloc_list);
     return p->data;

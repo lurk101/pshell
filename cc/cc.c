@@ -288,8 +288,8 @@ __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
 }
 
 // user malloc shim
-static void* wrap_malloc(int len) { return cc_malloc(len, 0); };
-static void* wrap_calloc(int nmemb, int siz) { return cc_malloc(nmemb * siz, 1); };
+static void* wrap_malloc(int len) { return cc_malloc(len, 0, 0); };
+static void* wrap_calloc(int nmemb, int siz) { return cc_malloc(nmemb * siz, 0, 1); };
 
 // file control block
 static struct file_handle {
@@ -303,7 +303,7 @@ static struct file_handle {
 
 // user function shims
 static int wrap_open(char* name, int mode) {
-    struct file_handle* h = cc_malloc(sizeof(struct file_handle), 1);
+    struct file_handle* h = cc_malloc(sizeof(struct file_handle), 1, 1);
     h->is_dir = false;
     int lfs_mode = (mode & 0xf) + 1;
     if (mode & O_CREAT)
@@ -324,7 +324,7 @@ static int wrap_open(char* name, int mode) {
 }
 
 static int wrap_opendir(char* name) {
-    struct file_handle* h = cc_malloc(sizeof(struct file_handle), 1);
+    struct file_handle* h = cc_malloc(sizeof(struct file_handle), 1, 1);
     h->is_dir = true;
     if (fs_dir_open(&h->u.dir, full_path(name)) < LFS_ERR_OK) {
         cc_free(h);
@@ -387,7 +387,7 @@ static int wrap_remove(char* name) { return fs_remove(full_path(name)); };
 
 static int wrap_rename(char* old, char* new) {
     char* fp = full_path(old);
-    char* fpa = cc_malloc(strlen(fp) + 1, 1);
+    char* fpa = cc_malloc(strlen(fp) + 1, 1, 1);
     strcpy(fpa, fp);
     char* fpb = full_path(new);
     int r = fs_rename(fpa, fpb);
@@ -772,7 +772,7 @@ static void next() {
             /* At this point, existing symbol name is not found.
              * "id" points to the first unused symbol table entry.
              */
-            id = cc_malloc(sizeof(struct ident_s), 1);
+            id = cc_malloc(sizeof(struct ident_s), 1, 1);
             id->name = pp;
             id->hash = tk;
             id->forward = 0;
@@ -1203,7 +1203,7 @@ static void expr(int lev) {
                 int ix = extern_search(d->name);
                 d->name[namelen] = ch;
                 if (ix < 0) {
-                    char* cp = cc_malloc(namelen + 1, 1);
+                    char* cp = cc_malloc(namelen + 1, 1, 1);
                     memcpy(cp, d->name, namelen);
                     cp[namelen] = 0;
                     fatal("Unknown external function %s", cp);
@@ -2438,7 +2438,7 @@ static void emit_load_long_imm(int r, int val, int ext) {
         ++pcrel_count;
         if (pcrel_1st == 0)
             pcrel_1st = e;
-        p = cc_malloc(sizeof(struct patch_s), 1);
+        p = cc_malloc(sizeof(struct patch_s), 1, 1);
         p->val = val;
         p->ext = ext;
         if (pcrel == 0)
@@ -2450,7 +2450,7 @@ static void emit_load_long_imm(int r, int val, int ext) {
             p2->next = p;
         }
     }
-    struct patch_s* pl = cc_malloc(sizeof(struct patch_s), 1);
+    struct patch_s* pl = cc_malloc(sizeof(struct patch_s), 1, 1);
     pl->addr = e;
     pl->next = p->locs;
     p->locs = pl;
@@ -2499,7 +2499,7 @@ static void patch_pc_relative(int brnch) {
         }
         emit_word(p->val);
         if (ofn && p->ext) {
-            struct reloc_s* r = cc_malloc(sizeof(struct reloc_s), 1);
+            struct reloc_s* r = cc_malloc(sizeof(struct reloc_s), 1, 1);
             r->addr = (int)(e - 1);
             r->next = relocs;
             relocs = r;
@@ -3149,7 +3149,7 @@ static void gen(int* n) {
         if (k) {
             l = Func_entry(n).parm_types >> 10;
             int* t;
-            t = cc_malloc(sizeof(int) * (k + 1), 1);
+            t = cc_malloc(sizeof(int) * (k + 1), 1, 1);
             j = 0;
             while (ast_Tk(b)) {
                 t[j++] = (int)b;
@@ -3273,13 +3273,13 @@ static void gen(int* n) {
             ecas = a;
         break;
     case Break:
-        patch = cc_malloc(sizeof(struct patch_s), 1);
+        patch = cc_malloc(sizeof(struct patch_s), 1, 1);
         patch->addr = emit_call(0);
         patch->next = brks;
         brks = patch;
         break;
     case Continue:
-        patch = cc_malloc(sizeof(struct patch_s), 1);
+        patch = cc_malloc(sizeof(struct patch_s), 1, 1);
         patch->next = cnts;
         patch->addr = emit_call(0);
         cnts = patch;
@@ -3287,7 +3287,7 @@ static void gen(int* n) {
     case Goto:
         label = (struct ident_s*)Num_entry(n).val;
         if (label->class == 0) {
-            struct patch_s* l = cc_malloc(sizeof(struct patch_s), 1);
+            struct patch_s* l = cc_malloc(sizeof(struct patch_s), 1, 1);
             l->addr = emit_call(0);
             l->next = (struct patch_s*)label->forward;
             label->forward = (uint16_t*)l;
@@ -3500,7 +3500,7 @@ static void stmt(int ctx) {
                         if (tk != Id)
                             fatal("bad struct member definition");
                         sz = (ty >= PTR) ? sizeof(int) : tsize[ty >> 2];
-                        struct member_s* m = cc_malloc(sizeof(struct member_s), 1);
+                        struct member_s* m = cc_malloc(sizeof(struct member_s), 1, 1);
                         m->id = id;
                         m->etype = 0;
                         next();
@@ -4046,8 +4046,9 @@ static int common_vfunc(int etype, int prntf, int* sp) {
 // More shims
 static char* x_strdup(char* s) {
     int l = strlen(s);
-    char* c = cc_malloc(l + 1, 0);
-    strcpy(c, s);
+    char* c = cc_malloc(l + 1, 0, 0);
+    if (c)
+        strcpy(c, s);
     return c;
 }
 
@@ -4222,8 +4223,8 @@ int cc(int mode, int argc, char** argv) {
         data_base = data = __StackLimit + TEXT_BYTES;
         memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
         // allocate the type size and abstract syntax tree
-        tsize = cc_malloc(TS_TBL_BYTES, 1);
-        ast = cc_malloc(AST_TBL_BYTES, 1);
+        tsize = cc_malloc(TS_TBL_BYTES, 1, 1);
+        ast = cc_malloc(AST_TBL_BYTES, 1, 1);
         n = ast + (AST_TBL_BYTES / 4) - 1;
 
         // add primitive type sizes
@@ -4311,12 +4312,12 @@ int cc(int mode, int argc, char** argv) {
         add_defines(irq_defines);
 
         // make a copy of the full path and append .c if necessary
-        char* fn = cc_malloc(strlen(full_path(*argv)) + 3, 1);
+        char* fn = cc_malloc(strlen(full_path(*argv)) + 3, 1, 1);
         strcpy(fn, full_path(*argv));
         if (strrchr(fn, '.') == NULL)
             strcat(fn, ".c");
         // allocate a file descriptor and open the input file
-        fd = cc_malloc(sizeof(lfs_file_t), 1);
+        fd = cc_malloc(sizeof(lfs_file_t), 1, 1);
         if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
             cc_free(fd);
             fd = NULL;
@@ -4328,7 +4329,7 @@ int cc(int mode, int argc, char** argv) {
         int fl = fs_file_seek(fd, 0, SEEK_END);
         fs_file_seek(fd, 0, SEEK_SET);
         // allocate the source buffer, terminate it, then close the file
-        src_base = p = lp = cc_malloc(fl + 1, 1);
+        src_base = p = lp = cc_malloc(fl + 1, 1, 1);
         // move the file contents to the source buffer
         if (fs_file_read(fd, src_base, fl) != fl)
             fatal("error reading source");
@@ -4347,7 +4348,7 @@ int cc(int mode, int argc, char** argv) {
         e = text_base - 1;
 
         // allocate the structure member table
-        members = cc_malloc(MEMBER_DICT_BYTES, 1);
+        members = cc_malloc(MEMBER_DICT_BYTES, 1, 1);
 
         // compile the program
         lineno = 1;
@@ -4365,6 +4366,9 @@ int cc(int mode, int argc, char** argv) {
         // free all the compiler buffers
         cc_free(src_base);
         src_base = NULL;
+        cc_free(ast);
+        ast = NULL;
+        cc_free(tsize);
         tsize = NULL;
 
         if (src_opt)
@@ -4380,7 +4384,7 @@ int cc(int mode, int argc, char** argv) {
         // optionally create executable output file
         if (ofn) {
             // allocate output file descriptor and create the file
-            fd = cc_malloc(sizeof(lfs_file_t), 1);
+            fd = cc_malloc(sizeof(lfs_file_t), 1, 1);
             char* cp = full_path(ofn);
             if (fs_file_open(fd, cp, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
                 cc_free(fd);
@@ -4441,7 +4445,7 @@ int cc(int mode, int argc, char** argv) {
         if (memcmp(buf, "exe", 4))
             fatal("file %s not found or not executable", ofn);
         // allocate file descriptor and open binary executable file
-        fd = cc_malloc(sizeof(lfs_file_t), 1);
+        fd = cc_malloc(sizeof(lfs_file_t), 1, 1);
         if (fs_file_open(fd, ofn, LFS_O_RDONLY) < LFS_ERR_OK)
             fatal("can't open file %s", ofn);
         // read the exe header
