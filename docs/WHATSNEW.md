@@ -1,3 +1,7 @@
+What's new in version 1.2.27
+
+- fix crash comppiling to executable
+
 What's new in version 1.2.26
 
 - Update disassembler module

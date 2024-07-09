@@ -4363,10 +4363,8 @@ int cc(int mode, int argc, char** argv) {
                 fatal("undeclared forward function %.*s", id->hash & 0x3f, id->name);
 
         // free all the compiler buffers
-        cc_free_all();
+        cc_free(src_base);
         src_base = NULL;
-        ast = NULL;
-        sym_base = NULL;
         tsize = NULL;
 
         if (src_opt)

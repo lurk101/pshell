@@ -6,15 +6,47 @@
 
 #include "cc_malloc.h"
 
+typedef struct dq_entry_s {
+    struct dq_entry_s* next;
+    struct dq_entry_s* prev;
+    char data[0];
+} dq_entry_t;
+
 #define UDATA __attribute__((section(".ccudata")))
 
 __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...);
 
-static int* malloc_list UDATA; // list of allocated memory blocks
+static dq_entry_t malloc_list UDATA; // list of allocated memory blocks
+
+static inline void dq_addfirst(dq_entry_t* node, dq_entry_t* queue) {
+    node->prev = NULL;
+    node->next = queue->next;
+
+    if (!queue->next)
+        queue->prev = node;
+    else
+        queue->next->prev = node;
+    queue->next = node;
+}
+
+static inline void dq_rem(dq_entry_t* node, dq_entry_t* queue) {
+    dq_entry_t* prev = node->prev;
+    dq_entry_t* next = node->next;
+    if (!prev)
+        queue->next = next;
+    else
+        prev->next = next;
+    if (!next)
+        queue->prev = prev;
+    else
+        next->prev = prev;
+    node->next = NULL;
+    node->prev = NULL;
+}
 
 // local memory management functions
 void* cc_malloc(int l, int die) {
-    int* p = malloc(l + 4);
+    dq_entry_t* p = malloc(l + sizeof(dq_entry_t));
     if (!p) {
         if (die)
             run_fatal("out of memory");
@@ -22,31 +54,28 @@ void* cc_malloc(int l, int die) {
             return 0;
     }
     if (die)
-        memset(p + 1, 0, l);
-    p[0] = (int)malloc_list;
-    malloc_list = p;
-    return p + 1;
+        memset(p->data, 0, l);
+    dq_addfirst(p, &malloc_list);
+    return p->data;
 }
 
 void cc_free(void* p) {
     if (!p)
         run_fatal("freeing a NULL pointer");
-    int* p2 = (int*)p - 1;
-    int* last = (int*)&malloc_list;
-    int* pi = (int*)(*last);
+    dq_entry_t* p2 = (dq_entry_t*)p - 1;
+    dq_entry_t* pi = malloc_list.next;
     while (pi) {
         if (pi == p2) {
-            last[0] = pi[0];
+            dq_rem(p2, &malloc_list);
             free(pi);
             return;
         }
-        last = pi;
-        pi = (int*)pi[0];
+        pi = pi->next;
     }
     run_fatal("corrupted memory");
 }
 
 void cc_free_all(void) {
-    while (malloc_list)
-        cc_free(malloc_list + 1);
+    while (!malloc_list.next)
+        dq_rem(malloc_list.next, &malloc_list);
 }
