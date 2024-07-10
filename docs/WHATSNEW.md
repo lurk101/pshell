@@ -1,3 +1,11 @@
+What's new in version 1.2.28
+
+- further optimization of C compile memory management
+- Vi recognizes and understands the EOF (0x1a) character.
+  This eliminatest the need do delete CTL-Z cahrs at the
+  end of files tranfered by zmodem which transfer files
+  in 256 byte chunks regarless of actual file size.
+
 What's new in version 1.2.27
 
 - fix crash comppiling to executable
