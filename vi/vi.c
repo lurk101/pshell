@@ -32,6 +32,8 @@ extern char* full_path(const char* name);
 
 static jmp_buf die_jmp UDATA;
 
+static const char EOFCHR = 0x1A;
+
 static inline void puts_no_eol(const char* s) {
     while (*s)
         putchar(*s++);
@@ -1710,16 +1712,13 @@ static int file_insert(const char* fn, char* p, int initial) {
         status_line_bold_errno(fn);
         p = text_hole_delete(p, p + size - 1, NO_UNDO); // un-do buffer insert
     } else {
-        for (int cnt2 = 0; cnt2 < cnt; cnt2++)
-            if (p[cnt2] == 0x1A) { // check for EOF
-                cnt = cnt2;
-                break;
-            }
-        if (cnt < size) {
+        char* t = memchr(p, EOFCHR, cnt);
+        if (t)
+            cnt = t - p - 1;
+        if (cnt < size)
             // There was a partial read, shrink unused space
             p = text_hole_delete(p + cnt, p + size - 1, NO_UNDO);
-            // status_line_bold("can't read '%s'", fn);
-        } else
+        else
             undo_push_insert(p, size, ALLOW_UNDO);
     }
 fi:
