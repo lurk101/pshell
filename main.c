@@ -338,8 +338,11 @@ static void cat_cmd(void) {
             sprintf(result, "error reading file");
             break;
         }
-        for (int i = 0; i < l2; ++i)
+        for (int i = 0; i < l2; ++i) {
+            if (buf[i] == 0x1A)
+                break;
             putchar(buf[i]);
+        }
         l -= l2;
     }
     fs_file_close(&file);
