@@ -320,58 +320,89 @@ static void cp_cmd(void) {
 static void cat_cmd(void) {
     if (check_mount(true))
         return;
-    if (check_name())
-        return;
-    lfs_file_t file;
-    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < LFS_ERR_OK) {
-        strcpy(result, "error opening file");
+    bool paginate = false;
+    char* path = NULL;
+    for (int arg = 1; arg < argc; arg++)
+        if (strcmp(argv[arg], "-p") == 0)
+            paginate = true;
+        else
+            path = argv[arg];
+    if (path == NULL) {
+        strcpy(result, "file name argument is required");
         return;
     }
-    int l = fs_file_seek(&file, 0, LFS_SEEK_END);
-    fs_file_seek(&file, 0, LFS_SEEK_SET);
-    char buf[256];
-    while (l) {
-        int l2 = l;
-        if (l2 > sizeof(buf))
-            l2 = sizeof(buf);
-        if (fs_file_read(&file, buf, l2) != l2) {
-            sprintf(result, "error reading file");
-            break;
-        }
-        for (int i = 0; i < l2; ++i) {
-            if (buf[i] == 0x1A)
-                break;
-            putchar(buf[i]);
-        }
-        l -= l2;
-    }
-    fs_file_close(&file);
-}
-
-static void hex_cmd(void) {
-    if (check_mount(true))
-        return;
-    if (check_name())
-        return;
     lfs_file_t file;
-    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < LFS_ERR_OK) {
-        strcpy(result, "error opening file");
+    char* fpath = full_path(path);
+    if (fs_file_open(&file, fpath, LFS_O_RDONLY) < LFS_ERR_OK) {
+        sprintf(result, "error opening file %s", fpath);
         return;
     }
     int l = fs_file_seek(&file, 0, LFS_SEEK_END);
     fs_file_seek(&file, 0, LFS_SEEK_SET);
     char* buf = malloc(l);
     if (!buf) {
-        sprintf(result, "insufficient memory");
+        strcpy(result, "insufficient memory");
+        return;
+    }
+    int line = 0;
+    int last = 0;
+    if (fs_file_read(&file, buf, l) != l) {
+        sprintf(result, "error reading file %s", fpath);
+        goto done;
+    }
+    char* cp_end = buf + l;
+    for (char* cp = buf; cp < cp_end; cp++) {
+        if (*cp == 0x1A)
+            break;
+        putchar(*cp);
+        if (paginate && line && (last != line) && (line % (screen_y - 1) == 0)) {
+            char cc = getchar();
+            if (cc == 0x03)
+                break;
+        }
+        last = line;
+        if (*cp == 0x0A)
+            line++;
+    }
+done:
+    free(buf);
+    fs_file_close(&file);
+}
+
+static void hex_cmd(void) {
+    if (check_mount(true))
+        return;
+    bool paginate = false;
+    char* path = NULL;
+    for (int arg = 1; arg < argc; arg++)
+        if (strcmp(argv[arg], "-p") == 0)
+            paginate = true;
+        else
+            path = argv[arg];
+    if (path == NULL) {
+        strcpy(result, "file name argument is required");
+        return;
+    }
+    lfs_file_t file;
+    char* fpath = full_path(path);
+    if (fs_file_open(&file, fpath, LFS_O_RDONLY) < LFS_ERR_OK) {
+        sprintf(result, "error opening file %s", fpath);
+        return;
+    }
+    int l = fs_file_seek(&file, 0, LFS_SEEK_END);
+    fs_file_seek(&file, 0, LFS_SEEK_SET);
+    char* buf = malloc(l);
+    if (!buf) {
+        strcpy(result, "insufficient memory");
         return;
     }
     if (fs_file_read(&file, buf, l) != l) {
-        sprintf(result, "error reading file");
-        fs_file_close(&file);
-        return;
+        sprintf(result, "error reading file %s", fpath);
+        goto done;
     }
     char* p = buf;
     char* pend = p + l;
+    int line = 0;
     while (p < pend) {
         char* p2 = p;
         printf("%04x", (int)(p - buf));
@@ -396,7 +427,14 @@ static void hex_cmd(void) {
         }
         printf("'\n");
         p += 16;
+        if (paginate & (++line % (screen_y - 1) == 0)) {
+            char cc = getchar();
+            if (cc == 0x03)
+                break;
+        }
     }
+done:
+    free(buf);
     fs_file_close(&file);
 }
 
@@ -829,13 +867,13 @@ static void resize_cmd(void) { screen_size(); }
 
 // clang-format off
 cmd_t cmd_table[] = {
-    {"cat",     cat_cmd,        "display a text file"},
+    {"cat",     cat_cmd,        "display a text file, use -p to paginate"},
     {"cc",      cc_cmd,         "compile & run C source file. cc -h for help"},
     {"cd",      cd_cmd,         "change directory"},
     {"clear",   clear_cmd,      "clear the screen"},
     {"cp",      cp_cmd,         "copy a file"},
     {"format",  format_cmd,     "format the filesystem"},
-    {"hex",     hex_cmd,        "simple hexdump"},
+    {"hex",     hex_cmd,        "simple hexdump, use -p to paginate"},
     {"ls",      ls_cmd,         "list a directory, -a to show hidden files"},
     {"mkdir",   mkdir_cmd,      "create a directory"},
     {"mount",   mount_cmd,      "mount the filesystem"},
