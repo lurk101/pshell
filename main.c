@@ -348,6 +348,58 @@ static void cat_cmd(void) {
     fs_file_close(&file);
 }
 
+static void hex_cmd(void) {
+    if (check_mount(true))
+        return;
+    if (check_name())
+        return;
+    lfs_file_t file;
+    if (fs_file_open(&file, full_path(argv[1]), LFS_O_RDONLY) < LFS_ERR_OK) {
+        strcpy(result, "error opening file");
+        return;
+    }
+    int l = fs_file_seek(&file, 0, LFS_SEEK_END);
+    fs_file_seek(&file, 0, LFS_SEEK_SET);
+    char* buf = malloc(l);
+    if (!buf) {
+        sprintf(result, "insufficient memory");
+        return;
+    }
+    if (fs_file_read(&file, buf, l) != l) {
+        sprintf(result, "error reading file");
+        fs_file_close(&file);
+        return;
+    }
+    char* p = buf;
+    char* pend = p + l;
+    while (p < pend) {
+        char* p2 = p;
+        printf("%04x", (int)(p - buf));
+        for (int i = 0; i < 16; i++) {
+            if ((i & 3) == 0)
+                printf(" ");
+            if (p + i < pend)
+                printf("%02x", p[i]);
+            else
+                printf("  ");
+        }
+        printf(" '");
+        p = p2;
+        for (int i = 0; i < 16; i++) {
+            if (p + i < pend) {
+                if (isprint(p[i]))
+                    printf("%c", p[i]);
+                else
+                    printf(".");
+            } else
+                printf(" ");
+        }
+        printf("'\n");
+        p += 16;
+    }
+    fs_file_close(&file);
+}
+
 static void xget_cmd(void) {
     if (check_mount(true))
         return;
@@ -783,6 +835,7 @@ cmd_t cmd_table[] = {
     {"clear",   clear_cmd,      "clear the screen"},
     {"cp",      cp_cmd,         "copy a file"},
     {"format",  format_cmd,     "format the filesystem"},
+    {"hex",     hex_cmd,        "simple hexdump"},
     {"ls",      ls_cmd,         "list a directory, -a to show hidden files"},
     {"mkdir",   mkdir_cmd,      "create a directory"},
     {"mount",   mount_cmd,      "mount the filesystem"},
