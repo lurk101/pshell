@@ -4186,7 +4186,6 @@ int cc(int mode, int argc, char** argv) {
     // clear uninitialized global variables
     extern char __ccudata_start__, __ccudata_end__;
     memset(&__ccudata_start__, 0, &__ccudata_end__ - &__ccudata_start__);
-
     extern const char* pshell_version;
     int rslt = -1;
     struct exe_s exe;
@@ -4393,7 +4392,7 @@ int cc(int mode, int argc, char** argv) {
             }
             // initialize the header and write it
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
-            exe.dsize = (data - data_base) | 0xc0000000;
+            exe.dsize = (data - data_base) | 0xc1000000;
             exe.nreloc = nrelocs;
             if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
                 fs_file_close(fd);
@@ -4405,7 +4404,7 @@ int cc(int mode, int argc, char** argv) {
                 fatal("error writing executable file");
             }
             // write the data segment
-            int ds = exe.dsize & 0x3fffffff;
+            int ds = exe.dsize & 0x00ffffff;
             if (ds && fs_file_write(fd, data_base, ds) != ds) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
@@ -4453,7 +4452,7 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
-        if ((exe.dsize & 0xc0000000) != 0xc0000000)
+        if ((exe.dsize & 0xff000000) != 0xc1000000)
             fatal("executable compiled with earlier version not compatible, please recompile");
         // clear the code segment for good measure though not necessary
         memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
@@ -4464,7 +4463,7 @@ int cc(int mode, int argc, char** argv) {
             fatal("error reading %s", ofn);
         }
         // read in the data segment
-        int ds = exe.dsize & 0x3fffffff;
+        int ds = exe.dsize & 0x00ffffff;
         if (ds && fs_file_read(fd, __StackLimit + TEXT_BYTES, ds) != ds) {
             fs_file_close(fd);
             fd = NULL;
