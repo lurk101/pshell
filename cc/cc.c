@@ -4128,7 +4128,8 @@ static void help(char* lib) {
                "    -n      turn off peep-hole optimization\n"
                "    -D symbol [= value]\n"
                "            define symbol for limited pre-processor, can repeat.\n"
-               "    -h      Compiler help. lib lists externals.\n"
+               "    -h [lib name]\n"
+               "            Compiler help. lib lists externals.\n"
                "    filename\n"
                "            C source file name.\n"
                "Libraries:\n"
@@ -4150,7 +4151,6 @@ static void help(char* lib) {
             return;
         }
     fatal("unknown lib %s", lib);
-    return;
 }
 
 static void add_defines(const struct define_grp* d) {
@@ -4235,11 +4235,11 @@ int cc(int mode, int argc, char** argv) {
         // parse the command line arguments
         --argc;
         ++argv;
-        char* lib_name = NULL;
         while (argc > 0 && **argv == '-') {
             if ((*argv)[1] == 'h') {
                 --argc;
                 ++argv;
+                char* lib_name = NULL;
                 if (argc)
                     lib_name = *argv;
                 help(lib_name);
