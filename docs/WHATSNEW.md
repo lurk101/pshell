@@ -1,3 +1,11 @@
+What's new in version 1.2.29
+
+- update functions document
+- fix extern table out of order
+- add simple hexdump command
+- add -p (paginate) option to cat and hex commands
+- cat terminate on EOF (0x1A) char
+
 What's new in version 1.2.28
 
 - further optimization of C compile memory management
