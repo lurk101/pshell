@@ -1,3 +1,7 @@
+What's new in version 1.2.30
+
+- fix compiler memory leak
+
 What's new in version 1.2.29
 
 - update functions document
