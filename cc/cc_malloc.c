@@ -4,6 +4,7 @@
 
 #include <pico/stdlib.h>
 
+#include "cc.h"
 #include "cc_malloc.h"
 
 typedef struct dq_entry_s {
@@ -13,8 +14,6 @@ typedef struct dq_entry_s {
 } dq_entry_t;
 
 #define UDATA __attribute__((section(".ccudata")))
-
-__attribute__((__noreturn__)) void run_fatal(const char* fmt, ...);
 
 static dq_entry_t malloc_list UDATA; // list of allocated memory blocks
 
@@ -65,16 +64,23 @@ void* cc_malloc(int l, int cc, int zero) {
     return p->data;
 }
 
-void cc_free(void* p) {
-    if (!p)
-        run_fatal("freeing a NULL pointer");
+void cc_free(void* p, int user) {
+    if (!p) {
+        if (user)
+            run_fatal("freeing a NULL pointer");
+        else
+            fatal("freeing a NULL pointer");
+    }
     dq_entry_t* p2 = dq_find(p);
     if (p2) {
         dq_rem(p2);
         free(p2);
         return;
     }
-    run_fatal("corrupted memory");
+    if (user)
+        run_fatal("corrupted memory");
+    else
+        fatal("corrupted memory");
 }
 
 void cc_free_all(void) {

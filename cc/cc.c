@@ -252,11 +252,7 @@ struct define_grp {
 
 static jmp_buf done_jmp UDATA; // fatal error jump address
 
-// fatal erro message and exit
-#define fatal(fmt, ...) fatal_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
-
-static __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, const char* fmt,
-                                                     ...) {
+__attribute__((__noreturn__)) void fatal_func(const char* func, int lne, const char* fmt, ...) {
     printf("\n");
 #ifndef NDEBUG
     printf("error in compiler function %s at line %d\n", func, lne);
@@ -290,6 +286,7 @@ __attribute__((__noreturn__)) void run_fatal(const char* fmt, ...) {
 // user malloc shim
 static void* wrap_malloc(int len) { return cc_malloc(len, 0, 0); };
 static void* wrap_calloc(int nmemb, int siz) { return cc_malloc(nmemb * siz, 0, 1); };
+static void wrap_free(void* m) { cc_free(m, 1); };
 
 // file control block
 static struct file_handle {
@@ -315,7 +312,7 @@ static int wrap_open(char* name, int mode) {
     if (mode & O_APPEND)
         lfs_mode |= LFS_O_APPEND;
     if (fs_file_open(&h->u.file, full_path(name), lfs_mode) < LFS_ERR_OK) {
-        cc_free(h);
+        cc_free(h, 1);
         return 0;
     }
     h->next = file_list;
@@ -327,7 +324,7 @@ static int wrap_opendir(char* name) {
     struct file_handle* h = cc_malloc(sizeof(struct file_handle), 1, 1);
     h->is_dir = true;
     if (fs_dir_open(&h->u.dir, full_path(name)) < LFS_ERR_OK) {
-        cc_free(h);
+        cc_free(h, 1);
         return 0;
     }
     h->next = file_list;
@@ -345,7 +342,7 @@ static void wrap_close(int handle) {
                 fs_dir_close(&h->u.dir);
             else
                 fs_file_close(&h->u.file);
-            cc_free(h);
+            cc_free(h, 1);
             return;
         }
         last_h = h;
@@ -391,7 +388,7 @@ static int wrap_rename(char* old, char* new) {
     strcpy(fpa, fp);
     char* fpb = full_path(new);
     int r = fs_rename(fpa, fpb);
-    cc_free(fpa);
+    cc_free(fpa, 1);
     return r;
 }
 
@@ -2495,7 +2492,7 @@ static void patch_pc_relative(int brnch) {
                 fatal("unexpected compiler error");
             *pl->addr |= ofs;
             p->locs = pl->next;
-            cc_free(pl);
+            cc_free(pl, 0);
         }
         emit_word(p->val);
         if (ofn && p->ext) {
@@ -2506,7 +2503,7 @@ static void patch_pc_relative(int brnch) {
             nrelocs++;
         }
         pcrel = p->next;
-        cc_free(p);
+        cc_free(p, 0);
     }
     pcrel_1st = 0;
 }
@@ -3162,7 +3159,7 @@ static void gen(int* n) {
                 --j;
                 b = (uint16_t*)t[j];
             }
-            cc_free(t);
+            cc_free(t, 0);
         }
         if (i == Syscall)
             emit_syscall(Func_entry(n).addr, Func_entry(n).parm_types);
@@ -3186,7 +3183,7 @@ static void gen(int* n) {
         while (cnts) {
             t = (uint16_t*)cnts->next;
             patch_branch(cnts->addr, e + 1);
-            cc_free(cnts);
+            cc_free(cnts, 0);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
@@ -3196,7 +3193,7 @@ static void gen(int* n) {
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch(brks->addr, e + 1);
-            cc_free(brks);
+            cc_free(brks, 0);
             brks = (struct patch_s*)t;
         }
         brks = (struct patch_s*)b;
@@ -3214,7 +3211,7 @@ static void gen(int* n) {
             t = (uint16_t*)cnts->next;
             t2 = e;
             patch_branch(cnts->addr, e + 1);
-            cc_free(cnts);
+            cc_free(cnts, 0);
             cnts = (struct patch_s*)t;
         }
         cnts = (struct patch_s*)c;
@@ -3229,7 +3226,7 @@ static void gen(int* n) {
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch(brks->addr, e + 1);
-            cc_free(brks);
+            cc_free(brks, 0);
             brks = (struct patch_s*)t;
         }
         brks = (struct patch_s*)b;
@@ -3249,7 +3246,7 @@ static void gen(int* n) {
         while (brks) {
             t = (uint16_t*)brks->next;
             patch_branch((uint16_t*)(brks->addr), e + 1);
-            cc_free(brks);
+            cc_free(brks, 0);
             brks = (struct patch_s*)t;
         }
         emit_adjust_stack(1);
@@ -3318,7 +3315,7 @@ static void gen(int* n) {
             struct patch_s* l = (struct patch_s*)label->forward;
             patch_branch(l->addr, d + 1);
             label->forward = (uint16_t*)l->next;
-            cc_free(l);
+            cc_free(l, 0);
         }
         label->val = (int)d;
         label->class = Label;
@@ -3663,7 +3660,7 @@ static void stmt(int ctx) {
                     } else if (id->class == Label) { // clear id for next func
                         struct ident_s* id3 = id;
                         id = id->next;
-                        cc_free(id3);
+                        cc_free(id3, 0);
                         id2->next = id;
                     } else if (id->class == 0 && id->type == -1)
                         fatal("%d: label %.*s not defined\n", lineno, id->hash & 0x3f, id->name);
@@ -4318,12 +4315,12 @@ int cc(int mode, int argc, char** argv) {
         // allocate a file descriptor and open the input file
         fd = cc_malloc(sizeof(lfs_file_t), 1, 1);
         if (fs_file_open(fd, fn, LFS_O_RDONLY) < LFS_ERR_OK) {
-            cc_free(fd);
+            cc_free(fd, 0);
             fd = NULL;
             fatal("could not open %s \n", fn);
         }
         // don't need the filename anymore
-        cc_free(fn);
+        cc_free(fn, 0);
         // get the file size
         int fl = fs_file_seek(fd, 0, SEEK_END);
         fs_file_seek(fd, 0, SEEK_SET);
@@ -4335,7 +4332,7 @@ int cc(int mode, int argc, char** argv) {
         src_base[fl] = 0;
         fs_file_close(fd);
         // free the file descriptor
-        cc_free(fd);
+        cc_free(fd, 0);
         fd = 0;
 
         // set the code base
@@ -4363,11 +4360,11 @@ int cc(int mode, int argc, char** argv) {
                 fatal("undeclared forward function %.*s", id->hash & 0x3f, id->name);
 
         // free all the compiler buffers
-        cc_free(src_base);
+        cc_free(src_base, 0);
         src_base = NULL;
-        cc_free(ast);
+        cc_free(ast, 0);
         ast = NULL;
-        cc_free(tsize);
+        cc_free(tsize, 0);
         tsize = NULL;
 
         if (src_opt)
@@ -4386,7 +4383,7 @@ int cc(int mode, int argc, char** argv) {
             fd = cc_malloc(sizeof(lfs_file_t), 1, 1);
             char* cp = full_path(ofn);
             if (fs_file_open(fd, cp, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
-                cc_free(fd);
+                cc_free(fd, 0);
                 fd = NULL;
                 fatal("could not create %s\n", full_path(ofn));
             }
@@ -4417,12 +4414,12 @@ int cc(int mode, int argc, char** argv) {
                     fatal("error writing executable file");
                 }
                 struct reloc_s* r = relocs->next;
-                cc_free(relocs);
+                cc_free(relocs, 0);
                 relocs = r;
             }
             // done. close the file and set the executable attribute
             fs_file_close(fd);
-            cc_free(fd);
+            cc_free(fd, 0);
             fd = NULL;
             if (fs_setattr(full_path(ofn), 1, "exe", 4) < LFS_ERR_OK)
                 fatal("unable to set executable attribute");
@@ -4453,9 +4450,7 @@ int cc(int mode, int argc, char** argv) {
             fatal("error reading %s", ofn);
         }
         if ((exe.dsize & 0xff000000) != 0xc1000000)
-            fatal("executable compiled with earlier version not compatible, please recompile");
-        // clear the code segment for good measure though not necessary
-        memset(__StackLimit, 0, TEXT_BYTES + DATA_BYTES);
+            fatal("executable compiled with earlier incompatible version, please recompile");
         // read in the code segment
         if (fs_file_read(fd, __StackLimit, exe.tsize) != exe.tsize) {
             fs_file_close(fd);

@@ -1,6 +1,3 @@
-/* vi: set sw=4 ts=4: */
-/* SPDX-License-Identifier: GPL-3.0-or-later */
-
 /* Copyright (C) 1883 Thomas Edison - All Rights Reserved
  * You may use, distribute and modify this code under the
  * terms of the BSD 3 clause license, which unfortunately
@@ -12,9 +9,14 @@
  *
  */
 
-#ifndef _C4_
-#define _C4_
+#pragma once
 
 int cc(int mode, int argc, char* argv[]);
 
-#endif
+#define UDATA __attribute__((section(".ccudata")))
+
+__attribute__((__noreturn__)) void run_fatal(const char* fmt, ...);
+__attribute__((__noreturn__)) void fatal_func(const char* func, int lne, const char* fmt, ...);
+
+// fatal erro message and exit
+#define fatal(fmt, ...) fatal_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
