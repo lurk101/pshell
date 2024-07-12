@@ -4486,6 +4486,7 @@ int cc(int mode, int argc, char** argv) {
         }
         // close the file and free its descriptor
         fs_file_close(fd);
+        cc_free(fd, 1);
         fd = NULL;
     }
     cc_free_all();
