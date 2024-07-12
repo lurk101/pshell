@@ -3,14 +3,14 @@
     // libc or Pico SDK functions. Consult those relevant docs.
 
     // stdio
-    close, get_rand_32, getchar, getchar_timeout_us, lseek, open, opendir, printf,
-    putchar, read, readdir, remove, rename, screen_height, screen_width, sprintf, write
+    close, getchar, getchar_timeout_us, lseek, open, opendir, printf, putchar, read,
+    readdir, remove, rename, screen_height, screen_width, sprintf, write
 
     Predefined symbols: TRUE, true, FALSE, false, O_RDONLY, O_WRONLY, O_RDWR, O_CREAT,
     O_EXCL, O_TRUNC, O_APPEND, SEEK_SET SEEK_CUR, SEEK_END, PICO_ERROR_TIMEOUT`
 
     // stdlib
-    atoi, calloc, exit, free, malloc, popcount, rand, srand
+    atoi, calloc, exit, free, malloc, popcount, rand, srand, get_rand_32
 
     // string
     memcmp, memcpy, memset, strcat, strchr, strcmp, strcpy, strdup, strlen, strncat,
