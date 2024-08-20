@@ -1,3 +1,7 @@
+What's new in version 1.2.31
+
+- Updated to Pico SDK version 2
+
 What's new in version 1.2.30
 
 - fix compiler memory leak
