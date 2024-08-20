@@ -4389,7 +4389,7 @@ int cc(int mode, int argc, char** argv) {
             }
             // initialize the header and write it
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
-            exe.dsize = (data - data_base) | 0xc1000000;
+            exe.dsize = (data - data_base) | 0xc2000000;
             exe.nreloc = nrelocs;
             if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
                 fs_file_close(fd);
@@ -4449,7 +4449,7 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
-        if ((exe.dsize & 0xff000000) != 0xc1000000)
+        if ((exe.dsize & 0xff000000) != 0xc2000000)
             fatal("executable compiled with earlier incompatible version, please recompile");
         // read in the code segment
         if (fs_file_read(fd, __StackLimit, exe.tsize) != exe.tsize) {

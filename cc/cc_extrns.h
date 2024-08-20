@@ -30,7 +30,9 @@
     {"clock_set_reported_hz", 2, clk_defines, clock_set_reported_hz, 0, 0, 0},
     {"clock_stop", 1, clk_defines, clock_stop, 0, 0, 0},
     {"clocks_enable_resus", 1, clk_defines, clocks_enable_resus, 0, 0, 0},
+#if PICO_SDK_VERSION_MAJOR < 2
     {"clocks_init", 0, clk_defines, clocks_init, 0, 0, 0},
+#endif
     {"close", 1, stdio_defines, wrap_close, 0, 0, 0},
     {"cosf", 1 | (1 << 5) | (1 << 10), math_defines, __wrap_cosf, 1, 0, 0},
     {"coshf", 1 | (1 << 5) | (1 << 10), math_defines, __wrap_coshf, 1, 0, 0},
@@ -95,9 +97,14 @@
     {"i2c_deinit", 1, i2c_defines, i2c_deinit, 0, 0, 0},
     {"i2c_get_dreq", 2, i2c_defines, i2c_get_dreq, 0, 0, 0},
     {"i2c_get_hw", 1, i2c_defines, i2c_get_hw, 0, 0, 0},
+#if PICO_SDK_VERSION_MAJOR == 2
+    {"i2c_get_index", 1, i2c_defines, i2c_get_index, 0, 0, 0},
+#endif
     {"i2c_get_read_available", 1, i2c_defines, i2c_get_read_available, 0, 0, 0},
     {"i2c_get_write_available", 1, i2c_defines, i2c_get_write_available, 0, 0, 0},
+#if PICO_SDK_VERSION_MAJOR < 2
     {"i2c_hw_index", 1, i2c_defines, i2c_hw_index, 0, 0, 0},
+#endif
     {"i2c_init", 2, i2c_defines, i2c_init, 0, 0, 0},
     {"i2c_read_blocking", 5, i2c_defines, i2c_read_blocking, 0, 0, 0},
     {"i2c_read_raw_blocking", 3, i2c_defines, i2c_read_raw_blocking, 0, 0, 0},

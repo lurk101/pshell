@@ -82,14 +82,18 @@ static const struct define_grp i2c_defines[] = {
     // I2C
     {"i2c0", (int)&i2c0_inst},
     {"i2c1", (int)&i2c1_inst},
+#if PICO_SDK_VERSION_MAJOR < 2
     {"i2c_default", (int)PICO_DEFAULT_I2C_INSTANCE},
+#endif
     {0}};
 
 static const struct define_grp spi_defines[] = {
     // SPI
     {"spi0", (int)spi0_hw},
     {"spi1", (int)spi1_hw},
+#if PICO_SDK_VERSION_MAJOR < 2
     {"spi_default", (int)PICO_DEFAULT_SPI_INSTANCE},
+#endif
     {0}};
 
 static const struct define_grp math_defines[] = {{0}};
