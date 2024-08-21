@@ -47,10 +47,20 @@ add_executable(${PSHELL}
     main.c
 )
 
+if ("${PICO_BOARD}" STREQUAL "pico2")
 target_compile_definitions(${PSHELL} PUBLIC
   PICO_MALLOC_PANIC=0
   PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
+  PICO2350=1
 )
+else()
+target_compile_definitions(${PSHELL} PUBLIC
+  PICO_MALLOC_PANIC=0
+  PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
+  PICO2350=0
+)
+endif()
+
 
 if (FORCE_TESTS)
 target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
@@ -58,7 +68,11 @@ endif()
 
 target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/misc/${FS_DIR})
 
+if ("${PICO_BOARD}" STREQUAL "pico2")
+pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell_2350.ld)
+else()
 pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell.ld)
+endif()
 
 if (USB_CONSOLE)
     pico_enable_stdio_uart(${PSHELL} 0)
@@ -68,8 +82,8 @@ else()
     pico_enable_stdio_usb(${PSHELL} 0)
 endif()
 
-pico_set_program_name(${PSHELL} "pshell")
-pico_set_program_version(${PSHELL} "${PSHELL_GIT_TAG}")
+#pico_set_program_name(${PSHELL} "pshell")
+#pico_set_program_version(${PSHELL} "${PSHELL_GIT_TAG}")
 
 target_link_libraries(${PSHELL} PUBLIC
     littlefs disassembler io vi cc misc xymodem

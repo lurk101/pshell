@@ -69,6 +69,40 @@ extern void get_screen_xy(int* x, int* y);           // retrieve screem dimensio
 extern void cc_exit(int rc);                         // C exit function
 extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 
+#if PICO2350
+void __wrap___aeabi_idiv() { asm volatile("sdiv r0,r0,r1"); }
+void __wrap___aeabi_i2f() { asm volatile("vmov s15,r0\n vcvt.f32.s32 s15,s15\n vmov r0,s15"); }
+void __wrap___aeabi_f2iz() { asm volatile("vmov s15,r0\n vcvt.s32.f32 s15,s15\n vmov r0,s15"); }
+void __wrap___aeabi_fadd() {
+    asm volatile("vmov s14,r0\n vmov s15,r1\n vadd.f32 s15,s14,s15\n vmov r0,s15");
+}
+void __wrap___aeabi_fsub() {
+    asm volatile("vmov s14,r0\n vmov s15,r1\n vsub.f32 s15,s14,s15\n vmov r0,s15");
+}
+void __wrap___aeabi_fmul() {
+    asm volatile("vmov s14,r0\n vmov s15,r1\n vmul.f32 s15,s14,s15\n vmov r0,s15");
+}
+void __wrap___aeabi_fdiv() {
+    asm volatile("vmov s14,r0\n vmov s15,r1\n vdiv.f32 s15,s14,s15\n vmov r0, s15");
+}
+void __wrap___aeabi_fcmple() {
+    asm volatile("vmov s14,r0\n vmov s15,r1\n vcmpe.f32 s14,s15\n vmrs APSR_nzcv,fpscr\n"
+                 "ite ls\n movls r0,#1\n movhi r0,#0");
+}
+void __wrap___aeabi_fcmpgt() {
+    asm volatile("vmov s14,r0\n vmov s15,r1\n vcmpe.f32 s14,s15\n vmrs APSR_nzcv,fpscr\n"
+                 "ite gt\n movgt r0,#1\n movle r0,#0");
+}
+void __wrap___aeabi_fcmplt() {
+    asm volatile("vmov s14,r0\n vmov s15,r1\n vcmpe.f32 s14,s15\n vmrs APSR_nzcv,fpscr\n"
+                 "ite mi\n movmi r0,#1\n movpl r0,#0");
+}
+void __wrap___aeabi_fcmpge() {
+    asm volatile("vmov s14,r0\n vmov s15,r1\n vcmpe.f32 s14,s15\n vmrs APSR_nzcv,fpscr\n"
+                 "ite ge\n movge r0,#1\n movlt r0,#0");
+}
+#endif
+
 // accellerated SDK floating point functions
 extern void __wrap___aeabi_idiv();
 extern void __wrap___aeabi_i2f();
@@ -2236,9 +2270,9 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 
 // peep hole optimizer
 
-// FROM:		   	  TO:
-// mov  r0, r7		  mov  r3,r7
-// push {r0}		  movs r0,#n
+// FROM:              TO:
+// mov  r0, r7        mov  r3,r7
+// push {r0}          movs r0,#n
 // movs r0,#n
 // pop  {r3}
 
@@ -2247,7 +2281,7 @@ static uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
 static uint16_t rep0[] = {0x463b, 0x2000};
 
 // ldr  r0,[r0,#n0]   ldr  r3,[r0,#n0]
-// push {r0}		  movs r0,#n1
+// push {r0}          movs r0,#n1
 // movs r0, #n1
 // pop  {r3}
 
@@ -2256,7 +2290,7 @@ static uint16_t msk1[] = {0xff00, 0xffff, 0xff00, 0xffff};
 static uint16_t rep1[] = {0x6803, 0x2000};
 
 // movs r0,#n         mov  r0,r7
-// rsbs r0,r0		  subs r0,#n
+// rsbs r0,r0         subs r0,#n
 // add  r0,r7
 
 static uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
@@ -2295,7 +2329,7 @@ static uint16_t pat6[] = {0x4638, 0x6800};
 static uint16_t msk6[] = {0xffff, 0xffff};
 static uint16_t rep6[] = {0x6838};
 
-// movs r0,#4			lsls r0,r3,#2
+// movs r0,#4           lsls r0,r3,#2
 // muls r0,r3
 
 static uint16_t pat7[] = {0x2004, 0x4358};

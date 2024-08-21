@@ -14,6 +14,7 @@ rm -rf *
 cmake .. -DUSB_CONSOLE=ON
 make -j8
 cp *.elf *.hex *.bin *.uf2 ..
+rm -rf *
 cmake .. -DPICO_BOARD=vgaboard
 make -j8
 cp pshell_usb.elf ../vgaboard.pshell_usb.elf

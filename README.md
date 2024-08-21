@@ -31,7 +31,7 @@ About the compiler, briefly:
 - Aggregate types: array (up to 3 dimensions), struct and union.
 - Flow control: for, while, if then else, break, continue, switch and goto.
 - Memory, math, newlib and SDK functions. ([list of implemented functions])
-- Native code generation for the Pico's cm0+ core
+- Native code generation for the Pico's cm0+ and pico2 cm33 cores.
 
 Raspberry Pi Forums [thread].
 
@@ -39,7 +39,7 @@ Discussion [area].
 
 [Getting Started]
 
-Building from source.
+Building from source for the RP2040.
 
 ```
 # NOTE: Requires sdk 1.4 or later
@@ -47,17 +47,29 @@ git clone --recursive https://github.com/lurk101/pshell.git
 cd pshell
 mkdir build
 cd build
-cmake ..
+cmake .. -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
 make
 ```
-For UART console, substitute the following cmake command
+Building from source for the RP2350.
+
 ```
-cmake .. -DUSB_CONSOLE=OFF
+# NOTE: Requires sdk 2.0 or later
+git clone --recursive https://github.com/lurk101/pshell.git
+cd pshell
+mkdir build
+cd build
+cmake .. -DPICO_BOARD=pico2 -DPICO_PLATFORM=rp2350
+make
+```
+
+For UART console, add the following cmake command parameter.
+```
+-DUSB_CONSOLE=OFF
 ```
 
 For vgaboard with filesystem on microSD card. See [here] for details on differing GPIO & UART configurations.
 ```
-cmake .. -DPICO_BOARD=vgaboard
+cmake .. -DPICO_BOARD=vgaboard -DPICO_PLATFORM=rp2040
 ```
 
 Starting with version 1.0.4 all development will occur on the dev branch. To build it:
