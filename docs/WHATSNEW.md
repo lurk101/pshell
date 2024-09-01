@@ -1,3 +1,7 @@
+What's new in version 2.0.0
+
+- Pico2 (RP2350) support
+
 What's new in version 1.2.31
 
 - Updated to Pico SDK version 2
