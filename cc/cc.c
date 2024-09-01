@@ -2774,7 +2774,10 @@ static void emit_oper(int op) {
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
 #if PICO2350
-        emit_fop(aeabi_imod);
+        if (op == MOD)
+            emit_fop(aeabi_imod);
+        else
+            emit_fop(aeabi_idiv);
 #else
         emit_fop(aeabi_idiv);
         if (op == MOD)
