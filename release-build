@@ -7,19 +7,35 @@ git checkout master
 rm -rf release
 mkdir release
 cd release
-cmake .. -DUSB_CONSOLE=OFF
+cmake .. -DUSB_CONSOLE=ON -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
 make -j8
-cp *.elf *.hex *.bin *.uf2 ..
+cp pshell_usb.elf ../pico.pshell_usb.elf
+cp pshell_usb.bin ../pico.pshell_usb.bin
+cp pshell_usb.uf2 ../pico.pshell_usb.uf2
 rm -rf *
-cmake .. -DUSB_CONSOLE=ON
+cmake .. -DUSB_CONSOLE=OFF -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
 make -j8
-cp *.elf *.hex *.bin *.uf2 ..
+cp pshell_usb.elf ../pico.pshell_uart.elf
+cp pshell_usb.bin ../pico.pshell_uart.bin
+cp pshell_usb.uf2 ../pico.pshell_uart.uf2
 rm -rf *
-cmake .. -DPICO_BOARD=vgaboard
+cmake .. -DPICO_BOARD=vgaboard -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
 make -j8
 cp pshell_usb.elf ../vgaboard.pshell_usb.elf
 cp pshell_usb.bin ../vgaboard.pshell_usb.bin
 cp pshell_usb.uf2 ../vgaboard.pshell_usb.uf2
+rm -rf *
+cmake .. -DUSB_CONSOLE=ON -DPICO_BOARD=pico2 -DPICO_PLATFORM=rp2350
+make -j8
+cp pshell_usb.elf ../pico2.pshell_usb.elf
+cp pshell_usb.bin ../pico2.pshell_usb.bin
+cp pshell_usb.uf2 ../pico2.pshell_usb.uf2
+rm -rf *
+cmake .. -DUSB_CONSOLE=OFF -DPICO_BOARD=pico2 -DPICO_PLATFORM=rp2350
+make -j8
+cp pshell_uart.elf ../pico2.pshell_uart.elf
+cp pshell_uart.bin ../pico2.pshell_uart.bin
+cp pshell_uart.uf2 ../pico2.pshell_uart.uf2
 cd ..
 rm -rf release
 tar czf pshell_$1.tgz *.elf *.bin *.uf2
