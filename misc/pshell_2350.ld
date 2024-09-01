@@ -186,7 +186,6 @@ SECTIONS
         __end__ = .;
         end = __end__;
         KEEP(*(.heap*))
-        . = ORIGIN(RAM) + LENGTH(RAM) - 0x8000;
         __HeapLimit = .;
     } > RAM
 
