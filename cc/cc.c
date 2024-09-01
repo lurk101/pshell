@@ -71,6 +71,7 @@ extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 
 #if PICO2350
 void __wrap___aeabi_idiv() { asm volatile("sdiv r0,r0,r1"); }
+void __wrap___aeabi_imod() { asm volatile("sdiv r3,r0,r1\n mls r0,r3,r1,r0"); }
 void __wrap___aeabi_i2f() { asm volatile("vmov s15,r0\n vcvt.f32.s32 s15,s15\n vmov r0,s15"); }
 void __wrap___aeabi_f2iz() { asm volatile("vmov s15,r0\n vcvt.s32.f32 s15,s15\n vmov r0,s15"); }
 void __wrap___aeabi_fadd() {
@@ -115,6 +116,9 @@ extern void __wrap___aeabi_fcmple();
 extern void __wrap___aeabi_fcmpgt();
 extern void __wrap___aeabi_fcmplt();
 extern void __wrap___aeabi_fcmpge();
+#if PICO2350
+extern void __wrap___aeabi_imod();
+#endif
 
 // accellerate SDK trig functions
 extern void __wrap_sinf();
@@ -141,7 +145,10 @@ enum {
     aeabi_fcmple,
     aeabi_fcmpgt,
     aeabi_fcmplt,
-    aeabi_fcmpge
+    aeabi_fcmpge,
+#if PICO2350
+    aeabi_imod,
+#endif
 };
 
 static void (*fops[])() = { //
@@ -156,7 +163,11 @@ static void (*fops[])() = { //
     __wrap___aeabi_fcmple,
     __wrap___aeabi_fcmpgt,
     __wrap___aeabi_fcmplt,
-    __wrap___aeabi_fcmpge};
+    __wrap___aeabi_fcmpge,
+#if PICO2350
+    __wrap___aeabi_imod,
+#endif
+};
 
 // patch list entry
 struct patch_s {
@@ -2762,9 +2773,13 @@ static void emit_oper(int op) {
     case MOD:
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
+#if PICO2350
+        emit_fop(aeabi_imod);
+#else
         emit_fop(aeabi_idiv);
         if (op == MOD)
             emit(0x4608); // mov r0,r1
+#endif
         break;
     default:
         fatal("unexpected compiler error");
