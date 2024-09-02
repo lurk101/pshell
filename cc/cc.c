@@ -1,10 +1,10 @@
 /*
- * mc is capable of compiling a (subset of) C source files
+ * cc is capable of compiling a (subset of) C source files
  * There is no preprocessor.
  *
  * See C4 and AMaCC project repositories for baseline code.
  * float, array, struct support in squint project by HPCguy.
- * native code generation for RP Pico by lurk101.
+ * native code generation for RP Pico and Pico2 by lurk101.
  *
  */
 
@@ -27,7 +27,7 @@
 #include <hardware/spi.h>
 #include <hardware/sync.h>
 
-// pico SDK accellerated functions
+// pico SDK functions
 #include <pico/rand.h>
 #include <pico/stdio.h>
 #include <pico/time.h>
@@ -63,6 +63,7 @@
 #define ADJ_BITS 5
 #define ADJ_MASK ((1 << ADJ_BITS) - 1)
 
+// pshell common functions
 extern char* full_path(char* name);                  // expand file name to full path name
 extern int cc_printf(void* stk, int wrds, int prnt); // shim for printf and sprintf
 extern void get_screen_xy(int* x, int* y);           // retrieve screem dimensions
@@ -70,57 +71,114 @@ extern void cc_exit(int rc);                         // C exit function
 extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 
 #if PICO2350
-void __wrap___aeabi_idiv() { asm volatile("sdiv r0,r0,r1"); }
-void __wrap___aeabi_imod() { asm volatile("sdiv r3,r0,r1\n mls r0,r3,r1,r0"); }
-void __wrap___aeabi_i2f() { asm volatile("vmov s15,r0\n vcvt.f32.s32 s15,s15\n vmov r0,s15"); }
-void __wrap___aeabi_f2iz() { asm volatile("vmov s15,r0\n vcvt.s32.f32 s15,s15\n vmov r0,s15"); }
+
+// rp2350 float operation and conversion functions
+// for the RP2040 these are builtin to the ROM
+void __wrap___aeabi_idiv() { asm volatile(" sdiv r0,r0,r1"); }
+
+void __wrap___aeabi_imod() {
+    asm volatile(" sdiv r3,r0,r1\n"
+                 " mls r0,r3,r1,r0");
+}
+
+void __wrap___aeabi_i2f() {
+    asm volatile(" vmov s15,r0\n"
+                 " vcvt.f32.s32 s15,s15\n"
+                 " vmov r0,s15");
+}
+
+void __wrap___aeabi_f2iz() {
+    asm volatile(" vmov s15,r0\n"
+                 " vcvt.s32.f32 s15,s15\n"
+                 " vmov r0,s15");
+}
+
 void __wrap___aeabi_fadd() {
-    asm volatile("vmov s14,r0\n vmov s15,r1\n vadd.f32 s15,s14,s15\n vmov r0,s15");
+    asm volatile(" vmov s14,r0\n"
+                 " vmov s15,r1\n"
+                 " vadd.f32 s15,s14,s15\n"
+                 " vmov r0,s15");
 }
+
 void __wrap___aeabi_fsub() {
-    asm volatile("vmov s14,r0\n vmov s15,r1\n vsub.f32 s15,s14,s15\n vmov r0,s15");
+    asm volatile(" vmov s14,r0\n"
+                 " vmov s15,r1\n"
+                 " vsub.f32 s15,s14,s15\n"
+                 " vmov r0,s15");
 }
+
 void __wrap___aeabi_fmul() {
-    asm volatile("vmov s14,r0\n vmov s15,r1\n vmul.f32 s15,s14,s15\n vmov r0,s15");
+    asm volatile(" vmov s14,r0\n"
+                 " vmov s15,r1\n"
+                 " vmul.f32 s15,s14,s15\n"
+                 " vmov r0,s15");
 }
+
 void __wrap___aeabi_fdiv() {
-    asm volatile("vmov s14,r0\n vmov s15,r1\n vdiv.f32 s15,s14,s15\n vmov r0, s15");
+    asm volatile(" vmov s14,r0\n"
+                 " vmov s15,r1\n"
+                 " vdiv.f32 s15,s14,s15\n"
+                 " vmov r0, s15");
 }
+
 void __wrap___aeabi_fcmple() {
-    asm volatile("vmov s14,r0\n vmov s15,r1\n vcmpe.f32 s14,s15\n vmrs APSR_nzcv,fpscr\n"
-                 "ite ls\n movls r0,#1\n movhi r0,#0");
+    asm volatile(" vmov s14,r0\n"
+                 " vmov s15,r1\n"
+                 " vcmpe.f32 s14,s15\n"
+                 " vmrs APSR_nzcv,fpscr\n"
+                 " ite ls\n"
+                 " movls r0,#1\n"
+                 " movhi r0,#0");
 }
+
 void __wrap___aeabi_fcmpgt() {
-    asm volatile("vmov s14,r0\n vmov s15,r1\n vcmpe.f32 s14,s15\n vmrs APSR_nzcv,fpscr\n"
-                 "ite gt\n movgt r0,#1\n movle r0,#0");
+    asm volatile(" vmov s14,r0\n"
+                 " vmov s15,r1\n"
+                 " vcmpe.f32 s14,s15\n"
+                 " vmrs APSR_nzcv,fpscr\n"
+                 " ite gt\n"
+                 " movgt r0,#1\n"
+                 " movle r0,#0");
 }
+
 void __wrap___aeabi_fcmplt() {
-    asm volatile("vmov s14,r0\n vmov s15,r1\n vcmpe.f32 s14,s15\n vmrs APSR_nzcv,fpscr\n"
-                 "ite mi\n movmi r0,#1\n movpl r0,#0");
+    asm volatile(" vmov s14,r0\n"
+                 " vmov s15,r1\n"
+                 " vcmpe.f32 s14,s15\n"
+                 " vmrs APSR_nzcv,fpscr\n"
+                 " ite mi\n"
+                 " movmi r0,#1\n"
+                 " movpl r0,#0");
 }
+
 void __wrap___aeabi_fcmpge() {
-    asm volatile("vmov s14,r0\n vmov s15,r1\n vcmpe.f32 s14,s15\n vmrs APSR_nzcv,fpscr\n"
-                 "ite ge\n movge r0,#1\n movlt r0,#0");
+    asm volatile(" vmov s14,r0\n"
+                 " vmov s15,r1\n"
+                 " vcmpe.f32 s14,s15\n"
+                 " vmrs APSR_nzcv,fpscr\n"
+                 " ite ge\n"
+                 " movge r0,#1\n"
+                 " movlt r0,#0");
 }
-#endif
 
-// accellerated SDK floating point functions
-extern void __wrap___aeabi_idiv();
-extern void __wrap___aeabi_i2f();
-extern void __wrap___aeabi_f2iz();
-extern void __wrap___aeabi_fadd();
-extern void __wrap___aeabi_fsub();
-extern void __wrap___aeabi_fmul();
-extern void __wrap___aeabi_fdiv();
-extern void __wrap___aeabi_fcmple();
-extern void __wrap___aeabi_fcmpgt();
-extern void __wrap___aeabi_fcmplt();
-extern void __wrap___aeabi_fcmpge();
-#if PICO2350
 extern void __wrap___aeabi_imod();
+
 #endif
 
-// accellerate SDK trig functions
+// SDK floating point functions
+void __wrap___aeabi_idiv();
+void __wrap___aeabi_i2f();
+void __wrap___aeabi_f2iz();
+void __wrap___aeabi_fadd();
+void __wrap___aeabi_fsub();
+void __wrap___aeabi_fmul();
+void __wrap___aeabi_fdiv();
+void __wrap___aeabi_fcmple();
+void __wrap___aeabi_fcmpgt();
+void __wrap___aeabi_fcmplt();
+void __wrap___aeabi_fcmpge();
+
+// accellerated SDK trig functions
 extern void __wrap_sinf();
 extern void __wrap_cosf();
 extern void __wrap_tanf();
@@ -287,6 +345,7 @@ enum { CHAR = 0, INT = 4, FLOAT = 8, ATOM_TYPE = 11, PTR = 0x1000, PTR2 = 0x2000
 
 // library help for external functions
 
+// function group
 struct define_grp {
     const char* name; // function group name
     const int val;    // index of 1st function in group
@@ -485,11 +544,12 @@ static const struct {
 static lfs_file_t* fd UDATA;
 static char* fp UDATA;
 
-#define numof(a) (sizeof(a) / sizeof(a[0]))
+#define NUMOF(a) (sizeof(a) / sizeof(a[0]))
 
+// binary search of external function table by name
 static int extern_search(char* name) // get cache index of external function
 {
-    int first = 0, last = numof(externs) - 1, middle;
+    int first = 0, last = NUMOF(externs) - 1, middle;
     while (first <= last) {
         middle = (first + last) / 2;
         if (strcmp(name, externs[middle].name) > 0)
@@ -509,6 +569,8 @@ static void push_ast(int l) {
     if (n < ast)
         fatal("AST overflow compiler error. Program too big");
 }
+
+// AST table entry types
 
 typedef struct {
     int tk;
@@ -2400,19 +2462,19 @@ static const struct segs {
     uint16_t* msk;
     uint16_t* rep;
     struct subs map[2];
-} segments[] = {{numof(pat0), numof(rep0), pat0, msk0, rep0, {{2, 1, 0}, {-1, -1, 0}}},
-                {numof(pat1), numof(rep1), pat1, msk1, rep1, {{0, 0, 0}, {2, 1, 0}}},
-                {numof(pat2), numof(rep2), pat2, msk2, rep2, {{0, 1, 0}, {-1, -1, 0}}},
-                {numof(pat3), numof(rep3), pat3, msk3, rep3, {{-1, -1, 0}, {-1, -1, 0}}},
-                {numof(pat4), numof(rep4), pat4, msk4, rep4, {{0, 0, 0}, {-1, -1, 0}}},
-                {numof(pat8), numof(rep8), pat8, msk8, rep8, {{3, 1, 0}, {-1, -1, 0}}},
-                {numof(pat5), numof(rep5), pat5, msk5, rep5, {{1, 1, 0}, {3, 2, 0}}},
-                {numof(pat6), numof(rep6), pat6, msk6, rep6, {{-1, -1, 0}, {-1, -1, 0}}},
-                {numof(pat7), numof(rep7), pat7, msk7, rep7, {{-1, -1, 0}, {-1, -1, 0}}},
-                {numof(pat9), numof(rep9), pat9, msk9, rep9, {{-1, -1, 0}, {-1, -1, 0}}},
-                {numof(pat10), numof(rep10), pat10, msk10, rep10, {{1, 1, 0}, {-1, -1, 0}}},
-                {numof(pat11), numof(rep11), pat11, msk11, rep11, {{-1, -1, 0}, {-1, -1, 0}}},
-                {numof(pat12), numof(rep12), pat12, msk12, rep12, {{0, 0, 4}, {-1, -1, 0}}}};
+} segments[] = {{NUMOF(pat0), NUMOF(rep0), pat0, msk0, rep0, {{2, 1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat1), NUMOF(rep1), pat1, msk1, rep1, {{0, 0, 0}, {2, 1, 0}}},
+                {NUMOF(pat2), NUMOF(rep2), pat2, msk2, rep2, {{0, 1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat3), NUMOF(rep3), pat3, msk3, rep3, {{-1, -1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat4), NUMOF(rep4), pat4, msk4, rep4, {{0, 0, 0}, {-1, -1, 0}}},
+                {NUMOF(pat8), NUMOF(rep8), pat8, msk8, rep8, {{3, 1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat5), NUMOF(rep5), pat5, msk5, rep5, {{1, 1, 0}, {3, 2, 0}}},
+                {NUMOF(pat6), NUMOF(rep6), pat6, msk6, rep6, {{-1, -1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat7), NUMOF(rep7), pat7, msk7, rep7, {{-1, -1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat9), NUMOF(rep9), pat9, msk9, rep9, {{-1, -1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat10), NUMOF(rep10), pat10, msk10, rep10, {{1, 1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat11), NUMOF(rep11), pat11, msk11, rep11, {{-1, -1, 0}, {-1, -1, 0}}},
+                {NUMOF(pat12), NUMOF(rep12), pat12, msk12, rep12, {{0, 0, 4}, {-1, -1, 0}}}};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[8];
@@ -2440,7 +2502,7 @@ static int peep_hole(const struct segs* s) {
 
 static void peep(void) {
 restart:
-    for (int i = 0; i < numof(segments); ++i)
+    for (int i = 0; i < NUMOF(segments); ++i)
         if (peep_hole(&segments[i]))
             goto restart;
 }
@@ -2558,7 +2620,7 @@ static void check_pc_relative(void) {
         return;
     int te = (int)e + 4 * pcrel_count;
     int ta = (int)pcrel_1st;
-    if ((te - ta) > 1000)
+    if ((te - ta) > 1000) // just under 1024
         patch_pc_relative(1);
 }
 
@@ -2635,7 +2697,7 @@ static void emit_branch(uint16_t* to) {
 }
 
 static void emit_fop(int n) {
-    if (!ofn)
+    if (!ofn) // if exe output emit negative external function index
         emit_load_long_imm(3, (int)fops[n], 0);
     else
         emit_load_long_imm(3, -n, 1);
@@ -2774,6 +2836,7 @@ static void emit_oper(int op) {
         emit_pop(0);  // pop {r0}
         emit_fop(aeabi_idiv);
         break;
+
     case MOD:
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
@@ -2784,6 +2847,7 @@ static void emit_oper(int op) {
         emit(0x4608); // mov r0,r1
 #endif
         break;
+
     default:
         fatal("unexpected compiler error");
     }
@@ -4147,7 +4211,7 @@ static void show_externals(int i) {
     int x, y;
     get_screen_xy(&x, &y);
     int pos = 0;
-    for (int j = 0; j < numof(externs); j++)
+    for (int j = 0; j < NUMOF(externs); j++)
         if (externs[j].grp == includes[i].grp) {
             if (pos == 0) {
                 pos = strlen(externs[j].name);
