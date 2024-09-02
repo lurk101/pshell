@@ -1,3 +1,7 @@
+What's new in version 2.0.1
+
+- Fix Heap Limit
+
 What's new in version 2.0.0
 
 - Pico2 (RP2350) support

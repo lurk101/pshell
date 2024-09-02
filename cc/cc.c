@@ -2770,18 +2770,18 @@ static void emit_oper(int op) {
         break;
 
     case DIV:
+        emit(0x4601); // mov r1,r0
+        emit_pop(0);  // pop {r0}
+        emit_fop(aeabi_idiv);
+        break;
     case MOD:
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
 #if PICO2350
-        if (op == MOD)
-            emit_fop(aeabi_imod);
-        else
-            emit_fop(aeabi_idiv);
+        emit_fop(aeabi_imod);
 #else
         emit_fop(aeabi_idiv);
-        if (op == MOD)
-            emit(0x4608); // mov r0,r1
+        emit(0x4608); // mov r0,r1
 #endif
         break;
     default:
