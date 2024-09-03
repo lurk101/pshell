@@ -76,7 +76,7 @@ extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 // for the RP2040 these are builtin to the ROM
 void __wrap___aeabi_idiv() { asm volatile(" sdiv r0,r0,r1"); }
 
-void __wrap___aeabi_imod() {
+void __wrap_imod() {
     asm volatile(" sdiv r3,r0,r1\n"
                  " mls r0,r3,r1,r0");
 }
@@ -161,7 +161,7 @@ void __wrap___aeabi_fcmpge() {
                  " movlt r0,#0");
 }
 
-void __wrap___aeabi_imod();
+void __wrap_imod();
 
 #endif
 
@@ -205,11 +205,12 @@ enum {
     aeabi_fcmplt,
     aeabi_fcmpge,
 #if PICO2350
-    aeabi_imod,
+    imod,
 #endif
 };
 
-static void (*fops[])() = { //
+static void (*fops[])() = {
+    //
     0,
     __wrap___aeabi_idiv,
     __wrap___aeabi_i2f,
@@ -223,7 +224,7 @@ static void (*fops[])() = { //
     __wrap___aeabi_fcmplt,
     __wrap___aeabi_fcmpge,
 #if PICO2350
-    __wrap___aeabi_imod,
+    __wrap_imod,
 #endif
 };
 
@@ -2841,7 +2842,7 @@ static void emit_oper(int op) {
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
 #if PICO2350
-        emit_fop(aeabi_imod);
+        emit_fop(imod);
 #else
         emit_fop(aeabi_idiv);
         emit(0x4608); // mov r0,r1
