@@ -161,7 +161,7 @@ void __wrap___aeabi_fcmpge() {
                  " movlt r0,#0");
 }
 
-extern void __wrap___aeabi_imod();
+void __wrap___aeabi_imod();
 
 #endif
 
@@ -179,18 +179,18 @@ void __wrap___aeabi_fcmplt();
 void __wrap___aeabi_fcmpge();
 
 // accellerated SDK trig functions
-extern void __wrap_sinf();
-extern void __wrap_cosf();
-extern void __wrap_tanf();
-extern void __wrap_asinf();
-extern void __wrap_acosf();
-extern void __wrap_atanf();
-extern void __wrap_sinhf();
-extern void __wrap_coshf();
-extern void __wrap_tanhf();
-extern void __wrap_asinhf();
-extern void __wrap_acoshf();
-extern void __wrap_atanhf();
+void __wrap_sinf();
+void __wrap_cosf();
+void __wrap_tanf();
+void __wrap_asinf();
+void __wrap_acosf();
+void __wrap_atanf();
+void __wrap_sinhf();
+void __wrap_coshf();
+void __wrap_tanhf();
+void __wrap_asinhf();
+void __wrap_acoshf();
+void __wrap_atanhf();
 
 enum {
     aeabi_idiv = 1,
