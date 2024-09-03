@@ -6,6 +6,7 @@ int histogram[64];
 int main() {
     printf("Using get_rand_32()\n\n");
 
+    int t = time_us_32();
     printf("Upper 4 bits distribution. All buckets should be aproximately equal\n");
     int i, n;
     for (i = 0; i < 16; ++i)
@@ -75,6 +76,7 @@ int main() {
                histogram[i + 32], histogram[i] + histogram[i + 32], expected);
         expected /= 2.0;
     }
+    printf("Runtime = %.2f seconds\n", (float)(time_us_32() - t) / 1000000.0);
     return 0;
 }
 
