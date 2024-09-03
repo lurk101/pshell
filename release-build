@@ -15,9 +15,9 @@ cp pshell_usb.uf2 ../pico.pshell_usb.uf2
 rm -rf *
 cmake .. -DUSB_CONSOLE=OFF -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
 make -j8
-cp pshell_usb.elf ../pico.pshell_uart.elf
-cp pshell_usb.bin ../pico.pshell_uart.bin
-cp pshell_usb.uf2 ../pico.pshell_uart.uf2
+cp pshell_uart.elf ../pico.pshell_uart.elf
+cp pshell_uart.bin ../pico.pshell_uart.bin
+cp pshell_uart.uf2 ../pico.pshell_uart.uf2
 rm -rf *
 cmake .. -DPICO_BOARD=vgaboard -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
 make -j8
