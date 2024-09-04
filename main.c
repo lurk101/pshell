@@ -969,6 +969,7 @@ int main(void) {
         sleep_ms(1000);
     uart = false;
 #endif
+    int save_fault = ((int*)scb_hw->vtor)[3];
     ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
     getchar_timeout_us(1000);
     bool detected = screen_size();
@@ -1060,6 +1061,8 @@ int main(void) {
             help();
     }
     fs_unload();
+    ((int*)scb_hw->vtor)[3] = save_fault;
+
     printf("\ndone\n");
     sleep_ms(1000);
 }

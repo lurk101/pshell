@@ -161,8 +161,6 @@ void __wrap___aeabi_fcmpge() {
                  " movlt r0,#0");
 }
 
-void __wrap_imod();
-
 #endif
 
 // SDK floating point functions
@@ -204,13 +202,9 @@ enum {
     aeabi_fcmpgt,
     aeabi_fcmplt,
     aeabi_fcmpge,
-#if PICO2350
-    imod,
-#endif
 };
 
 static void (*fops[])() = {
-    //
     0,
     __wrap___aeabi_idiv,
     __wrap___aeabi_i2f,
@@ -223,9 +217,6 @@ static void (*fops[])() = {
     __wrap___aeabi_fcmpgt,
     __wrap___aeabi_fcmplt,
     __wrap___aeabi_fcmpge,
-#if PICO2350
-    __wrap_imod,
-#endif
 };
 
 // patch list entry
@@ -2835,14 +2826,22 @@ static void emit_oper(int op) {
     case DIV:
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
+#if PICO2350
+        emit(0xfb90);
+        emit(0xf0f1); // sdiv    r0, r0, r1
+#else
         emit_fop(aeabi_idiv);
+#endif
         break;
 
     case MOD:
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
 #if PICO2350
-        emit_fop(imod);
+        emit(0xfb90);
+        emit(0xf3f1); // sdiv    r3, r0, r1
+        emit(0xfb03);
+        emit(0x0011); // mls r0, r3, r1, r0
 #else
         emit_fop(aeabi_idiv);
         emit(0x4608); // mov r0,r1
