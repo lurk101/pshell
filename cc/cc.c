@@ -76,11 +76,6 @@ extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 // for the RP2040 these are builtin to the ROM
 void __wrap___aeabi_idiv() { asm volatile(" sdiv r0,r0,r1"); }
 
-void __wrap_imod() {
-    asm volatile(" sdiv r3,r0,r1\n"
-                 " mls r0,r3,r1,r0");
-}
-
 void __wrap___aeabi_i2f() {
     asm volatile(" vmov s15,r0\n"
                  " vcvt.f32.s32 s15,s15\n"
