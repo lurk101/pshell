@@ -1,3 +1,9 @@
+What's new in version 2.0.2
+
+- Add -f compiler option to generate inline floating point operation for RP2350. The default is to generate RP2040 style wrapper function calls.
+- Generate integer division sdiv for RP2350.
+- Update RP2350 GPIO constants and functions for RP2350.
+
 What's new in version 2.0.1
 
 - Fix Heap Limit
