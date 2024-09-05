@@ -2853,7 +2853,7 @@ static void emit_float_oper(int op) {
     switch (op) {
     case ADDF:
         emit_pop(1); // pop {r1}
-#if RP2350
+#if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
             emit(0x0a10); // vmov s14,r0
@@ -2872,7 +2872,7 @@ static void emit_float_oper(int op) {
     case SUBF:
         emit(0x0001); // movs r1,r0
         emit_pop(0);
-#if RP2350
+#if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
             emit(0x0a10); // vmov s14,r0
@@ -2890,7 +2890,7 @@ static void emit_float_oper(int op) {
         break;
     case MULF:
         emit_pop(1);
-#if RP2350
+#if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
             emit(0x0a10); // vmov s14,r0
@@ -2909,7 +2909,7 @@ static void emit_float_oper(int op) {
     case DIVF:
         emit(0x0001); // movs r1,r0
         emit_pop(0);
-#if RP2350
+#if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
             emit(0x0a10); // vmov s14,r0
@@ -2928,7 +2928,7 @@ static void emit_float_oper(int op) {
     case GEF:
         emit(0x0001); // movs r1,r0
         emit_pop(0);
-#if RP2350
+#if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
             emit(0x0a10); // vmov s14,r0
@@ -2950,7 +2950,7 @@ static void emit_float_oper(int op) {
     case GTF:
         emit(0x0001); // movs r1,r0
         emit_pop(0);
-#if RP2350
+#if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
             emit(0x0a10); // vmov s14,r0
@@ -2972,7 +2972,7 @@ static void emit_float_oper(int op) {
     case LTF:
         emit(0x0001); // movs r1,r0
         emit_pop(0);
-#if RP2350
+#if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
             emit(0x0a10); // vmov s14,r0
@@ -2994,7 +2994,7 @@ static void emit_float_oper(int op) {
     case LEF:
         emit(0x0001); // movs r1,r0
         emit_pop(0);
-#if RP2350
+#if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
             emit(0x0a10); // vmov s14,r0
