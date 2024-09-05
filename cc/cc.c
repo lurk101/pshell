@@ -268,7 +268,7 @@ static int rtf UDATA, rtt UDATA;      // return flag and return type for current
 static int loc UDATA;                 // local variable offset
 static int lineno UDATA;              // current line number
 static int src_opt UDATA;             // print source and assembly flag
-static int inline_float_opt = 1;      // generate inline float instructions flag
+static int inline_float_opt UDATA;    // generate inline float instructions flag
 static int nopeep_opt UDATA;          // turn off peep-hole optimization
 static int uchar_opt UDATA;           // use unsigned character variables
 static int* n UDATA;                  // current position in emitted abstract syntax tree
@@ -4379,13 +4379,19 @@ static void show_externals(int i) {
 static void help(char* lib) {
     if (!lib) {
         printf("\n"
-               "usage: cc [-s] [-u] [-n] [-f] [-h [lib]] [-D [symbol[ = value]]]\n"
+               "usage: cc [-s] [-u] [-n]"
+#if PICO2350
+               " [-f]"
+#endif
+               " [-h [lib]] [-D [symbol[ = value]]]\n"
                "          [-o filename] filename\n"
                "    -s      display disassembly and quit.\n"
                "    -o      name of executable output file.\n"
                "    -u      treat char type as unsigned.\n"
                "    -n      turn off peep-hole optimization\n"
-               "    -f      do not use inline float operators\n"
+#if PICO2350
+               "    -f      use inline float instructions\n"
+#endif
                "    -D symbol [= value]\n"
                "            define symbol for limited pre-processor, can repeat.\n"
                "    -h [lib name]\n"
@@ -4515,8 +4521,10 @@ int cc(int mode, int argc, char** argv) {
                 goto done;
             } else if ((*argv)[1] == 's') {
                 src_opt = 1;
+#if PICO2350
             } else if ((*argv)[1] == 'f') {
-                inline_float_opt = 0;
+                inline_float_opt = 1;
+#endif
             } else if ((*argv)[1] == 'n') {
                 nopeep_opt = 1;
             } else if ((*argv)[1] == 'o') {
