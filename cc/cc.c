@@ -2928,20 +2928,90 @@ static void emit_float_oper(int op) {
     case GEF:
         emit(0x0001); // movs r1,r0
         emit_pop(0);
+#if RP2350
+        if (inline_float_opt) {
+            emit(0xee07);
+            emit(0x0a10); // vmov s14,r0
+            emit(0xee07);
+            emit(0x1a90); // vmov s15,r1
+            emit(0xeeb4);
+            emit(0x7ae7); // vcmpe.f32 s14,s15
+            emit(0xeef1);
+            emit(0xfa10); // vmrs APSR_nzcv,fpscr
+            emit(0xbfac); // ite ge
+            emit(0x2001); // movge r0,#1
+            emit(0x2000); // movlt r0,#0
+        } else
+            emit_fop((int)aeabi_fcmpge);
+#else
         emit_fop((int)aeabi_fcmpge);
+#endif
         break;
     case GTF:
-        emit_pop(1);
-        emit_fop((int)aeabi_fcmple);
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
+#if RP2350
+        if (inline_float_opt) {
+            emit(0xee07);
+            emit(0x0a10); // vmov s14,r0
+            emit(0xee07);
+            emit(0x1a90); // vmov s15,r1
+            emit(0xeeb4);
+            emit(0x7ae7); // vcmpe.f32 s14,s15
+            emit(0xeef1);
+            emit(0xfa10); // vmrs APSR_nzcv,fpscr
+            emit(0xbfcc); // ite gt
+            emit(0x2001); // movgt r0,#1
+            emit(0x2000); // movle r0,#0
+        } else
+            emit_fop((int)aeabi_fcmpgt);
+#else
+        emit_fop((int)aeabi_fcmpgt);
+#endif
         break;
     case LTF:
-        emit_pop(1);
-        emit_fop((int)aeabi_fcmpge);
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
+#if RP2350
+        if (inline_float_opt) {
+            emit(0xee07);
+            emit(0x0a10); // vmov s14,r0
+            emit(0xee07);
+            emit(0x1a90); // vmov s15,r1
+            emit(0xeeb4);
+            emit(0x7ae7); // vcmpe.f32 s14,s15
+            emit(0xeef1);
+            emit(0xfa10); // vmrs APSR_nzcv,fpscr
+            emit(0xbf4c); // ite mi
+            emit(0x2001); // movmi r0,#1
+            emit(0x2000); // movpl r0,#0
+        } else
+            emit_fop((int)aeabi_fcmplt);
+#else
+        emit_fop((int)aeabi_fcmplt);
+#endif
         break;
     case LEF:
         emit(0x0001); // movs r1,r0
         emit_pop(0);
+#if RP2350
+        if (inline_float_opt) {
+            emit(0xee07);
+            emit(0x0a10); // vmov s14,r0
+            emit(0xee07);
+            emit(0x1a90); // vmov s15,r1
+            emit(0xeeb4);
+            emit(0x7ae7); // vcmpe.f32 s14,s15
+            emit(0xeef1);
+            emit(0xfa10); // vmrs APSR_nzcv,fpscr
+            emit(0xbf94); // ite ls
+            emit(0x2001); // movls r0,#1
+            emit(0x2000); // movhi r0,#0
+        } else
+            emit_fop((int)aeabi_fcmple);
+#else
         emit_fop((int)aeabi_fcmple);
+#endif
         break;
     case EQF:
         emit_oper(EQ);
