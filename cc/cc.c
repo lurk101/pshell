@@ -96,8 +96,8 @@ static void __wrap___aeabi_fadd() {
 }
 
 static void __wrap___aeabi_fsub() {
-    asm volatile(" vmov s14,r0\n"
-                 " vmov s15,r1\n"
+    asm volatile(" vmov s14,r1\n"
+                 " vmov s15,r0\n"
                  " vsub.f32 s15,s14,s15\n"
                  " vmov r0,s15");
 }
@@ -110,15 +110,15 @@ static void __wrap___aeabi_fmul() {
 }
 
 static void __wrap___aeabi_fdiv() {
-    asm volatile(" vmov s14,r0\n"
-                 " vmov s15,r1\n"
+    asm volatile(" vmov s14,r1\n"
+                 " vmov s15,r0\n"
                  " vdiv.f32 s15,s14,s15\n"
                  " vmov r0, s15");
 }
 
 static void __wrap___aeabi_fcmple() {
-    asm volatile(" vmov s14,r0\n"
-                 " vmov s15,r1\n"
+    asm volatile(" vmov s14,r1\n"
+                 " vmov s15,r0\n"
                  " vcmpe.f32 s14,s15\n"
                  " vmrs APSR_nzcv,fpscr\n"
                  " ite ls\n"
@@ -127,8 +127,8 @@ static void __wrap___aeabi_fcmple() {
 }
 
 static void __wrap___aeabi_fcmpgt() {
-    asm volatile(" vmov s14,r0\n"
-                 " vmov s15,r1\n"
+    asm volatile(" vmov s14,r1\n"
+                 " vmov s15,r0\n"
                  " vcmpe.f32 s14,s15\n"
                  " vmrs APSR_nzcv,fpscr\n"
                  " ite gt\n"
@@ -137,8 +137,8 @@ static void __wrap___aeabi_fcmpgt() {
 }
 
 static void __wrap___aeabi_fcmplt() {
-    asm volatile(" vmov s14,r0\n"
-                 " vmov s15,r1\n"
+    asm volatile(" vmov s14,r1\n"
+                 " vmov s15,r0\n"
                  " vcmpe.f32 s14,s15\n"
                  " vmrs APSR_nzcv,fpscr\n"
                  " ite mi\n"
@@ -147,8 +147,8 @@ static void __wrap___aeabi_fcmplt() {
 }
 
 static void __wrap___aeabi_fcmpge() {
-    asm volatile(" vmov s14,r0\n"
-                 " vmov s15,r1\n"
+    asm volatile(" vmov s14,r1\n"
+                 " vmov s15,r0\n"
                  " vcmpe.f32 s14,s15\n"
                  " vmrs APSR_nzcv,fpscr\n"
                  " ite ge\n"
@@ -2870,21 +2870,22 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case SUBF:
-        emit(0x0001); // movs r1,r0
-        emit_pop(0);
 #if PICO2350
+        emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x0a10); // vmov s14,r0
+            emit(0x1a10); // vmov s14,r1
             emit(0xee07);
-            emit(0x1a90); // vmov s15,r1
+            emit(0x0a90); // vmov s15,r0
             emit(0xee77);
-            emit(0x7a67); // vsub.f32    s15, s14, s15
+            emit(0x7a67); // vsub.f32 s15,s14,s15
             emit(0xee17);
             emit(0x0a90); // vmov r0,s15
         } else
             emit_fop((int)aeabi_fsub);
 #else
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
         emit_fop((int)aeabi_fsub);
 #endif
         break;
@@ -2907,14 +2908,13 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case DIVF:
-        emit(0x0001); // movs r1,r0
-        emit_pop(0);
 #if PICO2350
+        emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x0a10); // vmov s14,r0
+            emit(0x1a10); // vmov s14,r1
             emit(0xee07);
-            emit(0x1a90); // vmov s15,r1
+            emit(0x0a90); // vmov s15,r0
             emit(0xeec7);
             emit(0x7a27); // vdiv.f32 s15,s14,s15
             emit(0xee17);
@@ -2922,18 +2922,19 @@ static void emit_float_oper(int op) {
         } else
             emit_fop((int)aeabi_fdiv);
 #else
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
         emit_fop((int)aeabi_fdiv);
 #endif
         break;
     case GEF:
-        emit(0x0001); // movs r1,r0
-        emit_pop(0);
 #if PICO2350
+        emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x0a10); // vmov s14,r0
+            emit(0x1a10); // vmov s14,r1
             emit(0xee07);
-            emit(0x1a90); // vmov s15,r1
+            emit(0x0a90); // vmov s15,r0
             emit(0xeeb4);
             emit(0x7ae7); // vcmpe.f32 s14,s15
             emit(0xeef1);
@@ -2944,18 +2945,19 @@ static void emit_float_oper(int op) {
         } else
             emit_fop((int)aeabi_fcmpge);
 #else
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
         emit_fop((int)aeabi_fcmpge);
 #endif
         break;
     case GTF:
-        emit(0x0001); // movs r1,r0
-        emit_pop(0);
 #if PICO2350
+        emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x0a10); // vmov s14,r0
+            emit(0x1a10); // vmov s14,r1
             emit(0xee07);
-            emit(0x1a90); // vmov s15,r1
+            emit(0x0a90); // vmov s15,r0
             emit(0xeeb4);
             emit(0x7ae7); // vcmpe.f32 s14,s15
             emit(0xeef1);
@@ -2966,18 +2968,19 @@ static void emit_float_oper(int op) {
         } else
             emit_fop((int)aeabi_fcmpgt);
 #else
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
         emit_fop((int)aeabi_fcmpgt);
 #endif
         break;
     case LTF:
-        emit(0x0001); // movs r1,r0
-        emit_pop(0);
 #if PICO2350
+        emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x0a10); // vmov s14,r0
+            emit(0x1a10); // vmov s14,r1
             emit(0xee07);
-            emit(0x1a90); // vmov s15,r1
+            emit(0x0a90); // vmov s15,r0
             emit(0xeeb4);
             emit(0x7ae7); // vcmpe.f32 s14,s15
             emit(0xeef1);
@@ -2988,18 +2991,19 @@ static void emit_float_oper(int op) {
         } else
             emit_fop((int)aeabi_fcmplt);
 #else
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
         emit_fop((int)aeabi_fcmplt);
 #endif
         break;
     case LEF:
-        emit(0x0001); // movs r1,r0
-        emit_pop(0);
 #if PICO2350
+        emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x0a10); // vmov s14,r0
+            emit(0x1a10); // vmov s14,r1
             emit(0xee07);
-            emit(0x1a90); // vmov s15,r1
+            emit(0x0a90); // vmov s15,r0
             emit(0xeeb4);
             emit(0x7ae7); // vcmpe.f32 s14,s15
             emit(0xeef1);
@@ -3010,6 +3014,8 @@ static void emit_float_oper(int op) {
         } else
             emit_fop((int)aeabi_fcmple);
 #else
+        emit(0x0001); // movs r1,r0
+        emit_pop(0);
         emit_fop((int)aeabi_fcmple);
 #endif
         break;
