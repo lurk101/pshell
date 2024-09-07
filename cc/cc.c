@@ -2437,6 +2437,13 @@ static uint16_t pat12[] = {0x2000, 0x4438, 0x6800};
 static uint16_t msk12[] = {0xff83, 0xffff, 0xffff};
 static uint16_t rep12[] = {0x6838};
 
+// vmov r0,s15
+// vmov s15,r0
+
+static uint16_t pat13[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
+static uint16_t msk13[] = {0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep13[] = {};
+
 struct subs {
     int8_t from;
     int8_t to;
@@ -2462,7 +2469,8 @@ static const struct segs {
                 {NUMOF(pat9), NUMOF(rep9), pat9, msk9, rep9, {{-1, -1, 0}, {-1, -1, 0}}},
                 {NUMOF(pat10), NUMOF(rep10), pat10, msk10, rep10, {{1, 1, 0}, {-1, -1, 0}}},
                 {NUMOF(pat11), NUMOF(rep11), pat11, msk11, rep11, {{-1, -1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat12), NUMOF(rep12), pat12, msk12, rep12, {{0, 0, 4}, {-1, -1, 0}}}};
+                {NUMOF(pat12), NUMOF(rep12), pat12, msk12, rep12, {{0, 0, 4}, {-1, -1, 0}}},
+                {NUMOF(pat13), NUMOF(rep13), pat13, msk13, rep13, {{-1, -1, -1}, {-1, -1, -1}}}};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[8];
