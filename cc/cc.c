@@ -4387,7 +4387,7 @@ static void help(char* lib) {
         printf("\n"
                "usage: cc [-s] [-u] [-n]"
 #if PICO2350
-               " [-f]"
+               " [-x]"
 #endif
                " [-h [lib]] [-D [symbol[ = value]]]\n"
                "          [-o filename] filename\n"
@@ -4396,7 +4396,7 @@ static void help(char* lib) {
                "    -u      treat char type as unsigned.\n"
                "    -n      turn off peep-hole optimization\n"
 #if PICO2350
-               "    -f      use inline float instructions\n"
+               "    -x      suppress inline float instructions\n"
 #endif
                "    -D symbol [= value]\n"
                "            define symbol for limited pre-processor, can repeat.\n"
@@ -4514,6 +4514,7 @@ int cc(int mode, int argc, char** argv) {
         tsize[tnew++] = 0; // reserved for another scalar type
 
         // parse the command line arguments
+        inline_float_opt = 1;
         --argc;
         ++argv;
         while (argc > 0 && **argv == '-') {
@@ -4529,7 +4530,7 @@ int cc(int mode, int argc, char** argv) {
                 src_opt = 1;
 #if PICO2350
             } else if ((*argv)[1] == 'f') {
-                inline_float_opt = 1;
+                inline_float_opt = 0;
 #endif
             } else if ((*argv)[1] == 'n') {
                 nopeep_opt = 1;
