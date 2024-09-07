@@ -1,3 +1,9 @@
+What's new in version 2.0.3
+
+- Optimize /, -, >, >=, <, <= float oprators for RP2350
+- Add a few FP instruction decodes to disassembler
+- Default to inline FP instructions (RP2350). Use -x compiler option to revert to RP2040 style wrapper function calls.
+
 What's new in version 2.0.2
 
 - Add -f compiler option to generate inline floating point operation for RP2350. The default is to generate RP2040 style wrapper function calls.
