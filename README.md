@@ -162,6 +162,7 @@ file system automatically mounted
 
 CC = 0
 
+
 /: cc -s sine.c 
 1: /* Math function test. Display a sine wave */
 2: 
@@ -186,88 +187,91 @@ CC = 0
 20078012    2000        movs    r0, #0
 20078014    bc08        pop     {r3}
 20078016    6018        str     r0, [r3, #0]
-20078018    f000 f834   bl      20078084
+20078018    f000 f848   bl      200780ac
 2007801c    4638        mov     r0, r7
 2007801e    380c        subs    r0, #12         ; 0xc
 20078020    b401        push    {r0}
 20078022    1f38        subs    r0, r7, #4
 20078024    6800        ldr     r0, [r0, #0]
-20078026    4b20        ldr     r3, [pc, #128]  ; 0x200780a8
-20078028    4798        blx     r3
-2007802a    b401        push    {r0}
-2007802c    481f        ldr     r0, [pc, #124]  ; 0x200780ac
-2007802e    bc02        pop     {r1}
-20078030    4b1f        ldr     r3, [pc, #124]  ; 0x200780b0
-20078032    4798        blx     r3
-20078034    bc08        pop     {r3}
-20078036    6018        str     r0, [r3, #0]
-20078038    481e        ldr     r0, [pc, #120]  ; 0x200780b4
-2007803a    b401        push    {r0}
-2007803c    201e        movs    r0, #30         ; 0x1e
-2007803e    b401        push    {r0}
-20078040    4638        mov     r0, r7
-20078042    380c        subs    r0, #12         ; 0xc
-20078044    6800        ldr     r0, [r0, #0]
-20078046    4b1c        ldr     r3, [pc, #112]  ; 0x200780b8
-20078048    4798        blx     r3
-2007804a    b401        push    {r0}
-2007804c    481b        ldr     r0, [pc, #108]  ; 0x200780bc
-2007804e    bc02        pop     {r1}
-20078050    4b17        ldr     r3, [pc, #92]   ; 0x200780b0
-20078052    4798        blx     r3
-20078054    4b1a        ldr     r3, [pc, #104]  ; 0x200780c0
-20078056    4798        blx     r3
-20078058    bc08        pop     {r3}
-2007805a    18c0        adds    r0, r0, r3
-2007805c    b401        push    {r0}
-2007805e    4819        ldr     r0, [pc, #100]  ; 0x200780c4
-20078060    b401        push    {r0}
-20078062    202a        movs    r0, #42         ; 0x2a
-20078064    b401        push    {r0}
-20078066    2004        movs    r0, #4
-20078068    4b17        ldr     r3, [pc, #92]   ; 0x200780c8
-2007806a    4798        blx     r3
-2007806c    b004        add     sp, #16         ; 0x10
-2007806e    1f38        subs    r0, r7, #4
-20078070    b401        push    {r0}
-20078072    6800        ldr     r0, [r0, #0]
-20078074    b401        push    {r0}
-20078076    4638        mov     r0, r7
-20078078    3808        subs    r0, #8
-2007807a    6800        ldr     r0, [r0, #0]
-2007807c    bc08        pop     {r3}
-2007807e    18c0        adds    r0, r0, r3
+20078026    ee07 0a90   vmov    s15, r0
+2007802a    eef8 7ae7   vcvt.f32 s15, s15
+2007802e    ee17 0a90   vmov    r0, s15
+20078032    b401        push    {r0}
+20078034    4826        ldr     r0, [pc, #152]  ; 0x200780d0
+20078036    bc02        pop     {r1}
+20078038    ee07 0a10   vmov    s14, r0
+2007803c    ee07 1a90   vmov    s15, r1
+20078040    ee67 7a27   vmul.f32 s15, s14, s15
+20078044    ee17 0a90   vmov    r0, s15
+20078048    bc08        pop     {r3}
+2007804a    6018        str     r0, [r3, #0]
+2007804c    4821        ldr     r0, [pc, #132]  ; 0x200780d4
+2007804e    b401        push    {r0}
+20078050    201e        movs    r0, #30         ; 0x1e
+20078052    b401        push    {r0}
+20078054    4638        mov     r0, r7
+20078056    380c        subs    r0, #12         ; 0xc
+20078058    6800        ldr     r0, [r0, #0]
+2007805a    4b1f        ldr     r3, [pc, #124]  ; 0x200780d8
+2007805c    4798        blx     r3
+2007805e    b401        push    {r0}
+20078060    481e        ldr     r0, [pc, #120]  ; 0x200780dc
+20078062    bc02        pop     {r1}
+20078064    ee07 0a10   vmov    s14, r0
+20078068    ee07 1a90   vmov    s15, r1
+2007806c    ee67 7a27   vmul.f32 s15, s14, s15
+20078070    ee17 0a90   vmov    r0, s15
+20078074    ee07 0a90   vmov    s15, r0
+20078078    eefd 7ae7   vcvt.s32 s15, s15
+2007807c    ee17 0a90   vmov    r0, s15
 20078080    bc08        pop     {r3}
-20078082    6018        str     r0, [r3, #0]
-20078084    1f38        subs    r0, r7, #4
-20078086    6800        ldr     r0, [r0, #0]
+20078082    18c0        adds    r0, r0, r3
+20078084    b401        push    {r0}
+20078086    4816        ldr     r0, [pc, #88]   ; 0x200780e0
 20078088    b401        push    {r0}
-2007808a    4810        ldr     r0, [pc, #64]   ; 0x200780cc
-2007808c    bc02        pop     {r1}
-2007808e    0003        movs    r3, r0
-20078090    0fc8        lsrs    r0, r1, #31
-20078092    17da        asrs    r2, r3, #31
-20078094    428b        cmp     r3, r1
-20078096    4150        adcs    r0, r2
-20078098    2800        cmp     r0, #0
-2007809a    d1bf        bne     2007801c
-2007809c    2000        movs    r0, #0
-2007809e    46bd        mov     sp, r7
-200780a0    bd80        pop     {r7, pc}
-200780a2    46bd        mov     sp, r7
-200780a4    bd80        pop     {r7, pc}
-200780a6    46c0        mov     r8, r8
-200780a8    1001 4d35   .word   0x10014d35      ; i2f
-200780ac    3c8e fa35   .word   0x3c8efa35
-200780b0    1001 4d7d   .word   0x10014d7d      ; fmul
-200780b4    2007 c000   .word   0x2007c000
-200780b8    1002 2b71   .word   0x10022b71      ; sinf
-200780bc    41c8 0000   .word   0x41c80000
-200780c0    1001 4d45   .word   0x10014d45      ; f2i
-200780c4    2007 c008   .word   0x2007c008
-200780c8    1001 51b9   .word   0x100151b9      ; printf
-200780cc    0000 0168   .word   0x00000168
-200780d0    0000 0000   .word   0x00000000      ; "\0\0\0\0"
+2007808a    202a        movs    r0, #42         ; 0x2a
+2007808c    b401        push    {r0}
+2007808e    2004        movs    r0, #4
+20078090    4b14        ldr     r3, [pc, #80]   ; 0x200780e4
+20078092    4798        blx     r3
+20078094    b004        add     sp, #16         ; 0x10
+20078096    1f38        subs    r0, r7, #4
+20078098    b401        push    {r0}
+2007809a    6800        ldr     r0, [r0, #0]
+2007809c    b401        push    {r0}
+2007809e    4638        mov     r0, r7
+200780a0    3808        subs    r0, #8
+200780a2    6800        ldr     r0, [r0, #0]
+200780a4    bc08        pop     {r3}
+200780a6    18c0        adds    r0, r0, r3
+200780a8    bc08        pop     {r3}
+200780aa    6018        str     r0, [r3, #0]
+200780ac    1f38        subs    r0, r7, #4
+200780ae    6800        ldr     r0, [r0, #0]
+200780b0    b401        push    {r0}
+200780b2    480d        ldr     r0, [pc, #52]   ; 0x200780e8
+200780b4    bc02        pop     {r1}
+200780b6    0003        movs    r3, r0
+200780b8    0fc8        lsrs    r0, r1, #31
+200780ba    17da        asrs    r2, r3, #31
+200780bc    428b        cmp     r3, r1
+200780be    4150        adcs    r0, r2
+200780c0    2800        cmp     r0, #0
+200780c2    d1ab        bne     2007801c
+200780c4    2000        movs    r0, #0
+200780c6    46bd        mov     sp, r7
+200780c8    bd80        pop     {r7, pc}
+200780ca    46bd        mov     sp, r7
+200780cc    bd80        pop     {r7, pc}
+200780ce    46c0        mov     r8, r8
+200780d0    3c8e fa35   .word   0x3c8efa35
+200780d4    2007 c000   .word   0x2007c000
+200780d8    1002 2ed1   .word   0x10022ed1      ; sinf
+200780dc    41c8 0000   .word   0x41c80000
+200780e0    2007 c008   .word   0x2007c008
+200780e4    1001 522d   .word   0x1001522d      ; printf
+200780e8    0000 0168   .word   0x00000168
+200780ec    0000 0000   .word   0x00000000      ; "\0\0\0\0"
 11: 
 
 /: 
