@@ -1,4 +1,4 @@
-A tiny Raspberry Pico shell with flash file system, Vi, and C compiler.
+A tiny Raspberry Pico and Pico2 shell with flash file system, Vi, and C compiler.
 
 This project explores to what extent a reasonably competent self-hosted programming environment can be built on a modern embedded SoC.
 
