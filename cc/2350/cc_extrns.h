@@ -199,7 +199,7 @@
     {"spi_write_blocking", 3, spi_defines, spi_write_blocking, 0, 0, 0},
     {"spi_write_read_blocking", 4, spi_defines, spi_write_read_blocking, 0, 0, 0},
     {"sprintf", 1, stdio_defines, x_sprintf, 0, 0, 1},
-    {"sqrtf", 1 | (1 << 5) | (1 << 10), math_defines, sqrtf, 1, 0, 0},
+    {"sqrtf", 1 | (1 << 5) | (1 << 10), math_defines, wrap_sqrtf, 1, 0, 0},
     {"srand", 1, stdlib_defines, srand, 0, 0, 0},
     {"strcat", 2, string_defines, strcat, 0, 0, 0},
     {"strchr", 2, string_defines, strchr, 0, 0, 0},

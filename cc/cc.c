@@ -156,6 +156,11 @@ static void __wrap___aeabi_fcmpge() {
                  " movlt r0,#0");
 }
 
+static void wrap_sqrtf() {
+    asm volatile(" vmov s15,r0\n"
+                 " vsqrt.f32 s15,s15\n"
+                 " vmov r0, s15");
+}
 #endif
 
 // SDK floating point functions
