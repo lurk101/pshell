@@ -15,6 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/* modified with simple hack to decode a few floating point instructions */
+
 #include <assert.h>
 #include <ctype.h>
 #include <malloc.h>
@@ -2021,7 +2024,8 @@ static bool thumb2_co_trans(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool float_oper1(ARMSTATE* state, uint32_t instr) {
+// FP decoders
+static bool v_add_sub(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     switch (instr & 0xffff) {
     case 0x7a27:
@@ -2036,7 +2040,7 @@ static bool float_oper1(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool cmpf(ARMSTATE* state, uint32_t instr) {
+static bool v_cmpf(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vcmpe.f32");
     padinstr(state->text);
@@ -2044,7 +2048,7 @@ static bool cmpf(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool itof(ARMSTATE* state, uint32_t instr) {
+static bool v_itof(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vcvt.f32");
     padinstr(state->text);
@@ -2052,7 +2056,7 @@ static bool itof(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool ftoi(ARMSTATE* state, uint32_t instr) {
+static bool v_ftoi(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vcvt.s32");
     padinstr(state->text);
@@ -2060,7 +2064,7 @@ static bool ftoi(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool mulf(ARMSTATE* state, uint32_t instr) {
+static bool v_mulf(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vmul.f32");
     padinstr(state->text);
@@ -2068,7 +2072,7 @@ static bool mulf(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool divf(ARMSTATE* state, uint32_t instr) {
+static bool v_divf(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vdiv.f32");
     padinstr(state->text);
@@ -2076,15 +2080,15 @@ static bool divf(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool vmrs(ARMSTATE* state, uint32_t instr) {
+static bool v_mrs(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
-    strcpy(state->text, "vmrs");
+    strcpy(state->text, "v_mrs");
     padinstr(state->text);
     strcat(state->text, "apsr_nzcv, fpscr");
     return true;
 }
 
-static bool vmov_from(ARMSTATE* state, uint32_t instr) {
+static bool v_mov_from(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vmov");
     padinstr(state->text);
@@ -2105,7 +2109,7 @@ static bool vmov_from(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool vmov_to(ARMSTATE* state, uint32_t instr) {
+static bool v_mov_to(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vmov");
     padinstr(state->text);
@@ -2113,17 +2117,20 @@ static bool vmov_to(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
+// end of FP decoders
+
 static const ENCODEMASK16 thumb_table[] = {
-    // simple patch for floating point extensions
-    {0xffff, 0xee07, vmov_from},
-    {0xffff, 0xee17, vmov_to},
-    {0xffff, 0xeef1, vmrs},
-    {0xffff, 0xee77, float_oper1},
-    {0xffff, 0xee67, mulf},
-    {0xffff, 0xeec7, divf},
-    {0xffff, 0xeeb4, cmpf},
-    {0xffff, 0xeef8, itof},
-    {0xffff, 0xeefd, ftoi},
+    // simple hack for floating point extensions
+    {0xffff, 0xee07, v_mov_from},
+    {0xffff, 0xee17, v_mov_to},
+    {0xffff, 0xeef1, v_mrs},
+    {0xffff, 0xee77, v_add_sub},
+    {0xffff, 0xee67, v_mulf},
+    {0xffff, 0xeec7, v_divf},
+    {0xffff, 0xeeb4, v_cmpf},
+    {0xffff, 0xeef8, v_itof},
+    {0xffff, 0xeefd, v_ftoi},
+    // end of hack
     {0xf800, 0x0000, thumb_lsl},           /* logical shift left by immediate, or MOV */
     {0xf800, 0x0800, thumb_lsr},           /* logical shift right by immediate */
     {0xf800, 0x1000, thumb_asr},           /* arithmetic shift right by immediate */
