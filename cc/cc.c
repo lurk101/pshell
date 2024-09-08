@@ -268,7 +268,9 @@ static int rtf UDATA, rtt UDATA;      // return flag and return type for current
 static int loc UDATA;                 // local variable offset
 static int lineno UDATA;              // current line number
 static int src_opt UDATA;             // print source and assembly flag
+#if PICO2350
 static int inline_float_opt UDATA;    // generate inline float instructions flag
+#endif
 static int nopeep_opt UDATA;          // turn off peep-hole optimization
 static int uchar_opt UDATA;           // use unsigned character variables
 static int* n UDATA;                  // current position in emitted abstract syntax tree
@@ -4522,7 +4524,9 @@ int cc(int mode, int argc, char** argv) {
         tsize[tnew++] = 0; // reserved for another scalar type
 
         // parse the command line arguments
+#if PICO2350
         inline_float_opt = 1;
+#endif
         --argc;
         ++argv;
         while (argc > 0 && **argv == '-') {

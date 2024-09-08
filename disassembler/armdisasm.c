@@ -2024,6 +2024,7 @@ static bool thumb2_co_trans(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
+#if PICO2350
 // FP decoders
 static bool v_add_sub(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
@@ -2118,8 +2119,10 @@ static bool v_mov_to(ARMSTATE* state, uint32_t instr) {
 }
 
 // end of FP decoders
+#endif
 
 static const ENCODEMASK16 thumb_table[] = {
+#if PICO2350
     // simple hack for floating point extensions
     {0xffff, 0xee07, v_mov_from},
     {0xffff, 0xee17, v_mov_to},
@@ -2130,7 +2133,8 @@ static const ENCODEMASK16 thumb_table[] = {
     {0xffff, 0xeeb4, v_cmpf},
     {0xffff, 0xeef8, v_itof},
     {0xffff, 0xeefd, v_ftoi},
-    // end of hack
+// end of hack
+#endif
     {0xf800, 0x0000, thumb_lsl},           /* logical shift left by immediate, or MOV */
     {0xf800, 0x0800, thumb_lsr},           /* logical shift right by immediate */
     {0xf800, 0x1000, thumb_asr},           /* arithmetic shift right by immediate */
