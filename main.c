@@ -170,8 +170,7 @@ static void yput_cmd(void) {
         return;
     }
     char* tmpname = strdup(full_path("ymodem.tmp"));
-    if (fs_file_open(&file, tmpname, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) <
-        LFS_ERR_OK) {
+    if (fs_file_open(&file, tmpname, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < LFS_ERR_OK) {
         strcpy(result, "Can't create file");
         return;
     }
