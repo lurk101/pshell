@@ -89,8 +89,8 @@ static void __wrap___aeabi_f2iz() {
 }
 
 static void __wrap___aeabi_fadd() {
-    asm volatile(" vmov s14,r0\n"
-                 " vmov s15,r1\n"
+    asm volatile(" vmov s15,r0\n"
+                 " vmov s14,r1\n"
                  " vadd.f32 s15,s14,s15\n"
                  " vmov r0,s15");
 }
@@ -103,8 +103,8 @@ static void __wrap___aeabi_fsub() {
 }
 
 static void __wrap___aeabi_fmul() {
-    asm volatile(" vmov s14,r0\n"
-                 " vmov s15,r1\n"
+    asm volatile(" vmov s15,r0\n"
+                 " vmov s14,r1\n"
                  " vmul.f32 s15,s14,s15\n"
                  " vmov r0,s15");
 }
@@ -117,8 +117,8 @@ static void __wrap___aeabi_fdiv() {
 }
 
 static void __wrap___aeabi_fcmple() {
-    asm volatile(" vmov s14,r1\n"
-                 " vmov s15,r0\n"
+    asm volatile(" vmov s15,r0\n"
+                 " vmov s14,r1\n"
                  " vcmpe.f32 s14,s15\n"
                  " vmrs APSR_nzcv,fpscr\n"
                  " ite ls\n"
@@ -127,8 +127,8 @@ static void __wrap___aeabi_fcmple() {
 }
 
 static void __wrap___aeabi_fcmpgt() {
-    asm volatile(" vmov s14,r1\n"
-                 " vmov s15,r0\n"
+    asm volatile(" vmov s15,r0\n"
+                 " vmov s14,r1\n"
                  " vcmpe.f32 s14,s15\n"
                  " vmrs APSR_nzcv,fpscr\n"
                  " ite gt\n"
@@ -137,8 +137,8 @@ static void __wrap___aeabi_fcmpgt() {
 }
 
 static void __wrap___aeabi_fcmplt() {
-    asm volatile(" vmov s14,r1\n"
-                 " vmov s15,r0\n"
+    asm volatile(" vmov s15,r0\n"
+                 " vmov s14,r1\n"
                  " vcmpe.f32 s14,s15\n"
                  " vmrs APSR_nzcv,fpscr\n"
                  " ite mi\n"
@@ -147,8 +147,8 @@ static void __wrap___aeabi_fcmplt() {
 }
 
 static void __wrap___aeabi_fcmpge() {
-    asm volatile(" vmov s14,r1\n"
-                 " vmov s15,r0\n"
+    asm volatile(" vmov s15,r0\n"
+                 " vmov s14,r1\n"
                  " vcmpe.f32 s14,s15\n"
                  " vmrs APSR_nzcv,fpscr\n"
                  " ite ge\n"
@@ -2444,6 +2444,8 @@ static uint16_t pat12[] = {0x2000, 0x4438, 0x6800};
 static uint16_t msk12[] = {0xff83, 0xffff, 0xffff};
 static uint16_t rep12[] = {0x6838};
 
+#if PICO2350
+
 // vmov r0,s15
 // vmov s15,r0
 
@@ -2459,6 +2461,16 @@ static uint16_t pat14[] = {0xee17, 0x0a90, 0xbc02, 0xee07, 0x0a10};
 static uint16_t msk14[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
 static uint16_t rep14[] = {0xeeb0, 0x7a67, 0xbc02};
 
+// vmov    r0, s15      pop {r1}
+// pop     {r1}
+// vmov    s15, r0
+
+static uint16_t pat15[] = {0xee17, 0x0a90, 0xbc02, 0xee07, 0x0a90};
+static uint16_t msk15[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep15[] = {0xbc02};
+
+#endif
+
 struct subs {
     int8_t from;
     int8_t to;
@@ -2472,21 +2484,26 @@ static const struct segs {
     uint16_t* msk;
     uint16_t* rep;
     struct subs map[2];
-} segments[] = {{NUMOF(pat0), NUMOF(rep0), pat0, msk0, rep0, {{2, 1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat1), NUMOF(rep1), pat1, msk1, rep1, {{0, 0, 0}, {2, 1, 0}}},
-                {NUMOF(pat2), NUMOF(rep2), pat2, msk2, rep2, {{0, 1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat3), NUMOF(rep3), pat3, msk3, rep3, {{-1, -1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat4), NUMOF(rep4), pat4, msk4, rep4, {{0, 0, 0}, {-1, -1, 0}}},
-                {NUMOF(pat8), NUMOF(rep8), pat8, msk8, rep8, {{3, 1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat5), NUMOF(rep5), pat5, msk5, rep5, {{1, 1, 0}, {3, 2, 0}}},
-                {NUMOF(pat6), NUMOF(rep6), pat6, msk6, rep6, {{-1, -1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat7), NUMOF(rep7), pat7, msk7, rep7, {{-1, -1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat9), NUMOF(rep9), pat9, msk9, rep9, {{-1, -1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat10), NUMOF(rep10), pat10, msk10, rep10, {{1, 1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat11), NUMOF(rep11), pat11, msk11, rep11, {{-1, -1, 0}, {-1, -1, 0}}},
-                {NUMOF(pat12), NUMOF(rep12), pat12, msk12, rep12, {{0, 0, 4}, {-1, -1, 0}}},
-                {NUMOF(pat13), NUMOF(rep13), pat13, msk13, rep13, {{-1, -1, -1}, {-1, -1, -1}}},
-                {NUMOF(pat14), NUMOF(rep14), pat14, msk14, rep14, {{-1, -1, -1}, {-1, -1, -1}}}};
+} segments[] = {
+    {NUMOF(pat0), NUMOF(rep0), pat0, msk0, rep0, {{2, 1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat1), NUMOF(rep1), pat1, msk1, rep1, {{0, 0, 0}, {2, 1, 0}}},
+    {NUMOF(pat2), NUMOF(rep2), pat2, msk2, rep2, {{0, 1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat3), NUMOF(rep3), pat3, msk3, rep3, {{-1, -1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat4), NUMOF(rep4), pat4, msk4, rep4, {{0, 0, 0}, {-1, -1, 0}}},
+    {NUMOF(pat8), NUMOF(rep8), pat8, msk8, rep8, {{3, 1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat5), NUMOF(rep5), pat5, msk5, rep5, {{1, 1, 0}, {3, 2, 0}}},
+    {NUMOF(pat6), NUMOF(rep6), pat6, msk6, rep6, {{-1, -1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat7), NUMOF(rep7), pat7, msk7, rep7, {{-1, -1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat9), NUMOF(rep9), pat9, msk9, rep9, {{-1, -1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat10), NUMOF(rep10), pat10, msk10, rep10, {{1, 1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat11), NUMOF(rep11), pat11, msk11, rep11, {{-1, -1, 0}, {-1, -1, 0}}},
+    {NUMOF(pat12), NUMOF(rep12), pat12, msk12, rep12, {{0, 0, 4}, {-1, -1, 0}}},
+#if PICO2350
+    {NUMOF(pat13), NUMOF(rep13), pat13, msk13, rep13, {{-1, -1, -1}, {-1, -1, -1}}},
+    {NUMOF(pat14), NUMOF(rep14), pat14, msk14, rep14, {{-1, -1, -1}, {-1, -1, -1}}},
+    {NUMOF(pat15), NUMOF(rep15), pat15, msk15, rep15, {{-1, -1, -1}, {-1, -1, -1}}},
+#endif
+};
 
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[8];
@@ -2880,9 +2897,9 @@ static void emit_float_oper(int op) {
 #if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x0a10); // vmov s14,r0
+            emit(0x0a90); // vmov s15,r0
             emit(0xee07);
-            emit(0x1a90); // vmov s15,r1
+            emit(0x1a10); // vmov s14,r1
             emit(0xee77);
             emit(0x7a27); // vadd.f32 s15,s14,s15
             emit(0xee17);
@@ -2918,9 +2935,9 @@ static void emit_float_oper(int op) {
 #if PICO2350
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x0a10); // vmov s14,r0
+            emit(0x0a90); // vmov s15,r0
             emit(0xee07);
-            emit(0x1a90); // vmov s15,r1
+            emit(0x1a10); // vmov s14,r1
             emit(0xee67);
             emit(0x7a27); // vmul.f32 s15,s14,s15
             emit(0xee17);
@@ -2956,9 +2973,9 @@ static void emit_float_oper(int op) {
         emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xee07);
             emit(0x0a90); // vmov s15,r0
+            emit(0xee07);
+            emit(0x1a10); // vmov s14,r1
             emit(0xeeb4);
             emit(0x7ae7); // vcmpe.f32 s14,s15
             emit(0xeef1);
@@ -2979,9 +2996,9 @@ static void emit_float_oper(int op) {
         emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xee07);
             emit(0x0a90); // vmov s15,r0
+            emit(0xee07);
+            emit(0x1a10); // vmov s14,r1
             emit(0xeeb4);
             emit(0x7ae7); // vcmpe.f32 s14,s15
             emit(0xeef1);
@@ -3002,9 +3019,9 @@ static void emit_float_oper(int op) {
         emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xee07);
             emit(0x0a90); // vmov s15,r0
+            emit(0xee07);
+            emit(0x1a10); // vmov s14,r1
             emit(0xeeb4);
             emit(0x7ae7); // vcmpe.f32 s14,s15
             emit(0xeef1);
@@ -3025,9 +3042,9 @@ static void emit_float_oper(int op) {
         emit_pop(1);
         if (inline_float_opt) {
             emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xee07);
             emit(0x0a90); // vmov s15,r0
+            emit(0xee07);
+            emit(0x1a10); // vmov s14,r1
             emit(0xeeb4);
             emit(0x7ae7); // vcmpe.f32 s14,s15
             emit(0xeef1);
@@ -4555,7 +4572,7 @@ int cc(int mode, int argc, char** argv) {
             } else if ((*argv)[1] == 's') {
                 src_opt = 1;
 #if PICO2350
-            } else if ((*argv)[1] == 'f') {
+            } else if ((*argv)[1] == 'x') {
                 inline_float_opt = 0;
 #endif
             } else if ((*argv)[1] == 'n') {
