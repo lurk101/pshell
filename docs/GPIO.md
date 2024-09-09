@@ -1,4 +1,4 @@
-| Function | pico | vgaboard |
+| Function | pico, pico2 | vgaboard |
 | --- | --- | --- |
 | UART TX | GPIO 0 (UART0) | GPIO 20 (UART1) |
 | UART RX | GPIO 1 (UART0) | GPIO 21 (UART1) |
