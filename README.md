@@ -187,7 +187,7 @@ CC = 0
 20078012    2000        movs    r0, #0
 20078014    bc08        pop     {r3}
 20078016    6018        str     r0, [r3, #0]
-20078018    f000 f848   bl      200780ac
+20078018    f000 f844   bl      200780a4
 2007801c    4638        mov     r0, r7
 2007801e    380c        subs    r0, #12         ; 0xc
 20078020    b401        push    {r0}
@@ -197,81 +197,79 @@ CC = 0
 2007802a    eef8 7ae7   vcvt.f32 s15, s15
 2007802e    ee17 0a90   vmov    r0, s15
 20078032    b401        push    {r0}
-20078034    4826        ldr     r0, [pc, #152]  ; 0x200780d0
+20078034    4824        ldr     r0, [pc, #144]  ; 0x200780c8
 20078036    bc02        pop     {r1}
-20078038    ee07 0a10   vmov    s14, r0
-2007803c    ee07 1a90   vmov    s15, r1
+20078038    ee07 0a90   vmov    s15, r0
+2007803c    ee07 1a10   vmov    s14, r1
 20078040    ee67 7a27   vmul.f32 s15, s14, s15
 20078044    ee17 0a90   vmov    r0, s15
 20078048    bc08        pop     {r3}
 2007804a    6018        str     r0, [r3, #0]
-2007804c    4821        ldr     r0, [pc, #132]  ; 0x200780d4
+2007804c    481f        ldr     r0, [pc, #124]  ; 0x200780cc
 2007804e    b401        push    {r0}
 20078050    201e        movs    r0, #30         ; 0x1e
 20078052    b401        push    {r0}
 20078054    4638        mov     r0, r7
 20078056    380c        subs    r0, #12         ; 0xc
 20078058    6800        ldr     r0, [r0, #0]
-2007805a    4b1f        ldr     r3, [pc, #124]  ; 0x200780d8
+2007805a    4b1d        ldr     r3, [pc, #116]  ; 0x200780d0
 2007805c    4798        blx     r3
 2007805e    b401        push    {r0}
-20078060    481e        ldr     r0, [pc, #120]  ; 0x200780dc
+20078060    481c        ldr     r0, [pc, #112]  ; 0x200780d4
 20078062    bc02        pop     {r1}
-20078064    ee07 0a10   vmov    s14, r0
-20078068    ee07 1a90   vmov    s15, r1
+20078064    ee07 0a90   vmov    s15, r0
+20078068    ee07 1a10   vmov    s14, r1
 2007806c    ee67 7a27   vmul.f32 s15, s14, s15
-20078070    ee17 0a90   vmov    r0, s15
-20078074    ee07 0a90   vmov    s15, r0
-20078078    eefd 7ae7   vcvt.s32 s15, s15
-2007807c    ee17 0a90   vmov    r0, s15
-20078080    bc08        pop     {r3}
-20078082    18c0        adds    r0, r0, r3
+20078070    eefd 7ae7   vcvt.s32 s15, s15
+20078074    ee17 0a90   vmov    r0, s15
+20078078    bc08        pop     {r3}
+2007807a    18c0        adds    r0, r0, r3
+2007807c    b401        push    {r0}
+2007807e    4816        ldr     r0, [pc, #88]   ; 0x200780d8
+20078080    b401        push    {r0}
+20078082    202a        movs    r0, #42         ; 0x2a
 20078084    b401        push    {r0}
-20078086    4816        ldr     r0, [pc, #88]   ; 0x200780e0
-20078088    b401        push    {r0}
-2007808a    202a        movs    r0, #42         ; 0x2a
-2007808c    b401        push    {r0}
-2007808e    2004        movs    r0, #4
-20078090    4b14        ldr     r3, [pc, #80]   ; 0x200780e4
-20078092    4798        blx     r3
-20078094    b004        add     sp, #16         ; 0x10
-20078096    1f38        subs    r0, r7, #4
-20078098    b401        push    {r0}
+20078086    2004        movs    r0, #4
+20078088    4b14        ldr     r3, [pc, #80]   ; 0x200780dc
+2007808a    4798        blx     r3
+2007808c    b004        add     sp, #16         ; 0x10
+2007808e    1f38        subs    r0, r7, #4
+20078090    b401        push    {r0}
+20078092    6800        ldr     r0, [r0, #0]
+20078094    b401        push    {r0}
+20078096    4638        mov     r0, r7
+20078098    3808        subs    r0, #8
 2007809a    6800        ldr     r0, [r0, #0]
-2007809c    b401        push    {r0}
-2007809e    4638        mov     r0, r7
-200780a0    3808        subs    r0, #8
-200780a2    6800        ldr     r0, [r0, #0]
-200780a4    bc08        pop     {r3}
-200780a6    18c0        adds    r0, r0, r3
-200780a8    bc08        pop     {r3}
-200780aa    6018        str     r0, [r3, #0]
-200780ac    1f38        subs    r0, r7, #4
-200780ae    6800        ldr     r0, [r0, #0]
-200780b0    b401        push    {r0}
-200780b2    480d        ldr     r0, [pc, #52]   ; 0x200780e8
-200780b4    bc02        pop     {r1}
-200780b6    0003        movs    r3, r0
-200780b8    0fc8        lsrs    r0, r1, #31
-200780ba    17da        asrs    r2, r3, #31
-200780bc    428b        cmp     r3, r1
-200780be    4150        adcs    r0, r2
-200780c0    2800        cmp     r0, #0
-200780c2    d1ab        bne     2007801c
-200780c4    2000        movs    r0, #0
-200780c6    46bd        mov     sp, r7
-200780c8    bd80        pop     {r7, pc}
-200780ca    46bd        mov     sp, r7
-200780cc    bd80        pop     {r7, pc}
-200780ce    46c0        mov     r8, r8
-200780d0    3c8e fa35   .word   0x3c8efa35
-200780d4    2007 c000   .word   0x2007c000
-200780d8    1002 2ed1   .word   0x10022ed1      ; sinf
-200780dc    41c8 0000   .word   0x41c80000
-200780e0    2007 c008   .word   0x2007c008
-200780e4    1001 522d   .word   0x1001522d      ; printf
-200780e8    0000 0168   .word   0x00000168
-200780ec    0000 0000   .word   0x00000000      ; "\0\0\0\0"
+2007809c    bc08        pop     {r3}
+2007809e    18c0        adds    r0, r0, r3
+200780a0    bc08        pop     {r3}
+200780a2    6018        str     r0, [r3, #0]
+200780a4    1f38        subs    r0, r7, #4
+200780a6    6800        ldr     r0, [r0, #0]
+200780a8    b401        push    {r0}
+200780aa    480d        ldr     r0, [pc, #52]   ; 0x200780e0
+200780ac    bc02        pop     {r1}
+200780ae    0003        movs    r3, r0
+200780b0    0fc8        lsrs    r0, r1, #31
+200780b2    17da        asrs    r2, r3, #31
+200780b4    428b        cmp     r3, r1
+200780b6    4150        adcs    r0, r2
+200780b8    2800        cmp     r0, #0
+200780ba    d1af        bne     2007801c
+200780bc    2000        movs    r0, #0
+200780be    46bd        mov     sp, r7
+200780c0    bd80        pop     {r7, pc}
+200780c2    46bd        mov     sp, r7
+200780c4    bd80        pop     {r7, pc}
+200780c6    46c0        mov     r8, r8
+200780c8    3c8e fa35   .word   0x3c8efa35
+200780cc    2007 c000   .word   0x2007c000
+200780d0    1002 2ea1   .word   0x10022ea1      ; sinf
+200780d4    41c8 0000   .word   0x41c80000
+200780d8    2007 c008   .word   0x2007c008
+200780dc    1001 5201   .word   0x10015201      ; printf
+200780e0    0000 0168   .word   0x00000168
+200780e4    0000 0000   .word   0x00000000      ; "\0\0\0\0"
 11: 
 
 /: 
