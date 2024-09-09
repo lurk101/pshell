@@ -1,3 +1,9 @@
+What's new in version 2.1.0
+
+- rp2350 specific peep hole optimizations
+- exclude unused code for RP2040 and RP2350, reducing pshell executable size.
+- for rp2350 use FP hardware to implement sqrtf function.
+
 What's new in version 2.0.3
 
 - Optimize /, -, >, >=, <, <= float oprators for RP2350
