@@ -2089,6 +2089,14 @@ static bool v_mrs(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
+static bool v_mov(ARMSTATE* state, uint32_t instr) {
+    state->size = 4;
+    strcpy(state->text, "vmov");
+    padinstr(state->text);
+    strcat(state->text, "s14, s15");
+    return true;
+}
+
 static bool v_mov_from(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vmov");
@@ -2133,6 +2141,8 @@ static const ENCODEMASK16 thumb_table[] = {
     {0xffff, 0xeeb4, v_cmpf},
     {0xffff, 0xeef8, v_itof},
     {0xffff, 0xeefd, v_ftoi},
+    {0xffff, 0xeeb0, v_mov},
+
 // end of hack
 #endif
     {0xf800, 0x0000, thumb_lsl},           /* logical shift left by immediate, or MOV */
