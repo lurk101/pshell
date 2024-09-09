@@ -2026,6 +2026,15 @@ static bool thumb2_co_trans(ARMSTATE* state, uint32_t instr) {
 
 #if PICO2350
 // FP decoders
+
+static bool v_pop(ARMSTATE* state, uint32_t instr) {
+    state->size = 4;
+    strcpy(state->text, "vpop");
+    padinstr(state->text);
+    strcat(state->text, "{s14}");
+    return true;
+}
+
 static bool v_add_sub(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     switch (instr & 0xffff) {
@@ -2142,7 +2151,7 @@ static const ENCODEMASK16 thumb_table[] = {
     {0xffff, 0xeef8, v_itof},
     {0xffff, 0xeefd, v_ftoi},
     {0xffff, 0xeeb0, v_mov},
-
+    {0xffff, 0xecbd, v_pop},
 // end of hack
 #endif
     {0xf800, 0x0000, thumb_lsl},           /* logical shift left by immediate, or MOV */

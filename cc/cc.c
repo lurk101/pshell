@@ -2469,6 +2469,21 @@ static uint16_t pat15[] = {0xee17, 0x0a90, 0xbc02, 0xee07, 0x0a90};
 static uint16_t msk15[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
 static uint16_t rep15[] = {0xbc02};
 
+// pop     {r1}         vpop {s14}
+// vmov    s14, r1
+
+static uint16_t pat16[] = {0xbc02, 0xee07, 0x1a10};
+static uint16_t msk16[] = {0xffff, 0xffff, 0xffff};
+static uint16_t rep16[] = {0xecbd, 0x7a01};
+
+// pop     {r1}         vmov s15, r0
+// vmov    s15, r0      vpop {s14]
+// vmov    s14, r1
+
+static uint16_t pat17[] = {0xbc02, 0xee07, 0x0a90, 0xee07, 0x1a10};
+static uint16_t msk17[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep17[] = {0xee07, 0x0a90, 0xecbd, 0x7a01};
+
 #endif
 
 struct subs {
@@ -2502,6 +2517,8 @@ static const struct segs {
     {NUMOF(pat13), NUMOF(rep13), pat13, msk13, rep13, {{-1, -1, -1}, {-1, -1, -1}}},
     {NUMOF(pat14), NUMOF(rep14), pat14, msk14, rep14, {{-1, -1, -1}, {-1, -1, -1}}},
     {NUMOF(pat15), NUMOF(rep15), pat15, msk15, rep15, {{-1, -1, -1}, {-1, -1, -1}}},
+    {NUMOF(pat16), NUMOF(rep16), pat16, msk16, rep16, {{-1, -1, -1}, {-1, -1, -1}}},
+    {NUMOF(pat17), NUMOF(rep17), pat17, msk17, rep17, {{-1, -1, -1}, {-1, -1, -1}}},
 #endif
 };
 
