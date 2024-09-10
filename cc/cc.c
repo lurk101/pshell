@@ -2484,6 +2484,13 @@ static uint16_t pat17[] = {0xbc02, 0xee07, 0x0a90, 0xee07, 0x1a10};
 static uint16_t msk17[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
 static uint16_t rep17[] = {0xee07, 0x0a90, 0xecbd, 0x7a01};
 
+// ldr r0, [r0, #0]     vldr s15,[r0]
+// vmov s15, r0
+
+static uint16_t pat18[] = {0x6800, 0xee07, 0x0a90};
+static uint16_t msk18[] = {0xffff, 0xffff, 0xffff};
+static uint16_t rep18[] = {0xedd0, 0x7a00};
+
 #endif
 
 struct subs {
@@ -2519,6 +2526,7 @@ static const struct segs {
     {NUMOF(pat15), NUMOF(rep15), pat15, msk15, rep15, {{-1, -1, -1}, {-1, -1, -1}}},
     {NUMOF(pat16), NUMOF(rep16), pat16, msk16, rep16, {{-1, -1, -1}, {-1, -1, -1}}},
     {NUMOF(pat17), NUMOF(rep17), pat17, msk17, rep17, {{-1, -1, -1}, {-1, -1, -1}}},
+    {NUMOF(pat18), NUMOF(rep18), pat18, msk18, rep18, {{-1, -1, -1}, {-1, -1, -1}}},
 #endif
 };
 
@@ -2574,6 +2582,8 @@ static void emit_word(uint32_t n) {
         fatal("code segment exceeded, program is too big");
     *((uint32_t*)e) = n;
     ++e;
+    if (!nopeep_opt)
+        peep();
 }
 
 static void emit_load_long_imm(int r, int val, int ext) {

@@ -2027,6 +2027,14 @@ static bool thumb2_co_trans(ARMSTATE* state, uint32_t instr) {
 #if PICO2350
 // FP decoders
 
+static bool v_ldr(ARMSTATE* state, uint32_t instr) {
+    state->size = 4;
+    strcpy(state->text, "vldr");
+    padinstr(state->text);
+    strcat(state->text, "s15, [r0]");
+    return true;
+}
+
 static bool v_pop(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vpop");
@@ -2039,10 +2047,10 @@ static bool v_add_sub(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     switch (instr & 0xffff) {
     case 0x7a27:
-        strcpy(state->text, "vadd.f32");
+        strcpy(state->text, "vadd");
         break;
     case 0x7a67:
-        strcpy(state->text, "vsub.f32");
+        strcpy(state->text, "vsub");
         break;
     }
     padinstr(state->text);
@@ -2052,7 +2060,7 @@ static bool v_add_sub(ARMSTATE* state, uint32_t instr) {
 
 static bool v_cmpf(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
-    strcpy(state->text, "vcmpe.f32");
+    strcpy(state->text, "vcmpe");
     padinstr(state->text);
     strcat(state->text, "s14, s15");
     return true;
@@ -2060,7 +2068,7 @@ static bool v_cmpf(ARMSTATE* state, uint32_t instr) {
 
 static bool v_itof(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
-    strcpy(state->text, "vcvt.f32");
+    strcpy(state->text, "vcvt");
     padinstr(state->text);
     strcat(state->text, "s15, s15");
     return true;
@@ -2076,7 +2084,7 @@ static bool v_ftoi(ARMSTATE* state, uint32_t instr) {
 
 static bool v_mulf(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
-    strcpy(state->text, "vmul.f32");
+    strcpy(state->text, "vmul");
     padinstr(state->text);
     strcat(state->text, "s15, s14, s15");
     return true;
@@ -2084,7 +2092,7 @@ static bool v_mulf(ARMSTATE* state, uint32_t instr) {
 
 static bool v_divf(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
-    strcpy(state->text, "vdiv.f32");
+    strcpy(state->text, "vdiv");
     padinstr(state->text);
     strcat(state->text, "s15, s14, s15");
     return true;
@@ -2152,6 +2160,7 @@ static const ENCODEMASK16 thumb_table[] = {
     {0xffff, 0xeefd, v_ftoi},
     {0xffff, 0xeeb0, v_mov},
     {0xffff, 0xecbd, v_pop},
+    {0xffff, 0xedd0, v_ldr},
 // end of hack
 #endif
     {0xf800, 0x0000, thumb_lsl},           /* logical shift left by immediate, or MOV */
