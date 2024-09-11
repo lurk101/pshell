@@ -96,8 +96,8 @@ static void __wrap___aeabi_fadd() {
 }
 
 static void __wrap___aeabi_fsub() {
-    asm volatile(" vmov s14,r1\n"
-                 " vmov s15,r0\n"
+    asm volatile(" vmov s15,r0\n"
+                 " vmov s14,r1\n"
                  " vsub.f32 s15,s14,s15\n"
                  " vmov r0,s15");
 }
@@ -110,8 +110,8 @@ static void __wrap___aeabi_fmul() {
 }
 
 static void __wrap___aeabi_fdiv() {
-    asm volatile(" vmov s14,r1\n"
-                 " vmov s15,r0\n"
+    asm volatile(" vmov s15,r0\n"
+                 " vmov s14,r1\n"
                  " vdiv.f32 s15,s14,s15\n"
                  " vmov r0, s15");
 }
@@ -2484,12 +2484,20 @@ static uint16_t pat17[] = {0xbc02, 0xee07, 0x0a90, 0xee07, 0x1a10};
 static uint16_t msk17[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
 static uint16_t rep17[] = {0xee07, 0x0a90, 0xecbd, 0x7a01};
 
-// ldr r0, [r0, #0]     vldr s15,[r0]
+// ldr r0, [r0, #n]     vldr s15,[r0, #n]
+// vpop {s14}           vpop {s14}
 // vmov s15, r0
 
-static uint16_t pat18[] = {0x6800, 0xee07, 0x0a90};
-static uint16_t msk18[] = {0xffff, 0xffff, 0xffff};
-static uint16_t rep18[] = {0xedd0, 0x7a00};
+static uint16_t pat18[] = {0x6800, 0xecbd, 0x7a01, 0xee07, 0x0a90};
+static uint16_t msk18[] = {0xffe0, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep18[] = {0xedd0, 0x7a00, 0xecbd, 0x7a01};
+
+// ldr r0, [r0, #n]     vldr s15,[r0, #n]
+// vmov s15, r0
+
+static uint16_t pat19[] = {0x6800, 0xee07, 0x0a90};
+static uint16_t msk19[] = {0xffe0, 0xffff, 0xffff};
+static uint16_t rep19[] = {0xedd0, 0x7a00};
 
 #endif
 
@@ -2502,36 +2510,38 @@ struct subs {
 static const struct segs {
     uint8_t n_pats;
     uint8_t n_reps;
+    uint8_t n_maps;
     uint16_t* pat;
     uint16_t* msk;
     uint16_t* rep;
     struct subs map[2];
 } segments[] = {
-    {NUMOF(pat0), NUMOF(rep0), pat0, msk0, rep0, {{2, 1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat1), NUMOF(rep1), pat1, msk1, rep1, {{0, 0, 0}, {2, 1, 0}}},
-    {NUMOF(pat2), NUMOF(rep2), pat2, msk2, rep2, {{0, 1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat3), NUMOF(rep3), pat3, msk3, rep3, {{-1, -1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat4), NUMOF(rep4), pat4, msk4, rep4, {{0, 0, 0}, {-1, -1, 0}}},
-    {NUMOF(pat8), NUMOF(rep8), pat8, msk8, rep8, {{3, 1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat5), NUMOF(rep5), pat5, msk5, rep5, {{1, 1, 0}, {3, 2, 0}}},
-    {NUMOF(pat6), NUMOF(rep6), pat6, msk6, rep6, {{-1, -1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat7), NUMOF(rep7), pat7, msk7, rep7, {{-1, -1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat9), NUMOF(rep9), pat9, msk9, rep9, {{-1, -1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat10), NUMOF(rep10), pat10, msk10, rep10, {{1, 1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat11), NUMOF(rep11), pat11, msk11, rep11, {{-1, -1, 0}, {-1, -1, 0}}},
-    {NUMOF(pat12), NUMOF(rep12), pat12, msk12, rep12, {{0, 0, 4}, {-1, -1, 0}}},
+    {NUMOF(pat0), NUMOF(rep0), 1, pat0, msk0, rep0, {{2, 1, 0}, {}}},
+    {NUMOF(pat1), NUMOF(rep1), 2, pat1, msk1, rep1, {{0, 0, 0}, {2, 1, 0}}},
+    {NUMOF(pat2), NUMOF(rep2), 1, pat2, msk2, rep2, {{0, 1, 0}, {}}},
+    {NUMOF(pat3), NUMOF(rep3), 0, pat3, msk3, rep3, {{}, {}}},
+    {NUMOF(pat4), NUMOF(rep4), 1, pat4, msk4, rep4, {{0, 0, 0}, {}}},
+    {NUMOF(pat8), NUMOF(rep8), 1, pat8, msk8, rep8, {{3, 1, 0}, {}}},
+    {NUMOF(pat5), NUMOF(rep5), 2, pat5, msk5, rep5, {{1, 1, 0}, {3, 2, 0}}},
+    {NUMOF(pat6), NUMOF(rep6), 0, pat6, msk6, rep6, {{}, {}}},
+    {NUMOF(pat7), NUMOF(rep7), 0, pat7, msk7, rep7, {{}, {}}},
+    {NUMOF(pat9), NUMOF(rep9), 0, pat9, msk9, rep9, {{}, {}}},
+    {NUMOF(pat10), NUMOF(rep10), 1, pat10, msk10, rep10, {{1, 1, 0}, {}}},
+    {NUMOF(pat11), NUMOF(rep11), 0, pat11, msk11, rep11, {{}, {}}},
+    {NUMOF(pat12), NUMOF(rep12), 1, pat12, msk12, rep12, {{0, 0, 4}, {}}},
 #if PICO2350
-    {NUMOF(pat13), NUMOF(rep13), pat13, msk13, rep13, {{-1, -1, -1}, {-1, -1, -1}}},
-    {NUMOF(pat14), NUMOF(rep14), pat14, msk14, rep14, {{-1, -1, -1}, {-1, -1, -1}}},
-    {NUMOF(pat15), NUMOF(rep15), pat15, msk15, rep15, {{-1, -1, -1}, {-1, -1, -1}}},
-    {NUMOF(pat16), NUMOF(rep16), pat16, msk16, rep16, {{-1, -1, -1}, {-1, -1, -1}}},
-    {NUMOF(pat17), NUMOF(rep17), pat17, msk17, rep17, {{-1, -1, -1}, {-1, -1, -1}}},
-    {NUMOF(pat18), NUMOF(rep18), pat18, msk18, rep18, {{-1, -1, -1}, {-1, -1, -1}}},
+    {NUMOF(pat13), NUMOF(rep13), 0, pat13, msk13, rep13, {{}, {}}},
+    {NUMOF(pat14), NUMOF(rep14), 0, pat14, msk14, rep14, {{}, {}}},
+    {NUMOF(pat15), NUMOF(rep15), 0, pat15, msk15, rep15, {{}, {}}},
+    {NUMOF(pat16), NUMOF(rep16), 0, pat16, msk16, rep16, {{}, {}}},
+    {NUMOF(pat17), NUMOF(rep17), 0, pat17, msk17, rep17, {{}, {}}},
+    {NUMOF(pat18), NUMOF(rep18), 1, pat18, msk18, rep18, {{0, 1, 0}, {}}},
+    {NUMOF(pat19), NUMOF(rep19), 1, pat19, msk19, rep19, {{0, 1, 0}, {}}},
 #endif
 };
 
 static int peep_hole(const struct segs* s) {
-    uint16_t rslt[8];
+    uint16_t rslt[32];
     int l = s->n_pats;
     uint16_t* pe = (e - l) + 1;
     if (pe < text_base)
@@ -2545,11 +2555,8 @@ static int peep_hole(const struct segs* s) {
     l = s->n_reps;
     for (int i = 0; i < l; i++)
         pe[i] = s->rep[i];
-    for (int i = 0; i < 2; ++i) {
-        if (s->map[i].from < 0)
-            break;
+    for (int i = 0; i < s->n_maps; ++i)
         pe[s->map[i].to] |= rslt[s->map[i].from] << s->map[i].lshft;
-    }
     e += l;
     return 1;
 }
@@ -2561,7 +2568,7 @@ restart:
             goto restart;
 }
 
-// ARM CM0+ code emitters
+// ARM CM code emitters
 
 static void emit(uint16_t n) {
     if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 1)
@@ -2577,13 +2584,8 @@ static void emit_cond_branch(uint16_t* to, int cond);
 static void emit_word(uint32_t n) {
     if (((int)e & 2) == 0)
         fatal("mis-aligned word");
-    ++e;
-    if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 2)
-        fatal("code segment exceeded, program is too big");
-    *((uint32_t*)e) = n;
-    ++e;
-    if (!nopeep_opt)
-        peep();
+    emit(n & 0xffff);
+    emit(n >> 16);
 }
 
 static void emit_load_long_imm(int r, int val, int ext) {
@@ -2917,16 +2919,30 @@ static void emit_oper(int op) {
     }
 }
 
+#if PICO2350
+static void emit_float_prefix(void) {
+    emit(0xee07);
+    emit(0x0a90); // vmov s15,r0
+    emit(0xee07);
+    emit(0x1a10); // vmov s14,r1
+}
+
+static void emit_cmp_prefix(void) {
+    emit_float_prefix();
+    emit(0xeeb4);
+    emit(0x7ae7); // vcmpe.f32 s14,s15
+    emit(0xeef1);
+    emit(0xfa10); // vmrs APSR_nzcv,fpscr
+}
+#endif
+
 static void emit_float_oper(int op) {
     switch (op) {
     case ADDF:
         emit_pop(1); // pop {r1}
 #if PICO2350
         if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
-            emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
+            emit_float_prefix();
             emit(0xee77);
             emit(0x7a27); // vadd.f32 s15,s14,s15
             emit(0xee17);
@@ -2941,10 +2957,7 @@ static void emit_float_oper(int op) {
 #if PICO2350
         emit_pop(1);
         if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
+            emit_float_prefix();
             emit(0xee77);
             emit(0x7a67); // vsub.f32 s15,s14,s15
             emit(0xee17);
@@ -2961,10 +2974,7 @@ static void emit_float_oper(int op) {
         emit_pop(1);
 #if PICO2350
         if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
-            emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
+            emit_float_prefix();
             emit(0xee67);
             emit(0x7a27); // vmul.f32 s15,s14,s15
             emit(0xee17);
@@ -2979,10 +2989,7 @@ static void emit_float_oper(int op) {
 #if PICO2350
         emit_pop(1);
         if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
+            emit_float_prefix();
             emit(0xeec7);
             emit(0x7a27); // vdiv.f32 s15,s14,s15
             emit(0xee17);
@@ -2999,14 +3006,7 @@ static void emit_float_oper(int op) {
 #if PICO2350
         emit_pop(1);
         if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
-            emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xeeb4);
-            emit(0x7ae7); // vcmpe.f32 s14,s15
-            emit(0xeef1);
-            emit(0xfa10); // vmrs APSR_nzcv,fpscr
+            emit_cmp_prefix();
             emit(0xbfac); // ite ge
             emit(0x2001); // movge r0,#1
             emit(0x2000); // movlt r0,#0
@@ -3022,14 +3022,7 @@ static void emit_float_oper(int op) {
 #if PICO2350
         emit_pop(1);
         if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
-            emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xeeb4);
-            emit(0x7ae7); // vcmpe.f32 s14,s15
-            emit(0xeef1);
-            emit(0xfa10); // vmrs APSR_nzcv,fpscr
+            emit_cmp_prefix();
             emit(0xbfcc); // ite gt
             emit(0x2001); // movgt r0,#1
             emit(0x2000); // movle r0,#0
@@ -3045,14 +3038,7 @@ static void emit_float_oper(int op) {
 #if PICO2350
         emit_pop(1);
         if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
-            emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xeeb4);
-            emit(0x7ae7); // vcmpe.f32 s14,s15
-            emit(0xeef1);
-            emit(0xfa10); // vmrs APSR_nzcv,fpscr
+            emit_cmp_prefix();
             emit(0xbf4c); // ite mi
             emit(0x2001); // movmi r0,#1
             emit(0x2000); // movpl r0,#0
@@ -3068,14 +3054,7 @@ static void emit_float_oper(int op) {
 #if PICO2350
         emit_pop(1);
         if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
-            emit(0xee07);
-            emit(0x1a10); // vmov s14,r1
-            emit(0xeeb4);
-            emit(0x7ae7); // vcmpe.f32 s14,s15
-            emit(0xeef1);
-            emit(0xfa10); // vmrs APSR_nzcv,fpscr
+            emit_cmp_prefix();
             emit(0xbf94); // ite ls
             emit(0x2001); // movls r0,#1
             emit(0x2000); // movhi r0,#0
