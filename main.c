@@ -889,10 +889,10 @@ cmd_t cmd_table[] = {
     {"unmount", unmount_cmd,    "unmount the filesystem"},
 	{"version", version_cmd,    "display pico shell's version"},
     {"vi",      vi_cmd,         "edit file(s) with vi"},
-    {"xget",    xget_cmd,       "get a file (xmodem)"},
-    {"xput",    xput_cmd,       "put a file (xmodem)"},
-    {"yget",    yget_cmd,       "get a file (ymodem)"},
-    {"yput",    yput_cmd,       "put a file (ymodem)"},
+    {"xget",    xget_cmd,       "get a file (xmodem, pico->host)"},
+    {"xput",    xput_cmd,       "put a file (xmodem, host->pico)"},
+    {"yget",    yget_cmd,       "get a file (ymodem, pico->host)"},
+    {"yput",    yput_cmd,       "put a file (ymodem, host->pico)"},
 	{0}
 };
 // clang-format on
@@ -982,7 +982,7 @@ int main(void) {
 #if defined(VGABOARD_SD_CLK_PIN)
     strcpy(buf, "sd card");
 #else
-    strcpy(buf, "internal flash");
+    strcpy(buf, "flash");
 #endif
     version_cmd();
     char console[8];

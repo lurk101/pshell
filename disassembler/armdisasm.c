@@ -2031,7 +2031,9 @@ static bool v_ldr(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vldr");
     padinstr(state->text);
-    strcat(state->text, "s15, [r0]");
+    strcat(state->text, "s15, [r0, #");
+    sprintf(state->text + strlen(state->text), "%d", (instr & 0x1f) * 4);
+    strcat(state->text, "]");
     return true;
 }
 
@@ -2160,7 +2162,7 @@ static const ENCODEMASK16 thumb_table[] = {
     {0xffff, 0xeefd, v_ftoi},
     {0xffff, 0xeeb0, v_mov},
     {0xffff, 0xecbd, v_pop},
-    {0xffff, 0xedd0, v_ldr},
+    {0xfffe, 0xedd0, v_ldr},
 // end of hack
 #endif
     {0xf800, 0x0000, thumb_lsl},           /* logical shift left by immediate, or MOV */
