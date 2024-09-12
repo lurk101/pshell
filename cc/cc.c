@@ -2492,10 +2492,10 @@ static const struct segs {
     {NUMOF(pat2), NUMOF(rep2), 1, pat2, msk2, rep2, {{0, 1, 0}, {}}},
     {NUMOF(pat3), NUMOF(rep3), 0, pat3, msk3, rep3, {{}, {}}},
     {NUMOF(pat4), NUMOF(rep4), 1, pat4, msk4, rep4, {{0, 0, 0}, {}}},
-    {NUMOF(pat8), NUMOF(rep8), 1, pat8, msk8, rep8, {{3, 1, 0}, {}}},
     {NUMOF(pat5), NUMOF(rep5), 2, pat5, msk5, rep5, {{1, 1, 0}, {3, 2, 0}}},
     {NUMOF(pat6), NUMOF(rep6), 0, pat6, msk6, rep6, {{}, {}}},
     {NUMOF(pat7), NUMOF(rep7), 0, pat7, msk7, rep7, {{}, {}}},
+    {NUMOF(pat8), NUMOF(rep8), 1, pat8, msk8, rep8, {{3, 1, 0}, {}}},
     {NUMOF(pat9), NUMOF(rep9), 0, pat9, msk9, rep9, {{}, {}}},
     {NUMOF(pat10), NUMOF(rep10), 1, pat10, msk10, rep10, {{1, 1, 0}, {}}},
     {NUMOF(pat11), NUMOF(rep11), 0, pat11, msk11, rep11, {{}, {}}},
@@ -2515,7 +2515,7 @@ static int peep_hole(const struct segs* s) {
         return 0;
     for (int i = 0; i < l; i++) {
         rslt[i] = pe[i] & ~s->msk[i];
-        if ((pe[i] & s->msk[i]) != s->pat[i])
+        if ((pe[i] & s->msk[i]) != (s->pat[i] & s->msk[i]))
             return 0;
     }
     e -= l;
