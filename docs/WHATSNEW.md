@@ -1,3 +1,7 @@
+What's new in version 2.1.1
+
+- improved peep hole optimizer. Bug fix and RP2350 floating point optimizations.
+
 What's new in version 2.1.0
 
 - rp2350 specific peep hole optimizations
