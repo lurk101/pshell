@@ -276,7 +276,6 @@ static int src_opt UDATA;             // print source and assembly flag
 #if PICO2350
 static int inline_float_opt UDATA;    // generate inline float instructions flag
 #endif
-static int nopeep_opt UDATA;          // turn off peep-hole optimization
 static int uchar_opt UDATA;           // use unsigned character variables
 static int* n UDATA;                  // current position in emitted abstract syntax tree
                                       // With an AST, the compiler is not limited to generate
@@ -2336,262 +2335,12 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
     } while (1);
 }
 
-// peep hole optimizer
-
-// FROM:              TO:
-// mov  r0, r7        mov  r3,r7
-// push {r0}          movs r0,#n
-// movs r0,#n
-// pop  {r3}
-
-static uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc08};
-static uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
-static uint16_t rep0[] = {0x463b, 0x2000};
-
-// ldr  r0,[r0,#n0]   ldr  r3,[r0,#n0]
-// push {r0}          movs r0,#n1
-// movs r0, #n1
-// pop  {r3}
-
-static uint16_t pat1[] = {0x6800, 0xb401, 0x2000, 0xbc08};
-static uint16_t msk1[] = {0xff00, 0xffff, 0xff00, 0xffff};
-static uint16_t rep1[] = {0x6803, 0x2000};
-
-// movs r0,#n         mov  r0,r7
-// rsbs r0,r0         subs r0,#n
-// add  r0,r7
-
-static uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
-static uint16_t msk2[] = {0xff00, 0xffff, 0xffff};
-static uint16_t rep2[] = {0x4638, 0x3800};
-
-// push {r0}
-// pop {r0}
-
-static uint16_t pat3[] = {0xb401, 0xbc01};
-static uint16_t msk3[] = {0xffff, 0xffff};
-static uint16_t rep3[] = {};
-
-// movs r0,#n          mov r1,#n
-// push {r0}
-// pop  {r1}
-
-static uint16_t pat4[] = {0x2000, 0xb401, 0xbc02};
-static uint16_t msk4[] = {0xff00, 0xffff, 0xffff};
-static uint16_t rep4[] = {0x2100};
-
-// mov  r0,r7          mov  r3,r7
-// subs r0,#n0         subs r3,#n0
-// push {r0}           movs r0,#n1
-// movs r0,#n1
-// pop  {r3}
-
-static uint16_t pat5[] = {0x4638, 0x3800, 0xb401, 0x2000, 0xbc08};
-static uint16_t msk5[] = {0xffff, 0xff00, 0xffff, 0xff00, 0xffff};
-static uint16_t rep5[] = {0x463b, 0x3b00, 0x2000};
-
-// mov  r0,r7          ldr  r0,[r7,#0]
-// ldr  r0,[r0,#0]
-
-static uint16_t pat6[] = {0x4638, 0x6800};
-static uint16_t msk6[] = {0xffff, 0xffff};
-static uint16_t rep6[] = {0x6838};
-
-// movs r0,#4           lsls r0,r3,#2
-// muls r0,r3
-
-static uint16_t pat7[] = {0x2004, 0x4358};
-static uint16_t msk7[] = {0xffff, 0xffff};
-static uint16_t rep7[] = {0x0098};
-
-// mov  r0,r7          subs r3,r7,#4
-// subs r0,#4          movs r0,#n1
-// push {r0}
-// movs r0,#n1
-// pop  {r3}
-
-static uint16_t pat8[] = {0x4638, 0x3804, 0xb401, 0x2000, 0xbc08};
-static uint16_t msk8[] = {0xffff, 0xffff, 0xffff, 0xff00, 0xffff};
-static uint16_t rep8[] = {0x1f3b, 0x2000};
-
-// mov  r0, r7         sub r0,r7,#4
-// subs r0, #4
-
-static uint16_t pat9[] = {0x4638, 0x3804};
-static uint16_t msk9[] = {0xffff, 0xffff};
-static uint16_t rep9[] = {0x1f38};
-
-// push {r0}            mov  r1,r0
-// movs r0,#n           movs r0,#n
-// pop  {r1}
-
-static uint16_t pat10[] = {0xb401, 0x2000, 0xbc02};
-static uint16_t msk10[] = {0xffff, 0xff00, 0xffff};
-static uint16_t rep10[] = {0x4601, 0x2000};
-
-// push {r0}            mov r1,r0
-// pop  {r1}
-
-static uint16_t pat11[] = {0xb401, 0xbc02};
-static uint16_t msk11[] = {0xffff, 0xffff};
-static uint16_t rep11[] = {0x4601};
-
-// movs r0,#0           ldr r0,[r7]
-// add  r0,r7
-// ldr  r0,[r0]
-
-static uint16_t pat12[] = {0x2000, 0x4438, 0x6800};
-static uint16_t msk12[] = {0xffff, 0xffff, 0xffff};
-static uint16_t rep12[] = {0x6838};
-
-// movs r0,#n           ldr r0,[r7, #n]
-// add  r0,r7
-// ldr  r0,[r0,#n]
-
-static uint16_t pat12b[] = {0x2000, 0x4438, 0x6800};
-static uint16_t msk12b[] = {0xffe0, 0xffff, 0xffff};
-static uint16_t rep12b[] = {0x6838};
-
-#if PICO2350
-
-// vmov r0,s15
-// vmov s15,r0
-
-static uint16_t pat13[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
-static uint16_t msk13[] = {0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep13[] = {};
-
-// vmov    r0, s15      vmov.f32 s14,s15
-// pop     {r1}         pop {r1}
-// vmov    s14, r0
-
-static uint16_t pat14[] = {0xee17, 0x0a90, 0xbc02, 0xee07, 0x0a10};
-static uint16_t msk14[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep14[] = {0xeeb0, 0x7a67, 0xbc02};
-
-// vmov    r0, s15      pop {r1}
-// pop     {r1}
-// vmov    s15, r0
-
-static uint16_t pat15[] = {0xee17, 0x0a90, 0xbc02, 0xee07, 0x0a90};
-static uint16_t msk15[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep15[] = {0xbc02};
-
-// pop     {r1}         vpop {s14}
-// vmov    s14, r1
-
-static uint16_t pat16[] = {0xbc02, 0xee07, 0x1a10};
-static uint16_t msk16[] = {0xffff, 0xffff, 0xffff};
-static uint16_t rep16[] = {0xecbd, 0x7a01};
-
-// pop     {r1}         vmov s15, r0
-// vmov    s15, r0      vpop {s14]
-// vmov    s14, r1
-
-static uint16_t pat17[] = {0xbc02, 0xee07, 0x0a90, 0xee07, 0x1a10};
-static uint16_t msk17[] = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep17[] = {0xee07, 0x0a90, 0xecbd, 0x7a01};
-
-// ldr r0, [r0, #n]     vldr s15,[r0, #n]
-// vpop {s14}           vpop {s14}
-// vmov s15, r0
-
-static uint16_t pat18[] = {0x6800, 0xecbd, 0x7a01, 0xee07, 0x0a90};
-static uint16_t msk18[] = {0xffe0, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep18[] = {0xedd0, 0x7a00, 0xecbd, 0x7a01};
-
-// ldr r0, [r0, #n]     vldr s15,[r0, #n]
-// vmov s15, r0
-
-static uint16_t pat19[] = {0x6800, 0xee07, 0x0a90};
-static uint16_t msk19[] = {0xffe0, 0xffff, 0xffff};
-static uint16_t rep19[] = {0xedd0, 0x7a00};
-
-#endif
-
-struct subs {
-    int8_t from;
-    int8_t to;
-    int8_t lshft;
-};
-
-// clang-format off
-static const struct segs {
-    uint8_t n_pats;
-    uint8_t n_reps;
-    uint8_t n_maps;
-    uint16_t* pat;
-    uint16_t* msk;
-    uint16_t* rep;
-    struct subs map[2];
-} segments[] = {
-    {NUMOF(pat0),   NUMOF(rep0),   1, pat0,   msk0,   rep0,   {{2, 1, 0}, {}}},
-    {NUMOF(pat1),   NUMOF(rep1),   2, pat1,   msk1,   rep1,   {{0, 0, 0}, {2, 1, 0}}},
-    {NUMOF(pat2),   NUMOF(rep2),   1, pat2,   msk2,   rep2,   {{0, 1, 0}, {}}},
-    {NUMOF(pat3),   NUMOF(rep3),   0, pat3,   msk3,   rep3,   {{}, {}}},
-    {NUMOF(pat4),   NUMOF(rep4),   1, pat4,   msk4,   rep4,   {{0, 0, 0}, {}}},
-    {NUMOF(pat8),   NUMOF(rep8),   1, pat8,   msk8,   rep8,   {{3, 1, 0}, {}}},
-    {NUMOF(pat5),   NUMOF(rep5),   2, pat5,   msk5,   rep5,   {{1, 1, 0}, {3, 2, 0}}},
-    {NUMOF(pat6),   NUMOF(rep6),   0, pat6,   msk6,   rep6,   {{}, {}}},
-    {NUMOF(pat7),   NUMOF(rep7),   0, pat7,   msk7,   rep7,   {{}, {}}},
-    {NUMOF(pat9),   NUMOF(rep9),   0, pat9,   msk9,   rep9,   {{}, {}}},
-    {NUMOF(pat10),  NUMOF(rep10),  1, pat10,  msk10,  rep10,  {{1, 1, 0}, {}}},
-    {NUMOF(pat11),  NUMOF(rep11),  0, pat11,  msk11,  rep11,  {{}, {}}},
-    {NUMOF(pat12),  NUMOF(rep12),  0, pat12,  msk12,  rep12,  {{}, {}}},
-    {NUMOF(pat12b), NUMOF(rep12b), 1, pat12b, msk12b, rep12b, {{0, 0, 5}, {}}},
-#if PICO2350
-    {NUMOF(pat13),  NUMOF(rep13),  0, pat13,  msk13,  rep13,  {{}, {}}},
-    {NUMOF(pat14),  NUMOF(rep14),  0, pat14,  msk14,  rep14,  {{}, {}}},
-    {NUMOF(pat15),  NUMOF(rep15),  0, pat15,  msk15,  rep15,  {{}, {}}},
-    {NUMOF(pat16),  NUMOF(rep16),  0, pat16,  msk16,  rep16,  {{}, {}}},
-    {NUMOF(pat17),  NUMOF(rep17),  0, pat17,  msk17,  rep17,  {{}, {}}},
-    {NUMOF(pat18),  NUMOF(rep18),  1, pat18,  msk18,  rep18,  {{0, 1, 0}, {}}},
-    {NUMOF(pat19),  NUMOF(rep19),  1, pat19,  msk19,  rep19,  {{0, 1, 0}, {}}},
-#endif
-};
-// clang-format on
-static uint8_t segment_used[NUMOF(segments)];
-
-static int peep_hole(const struct segs* s) {
-    uint16_t rslt[32];
-    int l = s->n_pats;
-    uint16_t* pe = (e - l) + 1;
-    if (pe < text_base)
-        return 0;
-    for (int i = 0; i < l; i++) {
-        rslt[i] = pe[i] & ~s->msk[i];
-        if ((pe[i] & s->msk[i]) != s->pat[i] & s->msk[i])
-            return 0;
-    }
-    e -= l;
-    l = s->n_reps;
-    for (int i = 0; i < l; i++)
-        pe[i] = s->rep[i];
-    for (int i = 0; i < s->n_maps; ++i)
-        pe[s->map[i].to] |= rslt[s->map[i].from] << s->map[i].lshft;
-    e += l;
-    return 1;
-}
-
-static void peep(void) {
-    for (int i = 0; i < NUMOF(segments); ++i)
-        segment_used[i] = 0;
-restart:
-    for (int i = 0; i < NUMOF(segments); ++i)
-        if (!segment_used[i] && peep_hole(&segments[i])) {
-            segment_used[i] = 1;
-            goto restart;
-        }
-}
-
 // ARM CM code emitters
 
 static void emit(uint16_t n) {
     if (e >= text_base + (TEXT_BYTES / sizeof(*e)) - 1)
         fatal("code segment exceeded, program is too big");
     *++e = n;
-    if (!nopeep_opt)
-        peep();
 }
 
 static void emit_branch(uint16_t* to);
@@ -4457,7 +4206,6 @@ static void help(char* lib) {
                "    -s      display disassembly and quit.\n"
                "    -o      name of executable output file.\n"
                "    -u      treat char type as unsigned.\n"
-               "    -n      turn off peep-hole optimization\n"
 #if PICO2350
                "    -x      suppress inline float instructions\n"
 #endif
@@ -4597,8 +4345,6 @@ int cc(int mode, int argc, char** argv) {
             } else if ((*argv)[1] == 'x') {
                 inline_float_opt = 0;
 #endif
-            } else if ((*argv)[1] == 'n') {
-                nopeep_opt = 1;
             } else if ((*argv)[1] == 'o') {
                 --argc;
                 ++argv;
