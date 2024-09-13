@@ -70,99 +70,14 @@ extern void get_screen_xy(int* x, int* y);           // retrieve screem dimensio
 extern void cc_exit(int rc);                         // C exit function
 extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 
-#if PICO2350
-
-// rp2350 float operation and conversion functions
-// for the RP2040 these are builtin to the ROM
-static void __wrap___aeabi_idiv() { asm volatile(" sdiv r0,r0,r1"); }
-
-static void __wrap___aeabi_i2f() {
-    asm volatile(" vmov s15,r0\n"
-                 " vcvt.f32.s32 s15,s15\n"
-                 " vmov r0,s15");
-}
-
-static void __wrap___aeabi_f2iz() {
-    asm volatile(" vmov s15,r0\n"
-                 " vcvt.s32.f32 s15,s15\n"
-                 " vmov r0,s15");
-}
-
-static void __wrap___aeabi_fadd() {
-    asm volatile(" vmov s15,r0\n"
-                 " vmov s14,r1\n"
-                 " vadd.f32 s15,s14,s15\n"
-                 " vmov r0,s15");
-}
-
-static void __wrap___aeabi_fsub() {
-    asm volatile(" vmov s15,r0\n"
-                 " vmov s14,r1\n"
-                 " vsub.f32 s15,s14,s15\n"
-                 " vmov r0,s15");
-}
-
-static void __wrap___aeabi_fmul() {
-    asm volatile(" vmov s15,r0\n"
-                 " vmov s14,r1\n"
-                 " vmul.f32 s15,s14,s15\n"
-                 " vmov r0,s15");
-}
-
-static void __wrap___aeabi_fdiv() {
-    asm volatile(" vmov s15,r0\n"
-                 " vmov s14,r1\n"
-                 " vdiv.f32 s15,s14,s15\n"
-                 " vmov r0, s15");
-}
-
-static void __wrap___aeabi_fcmple() {
-    asm volatile(" vmov s15,r0\n"
-                 " vmov s14,r1\n"
-                 " vcmpe.f32 s14,s15\n"
-                 " vmrs APSR_nzcv,fpscr\n"
-                 " ite ls\n"
-                 " movls r0,#1\n"
-                 " movhi r0,#0");
-}
-
-static void __wrap___aeabi_fcmpgt() {
-    asm volatile(" vmov s15,r0\n"
-                 " vmov s14,r1\n"
-                 " vcmpe.f32 s14,s15\n"
-                 " vmrs APSR_nzcv,fpscr\n"
-                 " ite gt\n"
-                 " movgt r0,#1\n"
-                 " movle r0,#0");
-}
-
-static void __wrap___aeabi_fcmplt() {
-    asm volatile(" vmov s15,r0\n"
-                 " vmov s14,r1\n"
-                 " vcmpe.f32 s14,s15\n"
-                 " vmrs APSR_nzcv,fpscr\n"
-                 " ite mi\n"
-                 " movmi r0,#1\n"
-                 " movpl r0,#0");
-}
-
-static void __wrap___aeabi_fcmpge() {
-    asm volatile(" vmov s15,r0\n"
-                 " vmov s14,r1\n"
-                 " vcmpe.f32 s14,s15\n"
-                 " vmrs APSR_nzcv,fpscr\n"
-                 " ite ge\n"
-                 " movge r0,#1\n"
-                 " movlt r0,#0");
-}
-
+// rp2350 sqrt float operation
 static void wrap_sqrtf() {
     asm volatile(" vmov s15,r0\n"
                  " vsqrt.f32 s15,s15\n"
                  " vmov r0, s15");
 }
-#endif
 
+#if !PICO2350
 // SDK floating point functions
 void __wrap___aeabi_idiv();
 void __wrap___aeabi_i2f();
@@ -175,7 +90,7 @@ void __wrap___aeabi_fcmple();
 void __wrap___aeabi_fcmpgt();
 void __wrap___aeabi_fcmplt();
 void __wrap___aeabi_fcmpge();
-
+#endif
 // accellerated SDK trig functions
 void __wrap_sinf();
 void __wrap_cosf();
@@ -190,6 +105,7 @@ void __wrap_asinhf();
 void __wrap_acoshf();
 void __wrap_atanhf();
 
+#if !PICO2350
 enum {
     aeabi_idiv = 1,
     aeabi_i2f,
@@ -218,6 +134,7 @@ static void (*fops[])() = {
     __wrap___aeabi_fcmplt,
     __wrap___aeabi_fcmpge,
 };
+#endif
 
 // patch list entry
 struct patch_s {
@@ -273,9 +190,6 @@ static int rtf UDATA, rtt UDATA;      // return flag and return type for current
 static int loc UDATA;                 // local variable offset
 static int lineno UDATA;              // current line number
 static int src_opt UDATA;             // print source and assembly flag
-#if PICO2350
-static int inline_float_opt UDATA;    // generate inline float instructions flag
-#endif
 static int nopeep_opt UDATA;          // turn off peep-hole optimization
 static int uchar_opt UDATA;           // use unsigned character variables
 static int* n UDATA;                  // current position in emitted abstract syntax tree
@@ -2721,6 +2635,7 @@ static void emit_branch(uint16_t* to) {
         emit_call((int)(to + 2));
 }
 
+#if !PICO2350
 static void emit_fop(int n) {
     if (!ofn) // if exe output emit negative external function index
         emit_load_long_imm(3, (int)fops[n], 0);
@@ -2728,6 +2643,7 @@ static void emit_fop(int n) {
         emit_load_long_imm(3, -n, 1);
     emit(0x4798); // blx r3
 }
+#endif
 
 static void emit_cond_branch(uint16_t* to, int cond) {
     int ofs = to - (e + 1);
@@ -2908,14 +2824,11 @@ static void emit_float_oper(int op) {
     case ADDF:
         emit_pop(1); // pop {r1}
 #if PICO2350
-        if (inline_float_opt) {
-            emit_float_prefix();
-            emit(0xee77);
-            emit(0x7a27); // vadd.f32 s15,s14,s15
-            emit(0xee17);
-            emit(0x0a90); // vmov r0,s15
-        } else
-            emit_fop((int)aeabi_fadd);
+        emit_float_prefix();
+        emit(0xee77);
+        emit(0x7a27); // vadd.f32 s15,s14,s15
+        emit(0xee17);
+        emit(0x0a90); // vmov r0,s15
 #else
         emit_fop((int)aeabi_fadd);
 #endif
@@ -2923,14 +2836,11 @@ static void emit_float_oper(int op) {
     case SUBF:
 #if PICO2350
         emit_pop(1);
-        if (inline_float_opt) {
-            emit_float_prefix();
-            emit(0xee77);
-            emit(0x7a67); // vsub.f32 s15,s14,s15
-            emit(0xee17);
-            emit(0x0a90); // vmov r0,s15
-        } else
-            emit_fop((int)aeabi_fsub);
+        emit_float_prefix();
+        emit(0xee77);
+        emit(0x7a67); // vsub.f32 s15,s14,s15
+        emit(0xee17);
+        emit(0x0a90); // vmov r0,s15
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2940,14 +2850,11 @@ static void emit_float_oper(int op) {
     case MULF:
         emit_pop(1);
 #if PICO2350
-        if (inline_float_opt) {
-            emit_float_prefix();
-            emit(0xee67);
-            emit(0x7a27); // vmul.f32 s15,s14,s15
-            emit(0xee17);
-            emit(0x0a90); // vmov r0,s15
-        } else
-            emit_fop((int)aeabi_fmul);
+        emit_float_prefix();
+        emit(0xee67);
+        emit(0x7a27); // vmul.f32 s15,s14,s15
+        emit(0xee17);
+        emit(0x0a90); // vmov r0,s15
 #else
         emit_fop((int)aeabi_fmul);
 #endif
@@ -2955,14 +2862,11 @@ static void emit_float_oper(int op) {
     case DIVF:
 #if PICO2350
         emit_pop(1);
-        if (inline_float_opt) {
-            emit_float_prefix();
-            emit(0xeec7);
-            emit(0x7a27); // vdiv.f32 s15,s14,s15
-            emit(0xee17);
-            emit(0x0a90); // vmov r0,s15
-        } else
-            emit_fop((int)aeabi_fdiv);
+        emit_float_prefix();
+        emit(0xeec7);
+        emit(0x7a27); // vdiv.f32 s15,s14,s15
+        emit(0xee17);
+        emit(0x0a90); // vmov r0,s15
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2972,13 +2876,10 @@ static void emit_float_oper(int op) {
     case GEF:
 #if PICO2350
         emit_pop(1);
-        if (inline_float_opt) {
-            emit_cmp_prefix();
-            emit(0xbfac); // ite ge
-            emit(0x2001); // movge r0,#1
-            emit(0x2000); // movlt r0,#0
-        } else
-            emit_fop((int)aeabi_fcmpge);
+        emit_cmp_prefix();
+        emit(0xbfac); // ite ge
+        emit(0x2001); // movge r0,#1
+        emit(0x2000); // movlt r0,#0
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2988,13 +2889,10 @@ static void emit_float_oper(int op) {
     case GTF:
 #if PICO2350
         emit_pop(1);
-        if (inline_float_opt) {
-            emit_cmp_prefix();
-            emit(0xbfcc); // ite gt
-            emit(0x2001); // movgt r0,#1
-            emit(0x2000); // movle r0,#0
-        } else
-            emit_fop((int)aeabi_fcmpgt);
+        emit_cmp_prefix();
+        emit(0xbfcc); // ite gt
+        emit(0x2001); // movgt r0,#1
+        emit(0x2000); // movle r0,#0
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -3004,13 +2902,10 @@ static void emit_float_oper(int op) {
     case LTF:
 #if PICO2350
         emit_pop(1);
-        if (inline_float_opt) {
-            emit_cmp_prefix();
-            emit(0xbf4c); // ite mi
-            emit(0x2001); // movmi r0,#1
-            emit(0x2000); // movpl r0,#0
-        } else
-            emit_fop((int)aeabi_fcmplt);
+        emit_cmp_prefix();
+        emit(0xbf4c); // ite mi
+        emit(0x2001); // movmi r0,#1
+        emit(0x2000); // movpl r0,#0
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -3020,13 +2915,10 @@ static void emit_float_oper(int op) {
     case LEF:
 #if PICO2350
         emit_pop(1);
-        if (inline_float_opt) {
-            emit_cmp_prefix();
-            emit(0xbf94); // ite ls
-            emit(0x2001); // movls r0,#1
-            emit(0x2000); // movhi r0,#0
-        } else
-            emit_fop((int)aeabi_fcmple);
+        emit_cmp_prefix();
+        emit(0xbf94); // ite ls
+        emit(0x2001); // movls r0,#1
+        emit(0x2000); // movhi r0,#0
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -3049,30 +2941,24 @@ static void emit_cast(int n) {
     switch (n) {
     case ITOF:
 #if PICO2350
-        if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
-            emit(0xeef8);
-            emit(0x7ae7); // vcvt.f32.s32 s15,s15
-            emit(0xee17);
-            emit(0x0a90); // vmov r0,s15
-        } else
-            emit_fop((int)aeabi_i2f);
+        emit(0xee07);
+        emit(0x0a90); // vmov s15,r0
+        emit(0xeef8);
+        emit(0x7ae7); // vcvt.f32.s32 s15,s15
+        emit(0xee17);
+        emit(0x0a90); // vmov r0,s15
 #else
         emit_fop((int)aeabi_i2f);
 #endif
         break;
     case FTOI:
 #if PICO2350
-        if (inline_float_opt) {
-            emit(0xee07);
-            emit(0x0a90); // vmov s15,r0
-            emit(0xeefd);
-            emit(0x7ae7); // vcvt.s32.f32 s15,s15
-            emit(0xee17);
-            emit(0x0a90); // vmov r0,s15
-        } else
-            emit_fop((int)aeabi_f2iz);
+        emit(0xee07);
+        emit(0x0a90); // vmov s15,r0
+        emit(0xeefd);
+        emit(0x7ae7); // vcvt.s32.f32 s15,s15
+        emit(0xee17);
+        emit(0x0a90); // vmov r0,s15
 #else
         emit_fop((int)aeabi_f2iz);
 #endif
@@ -4409,9 +4295,6 @@ static void help(char* lib) {
                "    -o      name of executable output file.\n"
                "    -u      treat char type as unsigned.\n"
                "    -n      turn off peep-hole optimization\n"
-#if PICO2350
-               "    -x      suppress inline float instructions\n"
-#endif
                "    -D symbol [= value]\n"
                "            define symbol for limited pre-processor, can repeat.\n"
                "    -h [lib name]\n"
@@ -4528,9 +4411,6 @@ int cc(int mode, int argc, char** argv) {
         tsize[tnew++] = 0; // reserved for another scalar type
 
         // parse the command line arguments
-#if PICO2350
-        inline_float_opt = 1;
-#endif
         --argc;
         ++argv;
         while (argc > 0 && **argv == '-') {
@@ -4544,10 +4424,6 @@ int cc(int mode, int argc, char** argv) {
                 goto done;
             } else if ((*argv)[1] == 's') {
                 src_opt = 1;
-#if PICO2350
-            } else if ((*argv)[1] == 'x') {
-                inline_float_opt = 0;
-#endif
             } else if ((*argv)[1] == 'n') {
                 nopeep_opt = 1;
             } else if ((*argv)[1] == 'o') {
@@ -4588,6 +4464,7 @@ int cc(int mode, int argc, char** argv) {
         }
 
         // optionally enable and add known symbols to disassembler tables
+#if !PICO2350
         if (src_opt) {
             disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
             disasm_symbol(&state, "idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
@@ -4602,6 +4479,7 @@ int cc(int mode, int argc, char** argv) {
             disasm_symbol(&state, "fcmpgt", (uint32_t)__wrap___aeabi_fcmpgt, ARMMODE_THUMB);
             disasm_symbol(&state, "fcmplt", (uint32_t)__wrap___aeabi_fcmplt, ARMMODE_THUMB);
         }
+#endif
 
         // add SDK and clib symbols
         add_defines(stdio_defines);
@@ -4779,7 +4657,11 @@ int cc(int mode, int argc, char** argv) {
             }
             int v = *((int*)addr);
             if (v < 0)
+#if !PICO2350
                 *((int*)addr) = (int)fops[-v];
+#else
+                ;
+#endif
             else {
                 if (externs[v].is_printf)
                     *((int*)addr) = (int)x_printf;
