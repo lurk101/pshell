@@ -2384,6 +2384,13 @@ static uint16_t pat15[] = {0x6800, 0xee07, 0x0a90};
 static uint16_t msk15[] = {0xff83, 0xffff, 0xffff};
 static uint16_t rep15[] = {0xedd0, 0x7a00};
 
+// vmov r0,s15          vmov r0,s15
+// vmov s15,r0
+
+static uint16_t pat16[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
+static uint16_t msk16[] = {0xff83, 0xffff, 0xffff, 0xffff};
+static uint16_t rep16[] = {0xee17, 0x0a90};
+
 #endif
 
 struct subs {
@@ -2418,6 +2425,7 @@ static const struct segs {
     {NUMOF(pat13), NUMOF(rep13), 0, pat13, msk13, rep13, {{}, {}}},
     {NUMOF(pat14), NUMOF(rep14), 0, pat14, msk14, rep14, {{}, {}}},
     {NUMOF(pat15), NUMOF(rep15), 0, pat15, msk15, rep15, {{}, {}}},
+    {NUMOF(pat16), NUMOF(rep16), 0, pat16, msk16, rep16, {{}, {}}},
 #endif
 };
 
@@ -4464,9 +4472,9 @@ int cc(int mode, int argc, char** argv) {
         }
 
         // optionally enable and add known symbols to disassembler tables
-#if !PICO2350
         if (src_opt) {
             disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
+#if !PICO2350
             disasm_symbol(&state, "idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
             disasm_symbol(&state, "i2f", (uint32_t)__wrap___aeabi_i2f, ARMMODE_THUMB);
             disasm_symbol(&state, "f2i", (uint32_t)__wrap___aeabi_f2iz, ARMMODE_THUMB);
@@ -4478,8 +4486,8 @@ int cc(int mode, int argc, char** argv) {
             disasm_symbol(&state, "fcmpge", (uint32_t)__wrap___aeabi_fcmpge, ARMMODE_THUMB);
             disasm_symbol(&state, "fcmpgt", (uint32_t)__wrap___aeabi_fcmpgt, ARMMODE_THUMB);
             disasm_symbol(&state, "fcmplt", (uint32_t)__wrap___aeabi_fcmplt, ARMMODE_THUMB);
-        }
 #endif
+        }
 
         // add SDK and clib symbols
         add_defines(stdio_defines);
