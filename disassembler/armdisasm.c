@@ -2024,7 +2024,7 @@ static bool thumb2_co_trans(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-#if PICO2350
+#if PICO_RP2350
 // FP decoders
 
 static bool v_ldr(ARMSTATE* state, uint32_t instr) {
@@ -2042,6 +2042,14 @@ static bool v_pop(ARMSTATE* state, uint32_t instr) {
     strcpy(state->text, "vpop");
     padinstr(state->text);
     strcat(state->text, "{s14}");
+    return true;
+}
+
+static bool v_pop15(ARMSTATE* state, uint32_t instr) {
+    state->size = 4;
+    strcpy(state->text, "vpop");
+    padinstr(state->text);
+    strcat(state->text, "{s15}");
     return true;
 }
 
@@ -2100,11 +2108,17 @@ static bool v_divf(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
-static bool v_mrs(ARMSTATE* state, uint32_t instr) {
+static bool v_mrs_sqrt(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
-    strcpy(state->text, "v_mrs");
-    padinstr(state->text);
-    strcat(state->text, "apsr_nzcv, fpscr");
+    if ((instr & 0xffff) == 0x7ae7) {
+        strcpy(state->text, "vsqrt");
+        padinstr(state->text);
+        strcat(state->text, "s15, s15");
+    } else {
+        strcpy(state->text, "v_mrs");
+        padinstr(state->text);
+        strcat(state->text, "apsr_nzcv, fpscr");
+    }
     return true;
 }
 
@@ -2149,11 +2163,11 @@ static bool v_mov_to(ARMSTATE* state, uint32_t instr) {
 #endif
 
 static const ENCODEMASK16 thumb_table[] = {
-#if PICO2350
+#if PICO_RP2350
     // simple hack for floating point extensions
     {0xffff, 0xee07, v_mov_from},
     {0xffff, 0xee17, v_mov_to},
-    {0xffff, 0xeef1, v_mrs},
+    {0xffff, 0xeef1, v_mrs_sqrt},
     {0xffff, 0xee77, v_add_sub},
     {0xffff, 0xee67, v_mulf},
     {0xffff, 0xeec7, v_divf},
@@ -2163,6 +2177,7 @@ static const ENCODEMASK16 thumb_table[] = {
     {0xffff, 0xeeb0, v_mov},
     {0xffff, 0xecbd, v_pop},
     {0xfffe, 0xedd0, v_ldr},
+    {0xffff, 0xecfd, v_pop15},
 // end of hack
 #endif
     {0xf800, 0x0000, thumb_lsl},           /* logical shift left by immediate, or MOV */

@@ -70,14 +70,7 @@ extern void get_screen_xy(int* x, int* y);           // retrieve screem dimensio
 extern void cc_exit(int rc);                         // C exit function
 extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 
-// rp2350 sqrt float operation
-static void wrap_sqrtf() {
-    asm volatile(" vmov s15,r0\n"
-                 " vsqrt.f32 s15,s15\n"
-                 " vmov r0, s15");
-}
-
-#if !PICO2350
+#if !PICO_RP2350
 // SDK floating point functions
 void __wrap___aeabi_idiv();
 void __wrap___aeabi_i2f();
@@ -105,7 +98,7 @@ void __wrap_asinhf();
 void __wrap_acoshf();
 void __wrap_atanhf();
 
-#if !PICO2350
+#if !PICO_RP2350
 enum {
     aeabi_idiv = 1,
     aeabi_i2f,
@@ -393,6 +386,10 @@ static int wrap_popcount(int n) { return __builtin_popcount(n); };
 static int wrap_printf(void){};
 static int wrap_sprintf(void){};
 
+#define IS_PRINTF(a) (!strcmp((a)->name, "printf"))
+#define IS_SPRINTF(a) (!strcmp((a)->name, "sprintf"))
+#define IS_SQRTF(a) (!strcmp((a)->name, "sqrtf"))
+
 static int wrap_remove(char* name) { return fs_remove(full_path(name)); };
 
 static int wrap_rename(char* old, char* new) {
@@ -430,8 +427,6 @@ struct externs_s {
     const struct define_grp* grp; // help group
     const void* extrn;            // function address
     const int ret_float : 1;      // returns float
-    const int is_printf : 1;      // printf function
-    const int is_sprintf : 1;     // sprintf function
 };
 
 static const struct externs_s externs[] = {
@@ -1268,7 +1263,7 @@ static void expr(int lev) {
             if (d->etype != tt) {
                 if (d->class == Func)
                     fatal("argument type mismatch");
-                else if (!externs[d->val].is_printf && !externs[d->val].is_sprintf)
+                else if ((!IS_PRINTF(&externs[d->val])) && (!IS_SPRINTF(&externs[d->val])))
                     fatal("argument type mismatch");
             }
             next();
@@ -2358,7 +2353,7 @@ static uint16_t pat12[] = {0x2000, 0x4438, 0x6800};
 static uint16_t msk12[] = {0xff83, 0xffff, 0xffff};
 static uint16_t rep12[] = {0x6838};
 
-#if PICO2350
+#if PICO_RP2350
 
 // ldr     r0,[r0,#0]   vldr s15,[r0]
 // pop     {r1}         vpop {s14}
@@ -2391,6 +2386,21 @@ static uint16_t pat16[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
 static uint16_t msk16[] = {0xff83, 0xffff, 0xffff, 0xffff};
 static uint16_t rep16[] = {0xee17, 0x0a90};
 
+// vmov r0,s15          vmov r0,s15
+// push {r0}            push {r0}
+// vmov s15,r0
+
+static uint16_t pat17[] = {0xee17, 0x0a90, 0xb401, 0xee07, 0x0a90};
+static uint16_t msk17[] = {0xff83, 0xffff, 0xffff, 0xffff, 0xffff};
+static uint16_t rep17[] = {0xee17, 0x0a90, 0xb401};
+
+// push {r0}            vmov s15,r0
+// vpop {s15}
+
+static uint16_t pat18[] = {0xb401, 0xecfd, 0x7a01};
+static uint16_t msk18[] = {0xff83, 0xffff, 0xffff};
+static uint16_t rep18[] = {0xee07, 0x0a90};
+
 #endif
 
 struct subs {
@@ -2421,11 +2431,13 @@ static const struct segs {
     {NUMOF(pat10), NUMOF(rep10), 1, pat10, msk10, rep10, {{1, 1, 0}, {}}},
     {NUMOF(pat11), NUMOF(rep11), 0, pat11, msk11, rep11, {{}, {}}},
     {NUMOF(pat12), NUMOF(rep12), 1, pat12, msk12, rep12, {{0, 0, 4}, {}}},
-#if PICO2350
+#if PICO_RP2350
     {NUMOF(pat13), NUMOF(rep13), 0, pat13, msk13, rep13, {{}, {}}},
     {NUMOF(pat14), NUMOF(rep14), 0, pat14, msk14, rep14, {{}, {}}},
     {NUMOF(pat15), NUMOF(rep15), 0, pat15, msk15, rep15, {{}, {}}},
     {NUMOF(pat16), NUMOF(rep16), 0, pat16, msk16, rep16, {{}, {}}},
+    {NUMOF(pat17), NUMOF(rep17), 0, pat17, msk17, rep17, {{}, {}}},
+    {NUMOF(pat18), NUMOF(rep18), 0, pat18, msk18, rep18, {{}, {}}},
 #endif
 };
 
@@ -2643,7 +2655,7 @@ static void emit_branch(uint16_t* to) {
         emit_call((int)(to + 2));
 }
 
-#if !PICO2350
+#if !PICO_RP2350
 static void emit_fop(int n) {
     if (!ofn) // if exe output emit negative external function index
         emit_load_long_imm(3, (int)fops[n], 0);
@@ -2783,7 +2795,7 @@ static void emit_oper(int op) {
     case DIV:
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
-#if PICO2350
+#if PICO_RP2350
         emit(0xfb90);
         emit(0xf0f1); // sdiv    r0, r0, r1
 #else
@@ -2794,7 +2806,7 @@ static void emit_oper(int op) {
     case MOD:
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
-#if PICO2350
+#if PICO_RP2350
         emit(0xfb90);
         emit(0xf3f1); // sdiv    r3, r0, r1
         emit(0xfb03);
@@ -2810,7 +2822,7 @@ static void emit_oper(int op) {
     }
 }
 
-#if PICO2350
+#if PICO_RP2350
 static void emit_float_prefix(void) {
     emit(0xee07);
     emit(0x0a90); // vmov s15,r0
@@ -2831,7 +2843,7 @@ static void emit_float_oper(int op) {
     switch (op) {
     case ADDF:
         emit_pop(1); // pop {r1}
-#if PICO2350
+#if PICO_RP2350
         emit_float_prefix();
         emit(0xee77);
         emit(0x7a27); // vadd.f32 s15,s14,s15
@@ -2842,7 +2854,7 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case SUBF:
-#if PICO2350
+#if PICO_RP2350
         emit_pop(1);
         emit_float_prefix();
         emit(0xee77);
@@ -2857,7 +2869,7 @@ static void emit_float_oper(int op) {
         break;
     case MULF:
         emit_pop(1);
-#if PICO2350
+#if PICO_RP2350
         emit_float_prefix();
         emit(0xee67);
         emit(0x7a27); // vmul.f32 s15,s14,s15
@@ -2868,7 +2880,7 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case DIVF:
-#if PICO2350
+#if PICO_RP2350
         emit_pop(1);
         emit_float_prefix();
         emit(0xeec7);
@@ -2882,7 +2894,7 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case GEF:
-#if PICO2350
+#if PICO_RP2350
         emit_pop(1);
         emit_cmp_prefix();
         emit(0xbfac); // ite ge
@@ -2895,7 +2907,7 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case GTF:
-#if PICO2350
+#if PICO_RP2350
         emit_pop(1);
         emit_cmp_prefix();
         emit(0xbfcc); // ite gt
@@ -2908,7 +2920,7 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case LTF:
-#if PICO2350
+#if PICO_RP2350
         emit_pop(1);
         emit_cmp_prefix();
         emit(0xbf4c); // ite mi
@@ -2921,7 +2933,7 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case LEF:
-#if PICO2350
+#if PICO_RP2350
         emit_pop(1);
         emit_cmp_prefix();
         emit(0xbf94); // ite ls
@@ -2948,7 +2960,7 @@ static void emit_float_oper(int op) {
 static void emit_cast(int n) {
     switch (n) {
     case ITOF:
-#if PICO2350
+#if PICO_RP2350
         emit(0xee07);
         emit(0x0a90); // vmov s15,r0
         emit(0xeef8);
@@ -2960,7 +2972,7 @@ static void emit_cast(int n) {
 #endif
         break;
     case FTOI:
-#if PICO2350
+#if PICO_RP2350
         emit(0xee07);
         emit(0x0a90); // vmov s15,r0
         emit(0xeefd);
@@ -3004,18 +3016,26 @@ static uint16_t* emit_call(int n) {
 
 static void emit_syscall(int n, int np) {
     const struct externs_s* p = externs + n;
-    if (p->is_printf) {
+    if (IS_PRINTF(p)) {
         emit_load_immediate(0, np);
         if (!ofn)
             emit_load_long_imm(3, (int)x_printf, 0);
         else
             emit_load_long_imm(3, n, 1);
-    } else if (p->is_sprintf) {
+    } else if (IS_SPRINTF(p)) {
         emit_load_immediate(0, np);
         if (!ofn)
             emit_load_long_imm(3, (int)x_sprintf, 0);
         else
             emit_load_long_imm(3, n, 1);
+    } else if (IS_SQRTF(p)) {
+        emit(0xecfd);
+        emit(0x7a01); // vpop {s15}
+        emit(0xeef1);
+        emit(0x7ae7); // vsqrt.f32 s15,s15
+        emit(0xee17);
+        emit(0x0a90); // vmov r0,s15
+        return;
     } else {
         int nparm = np & ADJ_MASK;
         if (nparm > 4)
@@ -3029,7 +3049,7 @@ static void emit_syscall(int n, int np) {
     }
     emit(0x4798); // blx r3
     int nparm = np & ADJ_MASK;
-    if (p->is_printf || p->is_sprintf)
+    if (IS_PRINTF(p) || IS_SPRINTF(p))
         emit_adjust_stack(nparm);
     else {
         nparm = (nparm > 4) ? nparm - 4 : 0;
@@ -4294,7 +4314,7 @@ static void help(char* lib) {
     if (!lib) {
         printf("\n"
                "usage: cc [-s] [-u] [-n]"
-#if PICO2350
+#if PICO_RP2350
                " [-x]"
 #endif
                " [-h [lib]] [-D [symbol[ = value]]]\n"
@@ -4474,7 +4494,7 @@ int cc(int mode, int argc, char** argv) {
         // optionally enable and add known symbols to disassembler tables
         if (src_opt) {
             disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
-#if !PICO2350
+#if !PICO_RP2350
             disasm_symbol(&state, "idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
             disasm_symbol(&state, "i2f", (uint32_t)__wrap___aeabi_i2f, ARMMODE_THUMB);
             disasm_symbol(&state, "f2i", (uint32_t)__wrap___aeabi_f2iz, ARMMODE_THUMB);
@@ -4665,15 +4685,15 @@ int cc(int mode, int argc, char** argv) {
             }
             int v = *((int*)addr);
             if (v < 0)
-#if !PICO2350
+#if !PICO_RP2350
                 *((int*)addr) = (int)fops[-v];
 #else
                 ;
 #endif
             else {
-                if (externs[v].is_printf)
+                if (IS_PRINTF(&externs[v]))
                     *((int*)addr) = (int)x_printf;
-                else if (externs[v].is_sprintf)
+                else if (IS_SPRINTF(&externs[v]))
                     *((int*)addr) = (int)x_sprintf;
                 else
                     *((int*)addr) = (int)externs[v].extrn;

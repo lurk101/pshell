@@ -919,14 +919,14 @@ static const char* search_cmds(int len) {
 
 static void HardFault_Handler(void) {
     static const char* clear = "\n\n" VT_BOLD "*** " VT_BLINK "CRASH" VT_NORMAL VT_BOLD
-                               " - Rebooting in 5 seconds ***" VT_NORMAL "\r\n\n";
+                               " - Rebooting in 3 seconds ***" VT_NORMAL "\r\n\n";
     for (const char* cp = clear; *cp; cp++)
         putchar(*cp);
 #ifndef NDEBUG
     for (;;)
         ;
 #endif
-    watchdog_reboot(0, 0, 5000);
+    watchdog_reboot(0, 0, 3000);
     for (;;)
         __wfi();
 }
@@ -968,7 +968,6 @@ int main(void) {
         sleep_ms(1000);
     uart = false;
 #endif
-    int save_fault = ((int*)scb_hw->vtor)[3];
     ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
     getchar_timeout_us(1000);
     bool detected = screen_size();
@@ -1060,7 +1059,6 @@ int main(void) {
             help();
     }
     fs_unload();
-    ((int*)scb_hw->vtor)[3] = save_fault;
 
     printf("\ndone\n");
     sleep_ms(1000);

@@ -47,20 +47,10 @@ add_executable(${PSHELL}
     main.c
 )
 
-if ("${PICO_BOARD}" STREQUAL "pico2")
 target_compile_definitions(${PSHELL} PUBLIC
   PICO_MALLOC_PANIC=0
   PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
-  PICO2350=1
 )
-else()
-target_compile_definitions(${PSHELL} PUBLIC
-  PICO_MALLOC_PANIC=0
-  PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
-  PICO2350=0
-)
-endif()
-
 
 if (FORCE_TESTS)
 target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
