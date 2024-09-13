@@ -1,3 +1,8 @@
+What's new in version 2.1.2
+
+- substitute HW FP sqrt instruction for sqrtf function call. (RP2350)
+- a few more peep hole optimizations. (RP2350)
+
 What's new in version 2.1.1
 
 - improved peep hole optimizer. Bug fix and RP2350 floating point optimizations.
