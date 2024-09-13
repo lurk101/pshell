@@ -2401,6 +2401,13 @@ static uint16_t pat18[] = {0xb401, 0xecfd, 0x7a01};
 static uint16_t msk18[] = {0xff83, 0xffff, 0xffff};
 static uint16_t rep18[] = {0xee07, 0x0a90};
 
+// vmov r0,s15          vmov r0,s15
+// vmov s15,r0
+
+static uint16_t pat19[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
+static uint16_t msk19[] = {0xff83, 0xffff, 0xffff, 0xffff};
+static uint16_t rep19[] = {0xee07, 0x0a90};
+
 #endif
 
 struct subs {
@@ -2438,6 +2445,7 @@ static const struct segs {
     {NUMOF(pat16), NUMOF(rep16), 0, pat16, msk16, rep16, {{}, {}}},
     {NUMOF(pat17), NUMOF(rep17), 0, pat17, msk17, rep17, {{}, {}}},
     {NUMOF(pat18), NUMOF(rep18), 0, pat18, msk18, rep18, {{}, {}}},
+    {NUMOF(pat19), NUMOF(rep19), 0, pat19, msk19, rep19, {{}, {}}},
 #endif
 };
 
