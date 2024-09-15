@@ -2767,37 +2767,65 @@ static void emit_oper(int op) {
         break;
     case GE:
         emit_pop(1);
+#if PICO_RP2350
+        emit(0x4281); // cmp r1, r0
+        emit(0xbfb4); // ite lt
+        emit(0x2000); // movlt   r0, #0
+        emit(0x2001); // movge   r0, #1
+#else
         emit(0x0003); // movs r3,r0
         emit(0x17c8); // asrs r0,r1,#31
         emit(0x0fda); // lsrs r2,r3,#31
         emit(0x4299); // cmp  r1,r3
         emit(0x4150); // adcs r0,r2
+#endif
         break;
     case LT:
         emit_pop(1);
+#if PICO_RP2350
+        emit(0x4281); // cmp r1, r0
+        emit(0xbfac); // ite ge
+        emit(0x2000); // movge   r0, #0
+        emit(0x2001); // movlt   r0, #1
+#else
         emit(0x2301); // movs r3,#1
         emit(0x4281); // cmp  r1,r0
         emit(0xdb00); // blt.n L2
         emit(0x2300); // movs r3,#0
                       // L2:
         emit(0x0018); // movs r0,r3
+#endif
         break;
     case GT:
         emit_pop(1);
+#if PICO_RP2350
+        emit(0x4281); // cmp r1, r0
+        emit(0xbfd4); // ite le
+        emit(0x2000); // movle   r0, #0
+        emit(0x2001); // movgt   r0, #1
+#else
         emit(0x2301); // movs r3,#1
         emit(0x4281); // cmp  r1,r0
         emit(0xdc00); // bgt.n L1
         emit(0x2300); // movs r3,#0
                       // L1:
         emit(0x0018); // movs r0,r3
+#endif
         break;
     case LE:
         emit_pop(1);
+#if PICO_RP2350
+        emit(0x4281); // cmp r1, r0
+        emit(0xbfcc); // ite gt
+        emit(0x2000); // movgt   r0, #0
+        emit(0x2001); // movle   r0, #1
+#else
         emit(0x0003); // movs r3,r0
         emit(0x0fc8); // lsrs r0,r1,#31
         emit(0x17da); // asrs r2,r3,#31
         emit(0x428b); // cmp  r3,r1
         emit(0x4150); // adcs r0,r2
+#endif
         break;
 
     case DIV:
