@@ -70,7 +70,7 @@ extern void get_screen_xy(int* x, int* y);           // retrieve screem dimensio
 extern void cc_exit(int rc);                         // C exit function
 extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 
-#if !PICO_RP2350
+#if PICO_RP2040
 // SDK floating point functions
 void __wrap___aeabi_idiv();
 void __wrap___aeabi_i2f();
@@ -98,7 +98,7 @@ void __wrap_asinhf();
 void __wrap_acoshf();
 void __wrap_atanhf();
 
-#if !PICO_RP2350
+#if PICO_RP2040
 enum {
     aeabi_idiv = 1,
     aeabi_i2f,
@@ -2663,7 +2663,7 @@ static void emit_branch(uint16_t* to) {
         emit_call((int)(to + 2));
 }
 
-#if !PICO_RP2350
+#if PICO_RP2040
 static void emit_fop(int n) {
     if (!ofn) // if exe output emit negative external function index
         emit_load_long_imm(3, (int)fops[n], 0);
@@ -2829,12 +2829,13 @@ static void emit_oper(int op) {
         break;
 
     case DIV:
+#if PICO_RP2350
+        emit_pop(1); // pop {r1}
+        emit(0xfb91);
+        emit(0xf0f0); // sdiv    r0, r1, r0
+#else
         emit(0x4601); // mov r1,r0
         emit_pop(0);  // pop {r0}
-#if PICO_RP2350
-        emit(0xfb90);
-        emit(0xf0f1); // sdiv    r0, r0, r1
-#else
         emit_fop(aeabi_idiv);
 #endif
         break;
@@ -4530,7 +4531,7 @@ int cc(int mode, int argc, char** argv) {
         // optionally enable and add known symbols to disassembler tables
         if (src_opt) {
             disasm_init(&state, DISASM_ADDRESS | DISASM_INSTR | DISASM_COMMENT);
-#if !PICO_RP2350
+#if PICO_RP2040
             disasm_symbol(&state, "idiv", (uint32_t)__wrap___aeabi_idiv, ARMMODE_THUMB);
             disasm_symbol(&state, "i2f", (uint32_t)__wrap___aeabi_i2f, ARMMODE_THUMB);
             disasm_symbol(&state, "f2i", (uint32_t)__wrap___aeabi_f2iz, ARMMODE_THUMB);
@@ -4721,7 +4722,7 @@ int cc(int mode, int argc, char** argv) {
             }
             int v = *((int*)addr);
             if (v < 0)
-#if !PICO_RP2350
+#if PICO_RP2040
                 *((int*)addr) = (int)fops[-v];
 #else
                 ;
