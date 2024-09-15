@@ -220,7 +220,7 @@ void doinit() {
     bot[3] = 0;
     xmin = 0;
     xmax = 0;
-    rlen = screen_height();
+    rlen = screen_height() - 2;
     clen = screen_width() - 1;
     if (clen > N)
         clen = N;
@@ -250,6 +250,8 @@ int main() {
         }
         //      ascplot(X);
         uniplot(X);
+        if (getchar_timeout_us(0) == 0x03)
+            break;
     }
     rowcol(rlen - 5, 1);
     t = toc();

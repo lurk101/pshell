@@ -79,4 +79,3 @@ int main() {
     printf("Runtime = %.2f seconds\n", (float)(time_us_32() - t) / 1000000.0);
     return 0;
 }
-

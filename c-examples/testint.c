@@ -1,0 +1,30 @@
+int main() {
+    int x = 3, y = 4;
+    printf("%d + %d = %d\n", x, y, x + y);
+    printf("%d - %d = %d\n", x, y, x - y);
+    printf("%d * %d = %d\n", x, y, x * y);
+    printf("%d / %d = %d\n", x, y, x / y);
+    printf("%d > %d = %d\n", x, y, x > y);
+    printf("%d < %d = %d\n", x, y, x < y);
+    printf("%d >= %d = %d\n", x, y, x >= y);
+    printf("%d <= %d = %d\n\n", x, y, x <= y);
+    x = 4, y = 3;
+    printf("%d + %d = %d\n", x, y, x + y);
+    printf("%d - %d = %d\n", x, y, x - y);
+    printf("%d * %d = %d\n", x, y, x * y);
+    printf("%d / %d = %d\n", x, y, x / y);
+    printf("%d > %d = %d\n", x, y, x > y);
+    printf("%d < %d = %d\n", x, y, x < y);
+    printf("%d >= %d = %d\n", x, y, x >= y);
+    printf("%d <= %d = %d\n\n", x, y, x <= y);
+    x = 4, y = 4;
+    printf("%d + %d = %d\n", x, y, x + y);
+    printf("%d - %d = %d\n", x, y, x - y);
+    printf("%d * %d = %d\n", x, y, x * y);
+    printf("%d / %d = %d\n", x, y, x / y);
+    printf("%d > %d = %d\n", x, y, x > y);
+    printf("%d < %d = %d\n", x, y, x < y);
+    printf("%d >= %d = %d\n", x, y, x >= y);
+    printf("%d <= %d = %d\n", x, y, x <= y);
+    return 0;
+}
