@@ -983,7 +983,6 @@ int main(void) {
 #else
     strcpy(buf, "flash");
 #endif
-    version_cmd();
     char console[8];
     if (uart) {
 #if defined(PICO_DEFAULT_UART)
@@ -993,7 +992,7 @@ int main(void) {
 #endif
     } else
         strcpy(console, "USB");
-    printf("\nboard: " PICO_BOARD ", console: %s [%u X %u], filesystem: %s\n\n"
+    printf("\nplatform: " PICO_BOARD ", console: %s [%u X %u], filesystem: %s\n\n"
            "enter command or hit ENTER for help\n\n",
            console, screen_x, screen_y, buf);
     if (!detected) {

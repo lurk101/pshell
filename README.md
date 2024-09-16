@@ -20,7 +20,8 @@ Credit where credit is due...
 - The compiler code is a remix of the [amacc compiler] parser generator
 and the [c4 virtual machine]. Many important amacc enhancements such as
 floating point, array, struct and type checking support were taken fom
-the [Squint] project. Native code generation by yours truly.
+the [Squint] project.
+- Native machine code generation for CM0 and CM33 by Jean M. Cyr.
 - Console command recall and auto completion by Eric Olson.
 
 [What's new] in pshell
