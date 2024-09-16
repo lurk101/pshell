@@ -3065,6 +3065,7 @@ static void emit_syscall(int n, int np) {
             emit_load_long_imm(3, (int)x_sprintf, 0);
         else
             emit_load_long_imm(3, n, 1);
+#if PICO_RP2350
     } else if (IS_SQRTF(p)) {
         emit(0xecfd);
         emit(0x7a01); // vpop {s15}
@@ -3073,6 +3074,7 @@ static void emit_syscall(int n, int np) {
         emit(0xee17);
         emit(0x0a90); // vmov r0,s15
         return;
+#endif
     } else {
         int nparm = np & ADJ_MASK;
         if (nparm > 4)
