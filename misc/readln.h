@@ -9,7 +9,7 @@ typedef struct {
     const char* descr;
 } cmd_t;
 
-extern cmd_t cmd_table[];
+extern const cmd_t cmd_table[];
 
 char* dgreadln(char* buffer, int mnt, char* prom);
 void savehist();

@@ -865,7 +865,7 @@ static bool screen_size(void) {
 static void resize_cmd(void) { screen_size(); }
 
 // clang-format off
-cmd_t cmd_table[] = {
+const cmd_t cmd_table[] = {
     {"cat",     cat_cmd,        "display a text file, use -p to paginate"},
     {"cc",      cc_cmd,         "compile & run C source file. cc -h for help"},
     {"cd",      cd_cmd,         "change directory"},

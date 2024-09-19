@@ -2253,41 +2253,41 @@ static void init_array(struct ident_s* tn, int extent[], int dim) {
 // movs r0,#n
 // pop  {r3}
 
-static uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc08};
-static uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
-static uint16_t rep0[] = {0x463b, 0x2000};
+static const uint16_t pat0[] = {0x4638, 0xb401, 0x2000, 0xbc08};
+static const uint16_t msk0[] = {0xffff, 0xffff, 0xff00, 0xffff};
+static const uint16_t rep0[] = {0x463b, 0x2000};
 
 // ldr  r0,[r0,#n0]   ldr  r3,[r0,#n0]
 // push {r0}          movs r0,#n1
 // movs r0, #n1
 // pop  {r3}
 
-static uint16_t pat1[] = {0x6800, 0xb401, 0x2000, 0xbc08};
-static uint16_t msk1[] = {0xff00, 0xffff, 0xff00, 0xffff};
-static uint16_t rep1[] = {0x6803, 0x2000};
+static const uint16_t pat1[] = {0x6800, 0xb401, 0x2000, 0xbc08};
+static const uint16_t msk1[] = {0xff00, 0xffff, 0xff00, 0xffff};
+static const uint16_t rep1[] = {0x6803, 0x2000};
 
 // movs r0,#n         mov  r0,r7
 // rsbs r0,r0         subs r0,#n
 // add  r0,r7
 
-static uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
-static uint16_t msk2[] = {0xff00, 0xffff, 0xffff};
-static uint16_t rep2[] = {0x4638, 0x3800};
+static const uint16_t pat2[] = {0x2000, 0x4240, 0x4438};
+static const uint16_t msk2[] = {0xff00, 0xffff, 0xffff};
+static const uint16_t rep2[] = {0x4638, 0x3800};
 
 // push {r0}
 // pop {r0}
 
-static uint16_t pat3[] = {0xb401, 0xbc01};
-static uint16_t msk3[] = {0xffff, 0xffff};
-static uint16_t rep3[0] = {};
+static const uint16_t pat3[] = {0xb401, 0xbc01};
+static const uint16_t msk3[] = {0xffff, 0xffff};
+static const uint16_t rep3[0] = {};
 
 // movs r0,#n          mov r1,#n
 // push {r0}
 // pop  {r1}
 
-static uint16_t pat4[] = {0x2000, 0xb401, 0xbc02};
-static uint16_t msk4[] = {0xff00, 0xffff, 0xffff};
-static uint16_t rep4[] = {0x2100};
+static const uint16_t pat4[] = {0x2000, 0xb401, 0xbc02};
+static const uint16_t msk4[] = {0xff00, 0xffff, 0xffff};
+static const uint16_t rep4[] = {0x2100};
 
 // mov  r0,r7          mov  r3,r7
 // subs r0,#n0         subs r3,#n0
@@ -2295,23 +2295,23 @@ static uint16_t rep4[] = {0x2100};
 // movs r0,#n1
 // pop  {r3}
 
-static uint16_t pat5[] = {0x4638, 0x3800, 0xb401, 0x2000, 0xbc08};
-static uint16_t msk5[] = {0xffff, 0xff00, 0xffff, 0xff00, 0xffff};
-static uint16_t rep5[] = {0x463b, 0x3b00, 0x2000};
+static const uint16_t pat5[] = {0x4638, 0x3800, 0xb401, 0x2000, 0xbc08};
+static const uint16_t msk5[] = {0xffff, 0xff00, 0xffff, 0xff00, 0xffff};
+static const uint16_t rep5[] = {0x463b, 0x3b00, 0x2000};
 
 // mov  r0,r7          ldr  r0,[r7,#0]
 // ldr  r0,[r0,#0]
 
-static uint16_t pat6[] = {0x4638, 0x6800};
-static uint16_t msk6[] = {0xffff, 0xffff};
-static uint16_t rep6[] = {0x6838};
+static const uint16_t pat6[] = {0x4638, 0x6800};
+static const uint16_t msk6[] = {0xffff, 0xffff};
+static const uint16_t rep6[] = {0x6838};
 
 // movs r0,#4           lsls r0,r3,#2
 // muls r0,r3
 
-static uint16_t pat7[] = {0x2004, 0x4358};
-static uint16_t msk7[] = {0xffff, 0xffff};
-static uint16_t rep7[] = {0x0098};
+static const uint16_t pat7[] = {0x2004, 0x4358};
+static const uint16_t msk7[] = {0xffff, 0xffff};
+static const uint16_t rep7[] = {0x0098};
 
 // mov  r0,r7          subs r3,r7,#4
 // subs r0,#4          movs r0,#n1
@@ -2319,39 +2319,39 @@ static uint16_t rep7[] = {0x0098};
 // movs r0,#n1
 // pop  {r3}
 
-static uint16_t pat8[] = {0x4638, 0x3804, 0xb401, 0x2000, 0xbc08};
-static uint16_t msk8[] = {0xffff, 0xffff, 0xffff, 0xff00, 0xffff};
-static uint16_t rep8[] = {0x1f3b, 0x2000};
+static const uint16_t pat8[] = {0x4638, 0x3804, 0xb401, 0x2000, 0xbc08};
+static const uint16_t msk8[] = {0xffff, 0xffff, 0xffff, 0xff00, 0xffff};
+static const uint16_t rep8[] = {0x1f3b, 0x2000};
 
 // mov  r0, r7         sub r0,r7,#4
 // subs r0, #4
 
-static uint16_t pat9[] = {0x4638, 0x3804};
-static uint16_t msk9[] = {0xffff, 0xffff};
-static uint16_t rep9[] = {0x1f38};
+static const uint16_t pat9[] = {0x4638, 0x3804};
+static const uint16_t msk9[] = {0xffff, 0xffff};
+static const uint16_t rep9[] = {0x1f38};
 
 // push {r0}            mov  r1,r0
 // movs r0,#n           movs r0,#n
 // pop  {r1}
 
-static uint16_t pat10[] = {0xb401, 0x2000, 0xbc02};
-static uint16_t msk10[] = {0xffff, 0xff00, 0xffff};
-static uint16_t rep10[] = {0x4601, 0x2000};
+static const uint16_t pat10[] = {0xb401, 0x2000, 0xbc02};
+static const uint16_t msk10[] = {0xffff, 0xff00, 0xffff};
+static const uint16_t rep10[] = {0x4601, 0x2000};
 
 // push {r0}            mov r1,r0
 // pop  {r1}
 
-static uint16_t pat11[] = {0xb401, 0xbc02};
-static uint16_t msk11[] = {0xffff, 0xffff};
-static uint16_t rep11[] = {0x4601};
+static const uint16_t pat11[] = {0xb401, 0xbc02};
+static const uint16_t msk11[] = {0xffff, 0xffff};
+static const uint16_t rep11[] = {0x4601};
 
 // movs r0,#n           ldr r0,[r7,#n]
 // add  r0,r7
 // ldr  r0,[r0,#0]
 
-static uint16_t pat12[] = {0x2000, 0x4438, 0x6800};
-static uint16_t msk12[] = {0xff83, 0xffff, 0xffff};
-static uint16_t rep12[] = {0x6838};
+static const uint16_t pat12[] = {0x2000, 0x4438, 0x6800};
+static const uint16_t msk12[] = {0xff83, 0xffff, 0xffff};
+static const uint16_t rep12[] = {0x6838};
 
 #if PICO_RP2350
 
@@ -2360,53 +2360,53 @@ static uint16_t rep12[] = {0x6838};
 // vmov    s15,r0
 // vmov    s14,r1
 
-static uint16_t pat13[] = {0x6800, 0xbc02, 0xee07, 0x0a90, 0xee07, 0x1a10};
-static uint16_t msk13[] = {0xff83, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep13[] = {0xedd0, 0x7a00, 0xecbd, 0x7a01};
+static const uint16_t pat13[] = {0x6800, 0xbc02, 0xee07, 0x0a90, 0xee07, 0x1a10};
+static const uint16_t msk13[] = {0xff83, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
+static const uint16_t rep13[] = {0xedd0, 0x7a00, 0xecbd, 0x7a01};
 
 // pop {r1}             vmov s15,r0
 // vmov s15,r0          vpop {s14}
 // vmov s14,r1
 
-static uint16_t pat14[] = {0xbc02, 0xee07, 0x0a90, 0xee07, 0x1a10};
-static uint16_t msk14[] = {0xff83, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep14[] = {0xee07, 0x0a90, 0xecbd, 0x7a01};
+static const uint16_t pat14[] = {0xbc02, 0xee07, 0x0a90, 0xee07, 0x1a10};
+static const uint16_t msk14[] = {0xff83, 0xffff, 0xffff, 0xffff, 0xffff};
+static const uint16_t rep14[] = {0xee07, 0x0a90, 0xecbd, 0x7a01};
 
 // ldr r0,[r0,#0]       vldr s15,[r0]
 // vmov s15,r0
 
-static uint16_t pat15[] = {0x6800, 0xee07, 0x0a90};
-static uint16_t msk15[] = {0xff83, 0xffff, 0xffff};
-static uint16_t rep15[] = {0xedd0, 0x7a00};
+static const uint16_t pat15[] = {0x6800, 0xee07, 0x0a90};
+static const uint16_t msk15[] = {0xff83, 0xffff, 0xffff};
+static const uint16_t rep15[] = {0xedd0, 0x7a00};
 
 // vmov r0,s15          vmov r0,s15
 // vmov s15,r0
 
-static uint16_t pat16[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
-static uint16_t msk16[] = {0xff83, 0xffff, 0xffff, 0xffff};
-static uint16_t rep16[] = {0xee17, 0x0a90};
+static const uint16_t pat16[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
+static const uint16_t msk16[] = {0xff83, 0xffff, 0xffff, 0xffff};
+static const uint16_t rep16[] = {0xee17, 0x0a90};
 
 // vmov r0,s15          vmov r0,s15
 // push {r0}            push {r0}
 // vmov s15,r0
 
-static uint16_t pat17[] = {0xee17, 0x0a90, 0xb401, 0xee07, 0x0a90};
-static uint16_t msk17[] = {0xff83, 0xffff, 0xffff, 0xffff, 0xffff};
-static uint16_t rep17[] = {0xee17, 0x0a90, 0xb401};
+static const uint16_t pat17[] = {0xee17, 0x0a90, 0xb401, 0xee07, 0x0a90};
+static const uint16_t msk17[] = {0xff83, 0xffff, 0xffff, 0xffff, 0xffff};
+static const uint16_t rep17[] = {0xee17, 0x0a90, 0xb401};
 
 // push {r0}            vmov s15,r0
 // vpop {s15}
 
-static uint16_t pat18[] = {0xb401, 0xecfd, 0x7a01};
-static uint16_t msk18[] = {0xff83, 0xffff, 0xffff};
-static uint16_t rep18[] = {0xee07, 0x0a90};
+static const uint16_t pat18[] = {0xb401, 0xecfd, 0x7a01};
+static const uint16_t msk18[] = {0xff83, 0xffff, 0xffff};
+static const uint16_t rep18[] = {0xee07, 0x0a90};
 
 // vmov r0,s15          vmov r0,s15
 // vmov s15,r0
 
-static uint16_t pat19[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
-static uint16_t msk19[] = {0xff83, 0xffff, 0xffff, 0xffff};
-static uint16_t rep19[] = {0xee07, 0x0a90};
+static const uint16_t pat19[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
+static const uint16_t msk19[] = {0xff83, 0xffff, 0xffff, 0xffff};
+static const uint16_t rep19[] = {0xee07, 0x0a90};
 
 #endif
 
@@ -2420,9 +2420,9 @@ static const struct segs {
     uint8_t n_pats;
     uint8_t n_reps;
     uint8_t n_maps;
-    uint16_t* pat;
-    uint16_t* msk;
-    uint16_t* rep;
+    const uint16_t* pat;
+    const uint16_t* msk;
+    const uint16_t* rep;
     struct subs map[2];
 } segments[] = {
     {NUMOF(pat0), NUMOF(rep0), 1, pat0, msk0, rep0, {{2, 1, 0}, {}}},
