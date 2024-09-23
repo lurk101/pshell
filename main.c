@@ -636,11 +636,9 @@ static void status_cmd(void) {
     printf("\ntext size 0x%x (%d), bss size 0x%x (%d)", stat.text_size, stat.text_size,
            stat.bss_size, stat.bss_size);
 #endif
-    sprintf(result,
-            "\ntotal blocks %d, block size %d, used %s out of %s, %1.1f%c "
-            "used.\n",
-            (int)stat.block_count, (int)stat.block_size, used_size, total_size,
-            stat.blocks_used * 100.0 / stat.block_count, percent);
+    sprintf(result, "\nblocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n",
+            (int)stat.block_count, (int)stat.blocks_used, (int)stat.block_size, used_size,
+            total_size, stat.blocks_used * 100.0 / stat.block_count, percent);
 }
 
 static void ls_cmd(void) {
