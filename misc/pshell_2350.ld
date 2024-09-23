@@ -220,7 +220,9 @@ SECTIONS
         PROVIDE(__flash_binary_end = .);
     } > FLASH =0xaa
 
-    __StackLimit = ORIGIN(RAM) + LENGTH(RAM) - 0x8000;
+    /* stack limit is poorly named, but historically is maximum heap ptr */
+    __StackLimit = ORIGIN(RAM) + LENGTH(RAM) - 0x8000; /* 32K for user code and data */
+
     __StackOneTop = ORIGIN(SCRATCH_X) + LENGTH(SCRATCH_X);
     __StackTop = ORIGIN(SCRATCH_Y) + LENGTH(SCRATCH_Y);
     __StackOneBottom = __StackOneTop - SIZEOF(.stack1_dummy);
