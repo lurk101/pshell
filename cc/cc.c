@@ -235,10 +235,14 @@ static struct member_s** members UDATA; // array (indexed by type) of struct mem
 
 // tokens and classes (operators last and in precedence order)
 // ( >= 128 so not to collide with ASCII-valued tokens)
+enum {
 #include "cc_tokns.h"
+};
 
 // operations
+enum {
 #include "cc_ops.h"
+};
 
 // types -- 4 scalar types, 1020 aggregate types, 4 tensor ranks, 8 ptr levels
 // bits 0-1 = tensor rank, 2-11 = type id, 12-14 = ptr level

@@ -1,5 +1,4 @@
 // clang-format off
-enum {
     LEA, /*  0 */
 /* LEA addressed the problem how to fetch arguments inside sub-function.
  * Let's check out what a calling frame looks like before learning how
@@ -106,5 +105,4 @@ enum {
     EXIT,
 	B,    // branch always
     INVALID
-};
-// clang-format on
+    // clang-format on
