@@ -2078,7 +2078,7 @@ static bool v_cmpf(ARMSTATE* state, uint32_t instr) {
 
 static bool v_itof(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
-    strcpy(state->text, "vcvt");
+    strcpy(state->text, "vcvt.f32");
     padinstr(state->text);
     strcat(state->text, "s15, s15");
     return true;

@@ -915,7 +915,7 @@ static const char* search_cmds(int len) {
     return cmd_table[last_i].name + len;
 }
 
-static void HardFault_Handler(void) {
+static void Fault_Handler(void) {
     static const char* clear = "\n\n" VT_BOLD "*** " VT_BLINK "CRASH" VT_NORMAL VT_BOLD
                                " - Rebooting in 3 seconds ***" VT_NORMAL "\r\n\n";
     for (const char* cp = clear; *cp; cp++)
@@ -966,7 +966,12 @@ int main(void) {
         sleep_ms(1000);
     uart = false;
 #endif
-    ((int*)scb_hw->vtor)[3] = (int)HardFault_Handler;
+    ((int*)scb_hw->vtor)[3] = (int)Fault_Handler; // Hard fault
+#if PICO_RP2350
+    ((int*)scb_hw->vtor)[4] = (int)Fault_Handler; // Memory manager
+    ((int*)scb_hw->vtor)[5] = (int)Fault_Handler; // Bus fault
+    ((int*)scb_hw->vtor)[6] = (int)Fault_Handler; // Usage fault
+#endif
     getchar_timeout_us(1000);
     bool detected = screen_size();
     printf(VT_CLEAR);
