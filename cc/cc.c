@@ -152,7 +152,9 @@ static char *p UDATA, *lp UDATA;                       // current position in so
 static char* data UDATA;                               // data/bss pointer
 static char* data_base UDATA;                          // data/bss pointer
 static int* base_sp UDATA;                             // stack
-static uint16_t *e UDATA, *le UDATA, *text_base UDATA; // current position in emitted code
+uint16_t* e;                                           // current position in emitted code
+uint16_t* text_base;
+static uint16_t* le UDATA;
 static uint16_t* ecas UDATA;                           // case statement patch-up pointer
 static int* ncas UDATA;                                // case statement patch-up pointer
 static uint16_t* def UDATA;                            // default statement patch-up pointer
@@ -2257,7 +2259,7 @@ static void emit(uint16_t n) {
         fatal("code segment exceeded, program is too big");
     *++e = n;
     if (!nopeep_opt)
-        peep(&e, text_base);
+        peep();
 }
 
 static void emit_branch(uint16_t* to);

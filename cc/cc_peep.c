@@ -1,10 +1,10 @@
 
+#include <stdint.h>
+
+#include "cc.h"
 #include "cc_peep.h"
 
 #define NUMOF(a) (sizeof(a) / sizeof(a[0]))
-
-static uint16_t* t_base;
-static uint16_t** ep;
 
 // peep hole optimizer
 
@@ -222,27 +222,25 @@ static const struct segs {
 static int peep_hole(const struct segs* s) {
     uint16_t rslt[32];
     int l = s->n_pats;
-    uint16_t* pe = (*ep - l) + 1;
-    if (pe < t_base)
+    uint16_t* pe = (e - l) + 1;
+    if (pe < text_base)
         return 0;
     for (int i = 0; i < l; i++) {
         rslt[i] = pe[i] & ~s->msk[i];
         if ((pe[i] & s->msk[i]) != (s->pat[i] & s->msk[i]))
             return 0;
     }
-    *ep -= l;
+    e -= l;
     l = s->n_reps;
     for (int i = 0; i < l; i++)
         pe[i] = s->rep[i];
     for (int i = 0; i < s->n_maps; ++i)
         pe[s->map[i].to] |= rslt[s->map[i].from] << s->map[i].lshft;
-    *ep += l;
+    e += l;
     return 1;
 }
 
-void peep(uint16_t** e, uint16_t* text_base) {
-    t_base = text_base;
-    ep = e;
+void peep(void) {
 restart:
     for (int i = 0; i < NUMOF(segments); ++i)
         if (peep_hole(&segments[i]))
