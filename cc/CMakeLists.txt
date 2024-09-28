@@ -10,5 +10,6 @@ target_sources(cc INTERFACE
     ${CC_PROC}/cc_defs.h
     ${CC_PROC}/cc_extrns.h
     cc_malloc.c cc_malloc.h
-    cc_printf.S
+    cc_peep.c cc_peep.h
+    cc_printf.S 
 )
