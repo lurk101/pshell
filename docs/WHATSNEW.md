@@ -3,9 +3,9 @@ What's new in version 2.1.3
 - Internal compiler restructure, separating functional parts, moving all constants to flash.
 - Multiple peep hole optimizer for RP2350 improvements.
 - Extend fault handler for RP2350
-- Replace sqrtf function call with inline floating point instruction.
+- Replace sqrtf function call with inline RP2350 floating point instruction.
 - Updated C examples
-- Optimize integer compare, and divide
+- Optimize integer compare, and divide for RP2350
 
 What's new in version 2.1.2
 
