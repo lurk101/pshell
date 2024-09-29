@@ -219,24 +219,29 @@ static const struct segs {
 #endif
 };
 
+void peep(void);
+
 static int peep_hole(const struct segs* s) {
-    uint16_t rslt[32];
+    uint16_t rslt[8], final[8];
     int l = s->n_pats;
     uint16_t* pe = (e - l) + 1;
     if (pe < text_base)
         return 0;
     for (int i = 0; i < l; i++) {
-        rslt[i] = pe[i] & ~s->msk[i];
         if ((pe[i] & s->msk[i]) != (s->pat[i] & s->msk[i]))
             return 0;
+        rslt[i] = pe[i] & ~s->msk[i];
     }
     e -= l;
     l = s->n_reps;
     for (int i = 0; i < l; i++)
-        pe[i] = s->rep[i];
+        final[i] = s->rep[i];
     for (int i = 0; i < s->n_maps; ++i)
-        pe[s->map[i].to] |= rslt[s->map[i].from] << s->map[i].lshft;
-    e += l;
+        final[s->map[i].to] |= rslt[s->map[i].from] << s->map[i].lshft;
+    for (int i = 0; i < l; i++) {
+        *++e = final[i];
+        peep();
+    }
     return 1;
 }
 
