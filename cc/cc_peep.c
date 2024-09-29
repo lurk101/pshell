@@ -162,20 +162,13 @@ static const uint16_t pat18[] = {0xb401, 0xecfd, 0x7a01};
 static const uint16_t msk18[] = {0xff83, 0xffff, 0xffff};
 static const uint16_t rep18[] = {0xee07, 0x0a90};
 
-// vmov r0,s15          vmov r0,s15
-// vmov s15,r0
-
-static const uint16_t pat19[] = {0xee17, 0x0a90, 0xee07, 0x0a90};
-static const uint16_t msk19[] = {0xff83, 0xffff, 0xffff, 0xffff};
-static const uint16_t rep19[] = {0xee07, 0x0a90};
-
 // vmov r0,s15          vxxx s15,s15
 // vxxx s15,s15         vmov r0,s15
 // vmov r0,s15
 
-static const uint16_t pat20[] = {0xee17, 0x0a90, 0xeef0, 0x7ae7, 0xee17, 0x0a90};
-static const uint16_t msk20[] = {0xffff, 0xffff, 0xfff0, 0xffff, 0xffff, 0xffff};
-static const uint16_t rep20[] = {0xeef0, 0x7ae7, 0xee17, 0x0a90};
+static const uint16_t pat19[] = {0xee17, 0x0a90, 0xeef0, 0x7ae7, 0xee17, 0x0a90};
+static const uint16_t msk19[] = {0xffff, 0xffff, 0xfff0, 0xffff, 0xffff, 0xffff};
+static const uint16_t rep19[] = {0xeef0, 0x7ae7, 0xee17, 0x0a90};
 
 #endif
 
@@ -214,8 +207,7 @@ static const struct segs {
     {NUMOF(pat16), NUMOF(rep16), 0, pat16, msk16, rep16, {{}, {}}},
     {NUMOF(pat17), NUMOF(rep17), 0, pat17, msk17, rep17, {{}, {}}},
     {NUMOF(pat18), NUMOF(rep18), 0, pat18, msk18, rep18, {{}, {}}},
-    {NUMOF(pat19), NUMOF(rep19), 0, pat19, msk19, rep19, {{}, {}}},
-    {NUMOF(pat20), NUMOF(rep20), 1, pat20, msk20, rep20, {{2, 0, 0}, {}}},
+    {NUMOF(pat19), NUMOF(rep19), 1, pat19, msk19, rep19, {{2, 0, 0}, {}}},
 #endif
 };
 
