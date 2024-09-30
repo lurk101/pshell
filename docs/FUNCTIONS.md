@@ -113,5 +113,5 @@
     uart_set_format, uart_set_hw_flow, uart_set_irqs_enabled, uart_set_translate_crlf
     uart_tx_wait_blocking, uart_write_blocking
 
-Predefined symbols: UART_PARITY_NONE, UART_PARITY_EVEN, UART_PARITY_ODD, uart0, uart1`
+    Predefined symbols: UART_PARITY_NONE, UART_PARITY_EVEN, UART_PARITY_ODD, uart0, uart1`
 ```
