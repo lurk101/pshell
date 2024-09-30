@@ -2053,6 +2053,14 @@ static bool v_pop15(ARMSTATE* state, uint32_t instr) {
     return true;
 }
 
+static bool v_push15(ARMSTATE* state, uint32_t instr) {
+    state->size = 4;
+    strcpy(state->text, "vpush");
+    padinstr(state->text);
+    strcat(state->text, "{s15}");
+    return true;
+}
+
 static bool v_add_sub(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     switch (instr & 0xffff) {
@@ -2178,6 +2186,7 @@ static const ENCODEMASK16 thumb_table[] = {
     {0xffff, 0xecbd, v_pop},
     {0xfffe, 0xedd0, v_ldr},
     {0xffff, 0xecfd, v_pop15},
+    {0xffff, 0xed6d, v_push15},
 // end of hack
 #endif
     {0xf800, 0x0000, thumb_lsl},           /* logical shift left by immediate, or MOV */

@@ -170,6 +170,14 @@ static const uint16_t pat19[] = {0xee17, 0x0a90, 0xeef0, 0x7ae7, 0xee17, 0x0a90}
 static const uint16_t msk19[] = {0xffff, 0xffff, 0xfff0, 0xffff, 0xffff, 0xffff};
 static const uint16_t rep19[] = {0xeef0, 0x7ae7, 0xee17, 0x0a90};
 
+// vmov r0, s15         vpush {s15}
+// push {r0}            ldr r0,[pc,#xxx]
+// ldr r0,[pc,#xxx]
+
+static const uint16_t pat20[] = {0xee17, 0x0a90, 0xb401, 0x4800};
+static const uint16_t msk20[] = {0xffff, 0xffff, 0xffff, 0xff00};
+static const uint16_t rep20[] = {0xed6d, 0x7a01, 0x4800};
+
 #endif
 
 struct subs {
@@ -208,20 +216,21 @@ static const struct segs {
     {NUMOF(pat17), NUMOF(rep17), 0, pat17, msk17, rep17, {{}, {}}},
     {NUMOF(pat18), NUMOF(rep18), 0, pat18, msk18, rep18, {{}, {}}},
     {NUMOF(pat19), NUMOF(rep19), 1, pat19, msk19, rep19, {{2, 0, 0}, {}}},
+    {NUMOF(pat20), NUMOF(rep20), 1, pat20, msk20, rep20, {{3, 2, 0}, {}}},
 #endif
 };
 
 void peep(void);
 
-static int peep_hole(const struct segs* s) {
+static void peep_hole(const struct segs* s) {
     uint16_t rslt[8], final[8];
     int l = s->n_pats;
     uint16_t* pe = (e - l) + 1;
     if (pe < text_base)
-        return 0;
+        return;
     for (int i = 0; i < l; i++) {
         if ((pe[i] & s->msk[i]) != (s->pat[i] & s->msk[i]))
-            return 0;
+            return;
         rslt[i] = pe[i] & ~s->msk[i];
     }
     e -= l;
@@ -234,12 +243,9 @@ static int peep_hole(const struct segs* s) {
         *++e = final[i];
         peep();
     }
-    return 1;
 }
 
 void peep(void) {
-restart:
     for (int i = 0; i < NUMOF(segments); ++i)
-        if (peep_hole(&segments[i]))
-            goto restart;
+        peep_hole(&segments[i]);
 }

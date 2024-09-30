@@ -766,6 +766,7 @@ static void quit_cmd(void) {
     printf("\nare you sure (Y/n) ? ");
     fflush(stdout);
     char c = getchar();
+    putchar(c);
     putchar('\n');
     if (c != 'y' && c != 'Y' && c != '\r')
         return;
@@ -877,20 +878,20 @@ const cmd_t cmd_table[] = {
     {"mv",      mv_cmd,         "rename a file or directory"},
     {"quit",    quit_cmd,       "shutdown the system"},
     {"reboot",  reboot_cmd,     "restart the system"},
-    {"resize",  resize_cmd,     "establish screen dimensions"},
+    {"resize",  resize_cmd,     "reestablish screen dimensions"},
     {"rm",      rm_cmd,         "remove a file or directory. -r for recursive"},
     {"status",  status_cmd,     "display the filesystem status"},
     {"tar",     tar_cmd,        "manage tar archives"},
 #if !defined(NDEBUG) || defined(PSHELL_TESTS)
     {"tests",   tests_cmd,      "run all tests"},
 #endif
-    {"unmount", unmount_cmd,    "unmount the filesystem"},
-	{"version", version_cmd,    "display pico shell's version"},
+    {"umount",  unmount_cmd,    "unmount the filesystem"},
+    {"version", version_cmd,    "display pico shell's version"},
     {"vi",      vi_cmd,         "edit file(s) with vi"},
-    {"xget",    xget_cmd,       "get a file (xmodem, pico->host)"},
-    {"xput",    xput_cmd,       "put a file (xmodem, host->pico)"},
-    {"yget",    yget_cmd,       "get a file (ymodem, pico->host)"},
-    {"yput",    yput_cmd,       "put a file (ymodem, host->pico)"},
+    {"xget",    xget_cmd,       "xmodem get a file (pico->host)"},
+    {"xput",    xput_cmd,       "xmodem put a file (host->pico)"},
+    {"yget",    yget_cmd,       "ymodem get a file (pico->host)"},
+    {"yput",    yput_cmd,       "ymodem put a file (host->pico)"},
 	{0}
 };
 // clang-format on
