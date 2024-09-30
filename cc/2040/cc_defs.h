@@ -146,4 +146,13 @@ static const struct define_grp irq_defines[] = {
     {"PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY",
      PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY},
     {0}};
+
+static const struct define_grp uart_defines[] = {
+    // UART
+    {"UART_PARITY_NONE", UART_PARITY_NONE},
+    {"UART_PARITY_EVEN", UART_PARITY_EVEN},
+    {"UART_PARITY_ODD", UART_PARITY_ODD},
+    {"uart0", ((uint32_t)uart0_hw)},
+    {"uart1", ((uint32_t)uart1_hw)},
+    {0}};
 // clang-format on

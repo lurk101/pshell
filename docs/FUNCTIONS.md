@@ -104,4 +104,14 @@
     PICO_LOWEST_IRQ_PRIORITY, PICO_HIGHEST_IRQ_PRIORITY,
     PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY, PICO_SHARED_IRQ_HANDLER_HIGHEST_ORDER_PRIORITY,
     PICO_SHARED_IRQ_HANDLER_LOWEST_ORDER_PRIORITY
+
+    // uart
+    uart_default_tx_wait_blocking, uart_deinit, uart_get_dreq_num, uart_get_hw, uart_get_index
+    uart_get_instance, uart_get_reset_num, uart_getc, uart_init, uart_is_enabled
+    uart_is_readable, uart_is_readable_within_us, uart_is_writable, uart_putc, uart_putc_raw
+    uart_puts, uart_read_blocking, uart_set_baudrate, uart_set_break, uart_set_fifo_enabled
+    uart_set_format, uart_set_hw_flow, uart_set_irqs_enabled, uart_set_translate_crlf
+    uart_tx_wait_blocking, uart_write_blocking
+
+Predefined symbols: UART_PARITY_NONE, UART_PARITY_EVEN, UART_PARITY_ODD, uart0, uart1`
 ```
