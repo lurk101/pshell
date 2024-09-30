@@ -22,4 +22,6 @@ __attribute__((__noreturn__)) void fatal_func(const char* func, int lne, const c
 #define fatal(fmt, ...) fatal_func(__FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
 extern uint16_t* e;
-extern uint16_t* text_base;
+extern const uint16_t* text_base;
+extern const uint32_t prog_space;
+extern const uint32_t data_space;

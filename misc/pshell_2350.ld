@@ -186,7 +186,7 @@ SECTIONS
         __end__ = .;
         end = __end__;
         KEEP(*(.heap*))
-        __HeapLimit = .;
+#        __HeapLimit = .;
     } > RAM
 
     /* Start and end symbols must be word-aligned */
@@ -222,6 +222,7 @@ SECTIONS
 
     /* stack limit is poorly named, but historically is maximum heap ptr */
     __StackLimit = ORIGIN(RAM) + LENGTH(RAM) - 0x8000; /* 32K for user code and data */
+    __HeapLimit = __StackLimit;
 
     __StackOneTop = ORIGIN(SCRATCH_X) + LENGTH(SCRATCH_X);
     __StackTop = ORIGIN(SCRATCH_Y) + LENGTH(SCRATCH_Y);

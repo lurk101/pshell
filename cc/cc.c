@@ -71,6 +71,9 @@ extern void get_screen_xy(int* x, int* y);           // retrieve screem dimensio
 extern void cc_exit(int rc);                         // C exit function
 extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 
+const uint32_t prog_space = TEXT_BYTES;
+const uint32_t data_space = DATA_BYTES;
+
 #if PICO_RP2040
 // SDK floating point functions
 void __wrap___aeabi_idiv();
@@ -153,7 +156,7 @@ static char* data UDATA;                               // data/bss pointer
 static char* data_base UDATA;                          // data/bss pointer
 static int* base_sp UDATA;                             // stack
 uint16_t* e;                                           // current position in emitted code
-uint16_t* text_base;
+const uint16_t* text_base;
 static uint16_t* le UDATA;
 static uint16_t* ecas UDATA;                           // case statement patch-up pointer
 static int* ncas UDATA;                                // case statement patch-up pointer
@@ -2362,7 +2365,7 @@ static void check_pc_relative(void) {
         return;
     int te = (int)e + 4 * pcrel_count;
     int ta = (int)pcrel_1st;
-    if ((te - ta) > 1000) // just under 1024
+    if ((te - ta) >= 960) // 64 bytes under 1024 (32 instr.)
         patch_pc_relative(1);
 }
 
@@ -4366,7 +4369,7 @@ int cc(int mode, int argc, char** argv) {
 #else
         text_base = le = (uint16_t*)__StackLimit;
 #endif
-        e = text_base - 1;
+        e = (uint16_t*)text_base - 1;
 
         // allocate the structure member table
         members = cc_malloc(MEMBER_DICT_BYTES, 1, 1);

@@ -43,6 +43,9 @@
 
 typedef char buf_t[128];
 
+extern char __heap_start;
+extern char __heap_end;
+
 static uint32_t screen_x = 80, screen_y = 24;
 static lfs_file_t file;
 static buf_t cmd_buffer, path, curdir = "/";
@@ -636,9 +639,12 @@ static void status_cmd(void) {
     printf("\ntext size 0x%x (%d), bss size 0x%x (%d)", stat.text_size, stat.text_size,
            stat.bss_size, stat.bss_size);
 #endif
-    sprintf(result, "\nblocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n",
+    sprintf(result,
+            "\nDISK - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
+            "MEM  - heap: %.1fK, program space: %dK, global data space: %dK\n",
             (int)stat.block_count, (int)stat.blocks_used, (int)stat.block_size, used_size,
-            total_size, stat.blocks_used * 100.0 / stat.block_count, percent);
+            total_size, stat.blocks_used * 100.0 / stat.block_count, percent,
+            (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024);
 }
 
 static void ls_cmd(void) {
