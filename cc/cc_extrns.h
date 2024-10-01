@@ -95,7 +95,11 @@
     {"i2c_deinit", 1, i2c_defines, i2c_deinit, 0},
     {"i2c_get_dreq", 2, i2c_defines, i2c_get_dreq, 0},
     {"i2c_get_hw", 1, i2c_defines, i2c_get_hw, 0},
-    {"i2c_get_index", 1, i2c_defines, i2c_get_index, 0},
+#if PICO_SDK_VERSION_MAJOR >= 2
+    {"i3c_get_index", 1, i2c_defines, i2c_get_index, 0},
+#else
+    {"i2c_hw_index", 1, i2c_defines, i2c_hw_index, 0},
+#endif
     {"i2c_get_read_available", 1, i2c_defines, i2c_get_read_available, 0},
     {"i2c_get_write_available", 1, i2c_defines, i2c_get_write_available, 0},
     {"i2c_init", 2, i2c_defines, i2c_init, 0},
@@ -199,7 +203,12 @@
     {"spi_write_blocking", 3, spi_defines, spi_write_blocking, 0},
     {"spi_write_read_blocking", 4, spi_defines, spi_write_read_blocking, 0},
     {"sprintf", 1, stdio_defines, x_sprintf, 0},
+#if PICO_RP2040
+    {"sqrtf", 1 | (1 << 5) | (1 << 10), math_defines, sqrtf, 1},
+#endif
+#if PICO_RP2350
     {"sqrtf", 1 | (1 << 5) | (1 << 10), math_defines, 0, 1},
+#endif
     {"srand", 1, stdlib_defines, srand, 0},
     {"strcat", 2, string_defines, strcat, 0},
     {"strchr", 2, string_defines, strchr, 0},

@@ -20,33 +20,48 @@ static const struct define_grp stdio_defines[] = {
 
 static const struct define_grp gpio_defines[] = {
     // GPIO
+#if PICO_RM2040
+    {"GPIO_FUNC_XIP", GPIO_FUNC_XIP},
+    {"GPIO_IO_IRQ_LEVEL_LOW", GPIO_IO_IRQ_LEVEL_LOW},
+    {"GPIO_IRQ_LEVEL_HIGH", GPIO_IRQ_LEVEL_HIGH},
+    {"GPIO_IRQ_EDGE_FALL", GPIO_IRQ_EDGE_FALL},
+    {"GPIO_IRQ_EDGE_RISE", GPIO_IRQ_EDGE_RISE},
+#endif
+#if PICO_RM2350
     {"GPIO_FUNC_HSTX", GPIO_FUNC_HSTX},
+    {"GPIO_FUNC_PIO2", GPIO_FUNC_PIO2},
+#endif
     {"GPIO_FUNC_SPI", GPIO_FUNC_SPI},
     {"GPIO_FUNC_UART", GPIO_FUNC_UART},
     {"GPIO_FUNC_I2C", GPIO_FUNC_I2C},
     {"GPIO_FUNC_PWM", GPIO_FUNC_PWM},
     {"GPIO_FUNC_SIO", GPIO_FUNC_SIO},
+#if PICO_RP2040
     {"GPIO_FUNC_PIO0", GPIO_FUNC_PIO0},
     {"GPIO_FUNC_PIO1", GPIO_FUNC_PIO1},
-    {"GPIO_FUNC_PIO2", GPIO_FUNC_PIO2},
+#endif
+#if PICO_RP2350
+    {"PROC0_IRQ_CTI", PROC0_IRQ_CTI},
+    {"PROC1_IRQ_CTI", PROC1_IRQ_CTI},
+#endif
     {"GPIO_FUNC_GPCK", GPIO_FUNC_GPCK},
+#if PICO_RM2350
     {"GPIO_FUNC_XIP_CS1", GPIO_FUNC_XIP_CS1},
     {"GPIO_FUNC_CORESIGHT_TRACE", GPIO_FUNC_CORESIGHT_TRACE},
+#endif
     {"GPIO_FUNC_USB", GPIO_FUNC_USB},
+#if PICO_RM2350
     {"GPIO_FUNC_UART_AUX", GPIO_FUNC_UART_AUX},
+#endif
     {"GPIO_FUNC_NULL", GPIO_FUNC_NULL},
-
     {"GPIO_OUT", GPIO_OUT},
     {"GPIO_IN", GPIO_IN},
-
     {"GPIO_IRQ_LEVEL_LOW", GPIO_IRQ_LEVEL_LOW},
     {"GPIO_IRQ_LEVEL_HIGH", GPIO_IRQ_LEVEL_HIGH},
     {"GPIO_IRQ_EDGE_FALL", GPIO_IRQ_EDGE_FALL},
     {"GPIO_IRQ_EDGE_RISE", GPIO_IRQ_EDGE_RISE},
-
     {"GPIO_SLEW_RATE_SLOW", GPIO_SLEW_RATE_SLOW},
     {"GPIO_SLEW_RATE_FAST", GPIO_SLEW_RATE_FAST},
-
     {"GPIO_DRIVE_STRENGTH_2MA", GPIO_DRIVE_STRENGTH_2MA},
     {"GPIO_DRIVE_STRENGTH_4MA", GPIO_DRIVE_STRENGTH_4MA},
     {"GPIO_DRIVE_STRENGTH_8MA", GPIO_DRIVE_STRENGTH_8MA},
@@ -79,6 +94,9 @@ static const struct define_grp clk_defines[] = {
     {"clk_peri", clk_peri},
     {"clk_usb", clk_usb},
     {"clk_adc", clk_adc},
+#if PICO_RP2040
+    {"clk_rtc", clk_rtc},
+#endif
     {"CLK_COUNT", CLK_COUNT},
     {0}};
 
@@ -114,12 +132,27 @@ static const struct define_grp sync_defines[] = {{0}};
 
 static const struct define_grp irq_defines[] = {
     // IRQ
+#if PICO_RP2040
+    {"TIMER_IRQ_0", TIMER_IRQ_0},
+    {"TIMER_IRQ_1", TIMER_IRQ_1},
+    {"TIMER_IRQ_2", TIMER_IRQ_2},
+    {"TIMER_IRQ_3", TIMER_IRQ_3},
+#endif
+#if PICO_RP2350
+    {"TIMER0_IRQ_0", TIMER0_IRQ_0},
+    {"TIMER0_IRQ_1", TIMER0_IRQ_1},
+    {"TIMER0_IRQ_2", TIMER0_IRQ_2},
+    {"TIMER0_IRQ_3", TIMER0_IRQ_3},
     {"TIMER1_IRQ_0", TIMER1_IRQ_0},
     {"TIMER1_IRQ_1", TIMER1_IRQ_1},
     {"TIMER1_IRQ_2", TIMER1_IRQ_2},
     {"TIMER1_IRQ_3", TIMER1_IRQ_3},
+#endif
     {"PWM_IRQ_WRAP", PWM_IRQ_WRAP},
     {"USBCTRL_IRQ", USBCTRL_IRQ},
+#if PICO_RP2040
+    {"XIP_IRQ", XIP_IRQ},
+#endif
     {"PIO0_IRQ_0", PIO0_IRQ_0},
     {"PIO0_IRQ_1", PIO0_IRQ_1},
     {"PIO1_IRQ_0", PIO1_IRQ_0},
@@ -128,8 +161,6 @@ static const struct define_grp irq_defines[] = {
     {"DMA_IRQ_1", DMA_IRQ_1},
     {"IO_IRQ_BANK0", IO_IRQ_BANK0},
     {"IO_IRQ_QSPI", IO_IRQ_QSPI},
-    {"PROC0_IRQ_CTI", PROC0_IRQ_CTI},
-    {"PROC1_IRQ_CTI", PROC1_IRQ_CTI},
     {"CLOCKS_IRQ", CLOCKS_IRQ},
     {"SPI0_IRQ", SPI0_IRQ},
     {"SPI1_IRQ", SPI1_IRQ},
@@ -138,6 +169,9 @@ static const struct define_grp irq_defines[] = {
     {"ADC_IRQ_FIFO", ADC_IRQ_FIFO},
     {"I2C0_IRQ", I2C0_IRQ},
     {"I2C1_IRQ", I2C1_IRQ},
+#if PICO_RP2040
+    {"RTC_IRQ", RTC_IRQ},
+#endif
     {"PICO_DEFAULT_IRQ_PRIORITY", PICO_DEFAULT_IRQ_PRIORITY},
     {"PICO_LOWEST_IRQ_PRIORITY", PICO_LOWEST_IRQ_PRIORITY},
     {"PICO_HIGHEST_IRQ_PRIORITY", PICO_HIGHEST_IRQ_PRIORITY},

@@ -641,7 +641,7 @@ static void status_cmd(void) {
 #endif
     sprintf(result,
             "\nDISK - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
-            "MEM  - heap: %.1fK, program space: %dK, global data space: %dK\n",
+            "MEM  - heap: %.1fK, program code space: %dK, global data space: %dK\n",
             (int)stat.block_count, (int)stat.blocks_used, (int)stat.block_size, used_size,
             total_size, stat.blocks_used * 100.0 / stat.block_count, percent,
             (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024);
