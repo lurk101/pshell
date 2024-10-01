@@ -4214,8 +4214,8 @@ int cc(int mode, int argc, char** argv) {
     if (mode == 0) {
         // check that table is ordered
         for (int i = 1; i < NUMOF(externs); i++)
-            if (strcmp(externs[i - 1].name, externs[i].name) >= 0)
-                run_fatal("out of order starting at %s\n", externs[i].name);
+            if (strcmp(externs[i].name, externs[i - 1].name) <= 0)
+                run_fatal("out of order starting at %s\n %s", externs[i - 1].name, externs[i].name);
         // Register keywords in symbol table. Must match the sequence of enum
         p = "enum char int float struct union sizeof return goto break continue "
             "if do while for switch case default else void main";

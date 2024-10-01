@@ -96,12 +96,13 @@
     {"i2c_get_dreq", 2, i2c_defines, i2c_get_dreq, 0},
     {"i2c_get_hw", 1, i2c_defines, i2c_get_hw, 0},
 #if PICO_SDK_VERSION_MAJOR >= 2
-    {"i3c_get_index", 1, i2c_defines, i2c_get_index, 0},
-#else
-    {"i2c_hw_index", 1, i2c_defines, i2c_hw_index, 0},
+    {"i2c_get_index", 1, i2c_defines, i2c_get_index, 0},
 #endif
     {"i2c_get_read_available", 1, i2c_defines, i2c_get_read_available, 0},
     {"i2c_get_write_available", 1, i2c_defines, i2c_get_write_available, 0},
+#if PICO_SDK_VERSION_MAJOR < 2
+    {"i2c_hw_index", 1, i2c_defines, i2c_hw_index, 0},
+#endif
     {"i2c_init", 2, i2c_defines, i2c_init, 0},
     {"i2c_read_blocking", 5, i2c_defines, i2c_read_blocking, 0},
     {"i2c_read_raw_blocking", 3, i2c_defines, i2c_read_raw_blocking, 0},
