@@ -1,3 +1,12 @@
+What's new in version 2.1.4
+
+- Revert to merged cc_externs and cc_defs
+- Update FUNCTIONs documentation
+- Add hardware UART function and defines
+- Expand heap size to maximum
+- RP2350 peep hole addition + misc text diffs
+- Improve peep hole optimizer logic
+
 What's new in version 2.1.3
 
 - Internal compiler restructure, separating functional parts, moving all constants to flash.
