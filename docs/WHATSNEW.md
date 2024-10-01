@@ -6,6 +6,7 @@ What's new in version 2.1.4
 - Expand heap size to maximum
 - RP2350 peep hole addition + misc text diffs
 - Improve peep hole optimizer logic
+- Enhance status command to include memory constraints
 
 What's new in version 2.1.3
 
