@@ -758,6 +758,8 @@ static void reboot_cmd(void) {
         fs_unmount();
     }
     watchdog_reboot(0, 0, 1);
+    for (;;)
+        ;
 }
 
 #if LIB_PICO_STDIO_USB
