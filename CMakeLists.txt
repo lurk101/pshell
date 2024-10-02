@@ -61,7 +61,7 @@ target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/misc/${FS_
 if ("${PICO_BOARD}" STREQUAL "pico2")
 pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell_2350.ld)
 else()
-pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell.ld)
+pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell_2040.ld)
 endif()
 
 if (USB_CONSOLE)
