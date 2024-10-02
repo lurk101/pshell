@@ -870,8 +870,6 @@ static void clear_cmd(void) {
     screen_size();
 }
 
-static void resize_cmd(void) { screen_size(); }
-
 // clang-format off
 const cmd_t cmd_table[] = {
     {"cat",     cat_cmd,        "display a text file, use -p to paginate"},
@@ -887,7 +885,6 @@ const cmd_t cmd_table[] = {
     {"mv",      mv_cmd,         "rename a file or directory"},
     {"quit",    quit_cmd,       "shutdown the system"},
     {"reboot",  reboot_cmd,     "restart the system"},
-    {"resize",  resize_cmd,     "reestablish screen dimensions"},
     {"rm",      rm_cmd,         "remove a file or directory. -r for recursive"},
     {"status",  status_cmd,     "display the filesystem status"},
     {"tar",     tar_cmd,        "manage tar archives"},
