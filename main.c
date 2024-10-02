@@ -746,8 +746,6 @@ static void vi_cmd(void) {
     vi(argc - 1, argv + 1);
 }
 
-static void clear_cmd(void) { strcpy(result, VT_CLEAR "\n"); }
-
 static void reboot_cmd(void) {
     // release any resources we were using
     if (mounted) {
@@ -865,6 +863,11 @@ static bool screen_size(void) {
     } while (false);
     set_translate_crlf(true);
     return rc;
+}
+
+static void clear_cmd(void) {
+    strcpy(result, VT_CLEAR "\n");
+    screen_size();
 }
 
 static void resize_cmd(void) { screen_size(); }
