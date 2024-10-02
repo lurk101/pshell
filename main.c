@@ -193,6 +193,8 @@ static void yput_cmd(void) {
     free(tmpname);
 }
 
+static void cmnt_cmd(void){};
+
 int check_from_to_parms(char** from, char** to, int copy) {
     *from = NULL;
     *to = NULL;
@@ -641,9 +643,9 @@ static void status_cmd(void) {
            stat.bss_size, stat.bss_size);
 #endif
     sprintf(result,
-            "\nDISK   - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
-            "MEM    - heap: %.1fK, program code space: %dK, global data space: %dK\n"
-            "COSOLE - %s, width %d, height %d\n",
+            "STORAGE - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
+            "MEMORY  - heap: %.1fK, program code space: %dK, global data space: %dK\n"
+            "CONSOLE - %s, width %d, height %d\n",
             (int)stat.block_count, (int)stat.blocks_used, (int)stat.block_size, used_size,
             total_size, stat.blocks_used * 100.0 / stat.block_count, percent,
             (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024, console,
@@ -900,6 +902,7 @@ const cmd_t cmd_table[] = {
     {"xput",    xput_cmd,       "xmodem put a file (host->pico)"},
     {"yget",    yget_cmd,       "ymodem get a file (pico->host)"},
     {"yput",    yput_cmd,       "ymodem put a file (host->pico)"},
+    {"#",       cmnt_cmd,       "comment line"},
 	{0}
 };
 // clang-format on

@@ -100,18 +100,23 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions. See LICENSE file for details.
 
-platform: pico2, console: UART0 [94 X 31], filesystem: flash
+platform: pico2, console: UART0 [114 X 33], filesystem: flash
 
 enter command or hit ENTER for help
 
 file system automatically mounted
 
+/: # display pshell version
+
 /: version 
 
-Pico Shell v2.1.2, LittleFS v2.9, Vi 0.9.1, SDK v2.0.0
+Pico Shell v2.1.4, LittleFS v2.9, Vi 0.9.1, SDK v2.0.0
+
+/: # list files in current directory
 
 /: ls
 
+       0 [bin]
      343 blink.c
      364 clocks.c
      120 crash.c
@@ -121,25 +126,27 @@ Pico Shell v2.1.2, LittleFS v2.9, Vi 0.9.1, SDK v2.0.0
     2308 doughnut.c
      171 exit.c
      976 fade.c
+    1503 floatops.c
      175 forward.c
       69 hello.c
+    1405 intops.c
     1344 io.c
     2221 life.c
     5423 lorenz.c
-    1951 penta.c
-     215 pi.c
+    1975 penta.c
+     196 pi.c
      249 printf.c
-    1328 qsort.c
+    1331 qsort.c
     2631 rndtest.c
-     536 sieve.c
+     693 sieve.c
      373 sine.c
      673 string.c
-    1265 testfloat.c
-    1135 testint.c
-     297 tictoc.c
+     220 tictoc.c
    10192 wumpus.c
 
-/: cc sine.c 
+/: # compile and run C file    
+
+/: cc sine.c
 
                               *
                                     *
@@ -167,6 +174,8 @@ Pico Shell v2.1.2, LittleFS v2.9, Vi 0.9.1, SDK v2.0.0
 
 CC = 0
 
+/: # compile C and disassemble generated CMxx code  
+
 /: cc -s sine.c 
 1: /* Math function test. Display a sine wave */
 2: 
@@ -175,7 +184,7 @@ CC = 0
 5:     for (incr = 16, angle = 0; angle <= 360; angle += incr) {
 6:         float rad = (float)angle * 0.01745329252;
 7:         printf("%.*s%c\n", 30 + (int)(sinf(rad) * 25.0),
-8:                "                                                                          ;
+8:                "                                                                            ", '*');
 9:     }
 10:     return 0;
 11: }
@@ -191,87 +200,86 @@ CC = 0
 20078012    2000        movs    r0, #0
 20078014    bc08        pop     {r3}
 20078016    6018        str     r0, [r3, #0]
-20078018    f000 f843   bl      200780a2
+20078018    f000 f840   bl      2007809c
 2007801c    4638        mov     r0, r7
 2007801e    380c        subs    r0, #12         ; 0xc
 20078020    b401        push    {r0}
 20078022    1f38        subs    r0, r7, #4
 20078024    edd0 7a00   vldr    s15, [r0, #0]
-20078028    eef8 7ae7   vcvt    s15, s15
-2007802c    ee17 0a90   vmov    r0, s15
-20078030    b401        push    {r0}
-20078032    4824        ldr     r0, [pc, #144]  ; 0x200780c4
-20078034    ee07 0a90   vmov    s15, r0
-20078038    ecbd 7a01   vpop    {s14}
-2007803c    ee67 7a27   vmul    s15, s14, s15
-20078040    ee17 0a90   vmov    r0, s15
-20078044    bc08        pop     {r3}
-20078046    6018        str     r0, [r3, #0]
-20078048    481f        ldr     r0, [pc, #124]  ; 0x200780c8
-2007804a    b401        push    {r0}
-2007804c    201e        movs    r0, #30         ; 0x1e
-2007804e    b401        push    {r0}
-20078050    4638        mov     r0, r7
-20078052    380c        subs    r0, #12         ; 0xc
-20078054    6800        ldr     r0, [r0, #0]
-20078056    4b1d        ldr     r3, [pc, #116]  ; 0x200780cc
-20078058    4798        blx     r3
-2007805a    b401        push    {r0}
-2007805c    481c        ldr     r0, [pc, #112]  ; 0x200780d0
-2007805e    ee07 0a90   vmov    s15, r0
-20078062    ecbd 7a01   vpop    {s14}
-20078066    ee67 7a27   vmul    s15, s14, s15
-2007806a    ee17 0a90   vmov    r0, s15
-2007806e    eefd 7ae7   vcvt.s32 s15, s15
-20078072    ee17 0a90   vmov    r0, s15
-20078076    bc08        pop     {r3}
-20078078    18c0        adds    r0, r0, r3
-2007807a    b401        push    {r0}
-2007807c    4815        ldr     r0, [pc, #84]   ; 0x200780d4
-2007807e    b401        push    {r0}
-20078080    202a        movs    r0, #42         ; 0x2a
-20078082    b401        push    {r0}
-20078084    2004        movs    r0, #4
-20078086    4b14        ldr     r3, [pc, #80]   ; 0x200780d8
-20078088    4798        blx     r3
-2007808a    b004        add     sp, #16         ; 0x10
-2007808c    1f38        subs    r0, r7, #4
-2007808e    b401        push    {r0}
-20078090    6800        ldr     r0, [r0, #0]
-20078092    b401        push    {r0}
-20078094    4638        mov     r0, r7
-20078096    3808        subs    r0, #8
-20078098    6800        ldr     r0, [r0, #0]
-2007809a    bc08        pop     {r3}
-2007809c    18c0        adds    r0, r0, r3
-2007809e    bc08        pop     {r3}
-200780a0    6018        str     r0, [r3, #0]
-200780a2    1f38        subs    r0, r7, #4
-200780a4    6800        ldr     r0, [r0, #0]
-200780a6    b401        push    {r0}
-200780a8    480c        ldr     r0, [pc, #48]   ; 0x200780dc
-200780aa    bc02        pop     {r1}
-200780ac    4281        cmp     r1, r0
-200780ae    bfcc        ite     gt
-200780b0    2000        movgt   r0, #0
-200780b2    2001        movle   r0, #1
-200780b4    2800        cmp     r0, #0
-200780b6    d1b1        bne     2007801c
-200780b8    2000        movs    r0, #0
-200780ba    46bd        mov     sp, r7
-200780bc    bd80        pop     {r7, pc}
-200780be    46bd        mov     sp, r7
-200780c0    bd80        pop     {r7, pc}
-200780c2    46c0        mov     r8, r8
-200780c4    3c8e fa35   .word   0x3c8efa35
-200780c8    2007 c000   .word   0x2007c000
-200780cc    1002 2b31   .word   0x10022b31      ; sinf
-200780d0    41c8 0000   .word   0x41c80000
-200780d4    2007 c008   .word   0x2007c008
-200780d8    1001 520d   .word   0x1001520d      ; printf
-200780dc    0000 0168   .word   0x00000168
-200780e0    0000 0000   .word   0x00000000      ; "\0\0\0\0"
+20078028    eef8 7ae7   vcvt.f32 s15, s15
+2007802c    ed6d 7a01   vpush   {s15}
+20078030    4822        ldr     r0, [pc, #136]  ; 0x200780bc
+20078032    ee07 0a90   vmov    s15, r0
+20078036    ecbd 7a01   vpop    {s14}
+2007803a    ee67 7a27   vmul    s15, s14, s15
+2007803e    ee17 0a90   vmov    r0, s15
+20078042    bc08        pop     {r3}
+20078044    6018        str     r0, [r3, #0]
+20078046    481e        ldr     r0, [pc, #120]  ; 0x200780c0
+20078048    b401        push    {r0}
+2007804a    201e        movs    r0, #30         ; 0x1e
+2007804c    b401        push    {r0}
+2007804e    4638        mov     r0, r7
+20078050    380c        subs    r0, #12         ; 0xc
+20078052    6800        ldr     r0, [r0, #0]
+20078054    4b1b        ldr     r3, [pc, #108]  ; 0x200780c4
+20078056    4798        blx     r3
+20078058    b401        push    {r0}
+2007805a    481b        ldr     r0, [pc, #108]  ; 0x200780c8
+2007805c    ee07 0a90   vmov    s15, r0
+20078060    ecbd 7a01   vpop    {s14}
+20078064    ee67 7a27   vmul    s15, s14, s15
+20078068    eefd 7ae7   vcvt.s32 s15, s15
+2007806c    ee17 0a90   vmov    r0, s15
+20078070    bc08        pop     {r3}
+20078072    18c0        adds    r0, r0, r3
+20078074    b401        push    {r0}
+20078076    4815        ldr     r0, [pc, #84]   ; 0x200780cc
+20078078    b401        push    {r0}
+2007807a    202a        movs    r0, #42         ; 0x2a
+2007807c    b401        push    {r0}
+2007807e    2004        movs    r0, #4
+20078080    4b13        ldr     r3, [pc, #76]   ; 0x200780d0
+20078082    4798        blx     r3
+20078084    b004        add     sp, #16         ; 0x10
+20078086    1f38        subs    r0, r7, #4
+20078088    b401        push    {r0}
+2007808a    6800        ldr     r0, [r0, #0]
+2007808c    b401        push    {r0}
+2007808e    4638        mov     r0, r7
+20078090    3808        subs    r0, #8
+20078092    6800        ldr     r0, [r0, #0]
+20078094    bc08        pop     {r3}
+20078096    18c0        adds    r0, r0, r3
+20078098    bc08        pop     {r3}
+2007809a    6018        str     r0, [r3, #0]
+2007809c    1f38        subs    r0, r7, #4
+2007809e    6800        ldr     r0, [r0, #0]
+200780a0    b401        push    {r0}
+200780a2    480c        ldr     r0, [pc, #48]   ; 0x200780d4
+200780a4    bc02        pop     {r1}
+200780a6    4281        cmp     r1, r0
+200780a8    bfcc        ite     gt
+200780aa    2000        movgt   r0, #0
+200780ac    2001        movle   r0, #1
+200780ae    2800        cmp     r0, #0
+200780b0    d1b4        bne     2007801c
+200780b2    2000        movs    r0, #0
+200780b4    46bd        mov     sp, r7
+200780b6    bd80        pop     {r7, pc}
+200780b8    46bd        mov     sp, r7
+200780ba    bd80        pop     {r7, pc}
+200780bc    3c8e fa35   .word   0x3c8efa35
+200780c0    2007 c000   .word   0x2007c000
+200780c4    1002 44e1   .word   0x100244e1      ; sinf
+200780c8    41c8 0000   .word   0x41c80000
+200780cc    2007 c008   .word   0x2007c008
+200780d0    1001 53c1   .word   0x100153c1      ; printf
+200780d4    0000 0168   .word   0x00000168
+200780d8    0000 0000   .word   0x00000000      ; "\0\0\0\0"
 11: 
+
+/: # list available pshel command
 
 /: 
 
@@ -288,18 +296,27 @@ CC = 0
      mv - rename a file or directory
    quit - shutdown the system
  reboot - restart the system
- resize - establish screen dimensions
      rm - remove a file or directory. -r for recursive
  status - display the filesystem status
     tar - manage tar archives
-unmount - unmount the filesystem
+ umount - unmount the filesystem
 version - display pico shell's version
      vi - edit file(s) with vi
-   xget - get a file (xmodem, pico->host)
-   xput - put a file (xmodem, host->pico)
-   yget - get a file (ymodem, pico->host)
-   yput - put a file (ymodem, host->pico)
+   xget - xmodem get a file (pico->host)
+   xput - xmodem put a file (host->pico)
+   yget - ymodem get a file (pico->host)
+   yput - ymodem put a file (host->pico)
+      # - comment line
 
-/:
+/: # display pshell states
+
+/: status 
+
+STORAGE - blocks: total 960, used 36, size 4096 (147.5KB of 3.9MB, 3.8% used)
+MEMORY  - heap: 461.5K, program code space: 16K, global data space: 16K
+CONSOLE - UART0, width 114, height 33
+
+/: 
+
 ```
 
