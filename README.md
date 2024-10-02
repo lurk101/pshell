@@ -108,7 +108,7 @@ file system automatically mounted
 
 /: # display pshell version
 
-/: version 
+/: version
 
 Pico Shell v2.1.4, LittleFS v2.9, Vi 0.9.1, SDK v2.0.0
 
@@ -144,7 +144,7 @@ Pico Shell v2.1.4, LittleFS v2.9, Vi 0.9.1, SDK v2.0.0
      220 tictoc.c
    10192 wumpus.c
 
-/: # compile and run C file    
+/: # compile and run C file
 
 /: cc sine.c
 
@@ -174,11 +174,11 @@ Pico Shell v2.1.4, LittleFS v2.9, Vi 0.9.1, SDK v2.0.0
 
 CC = 0
 
-/: # compile C and disassemble generated CMxx code  
+/: # compile C and disassemble generated CMxx code
 
-/: cc -s sine.c 
+/: cc -s sine.c
 1: /* Math function test. Display a sine wave */
-2: 
+2:
 3: int main() {
 4:     int angle, incr;
 5:     for (incr = 16, angle = 0; angle <= 360; angle += incr) {
@@ -277,11 +277,11 @@ CC = 0
 200780d0    1001 53c1   .word   0x100153c1      ; printf
 200780d4    0000 0168   .word   0x00000168
 200780d8    0000 0000   .word   0x00000000      ; "\0\0\0\0"
-11: 
+11:
 
 /: # list available pshel command
 
-/: 
+/:
 
     cat - display a text file, use -p to paginate
      cc - compile & run C source file. cc -h for help
@@ -310,13 +310,13 @@ version - display pico shell's version
 
 /: # display pshell states
 
-/: status 
+/: status
 
 STORAGE - blocks: total 960, used 36, size 4096 (147.5KB of 3.9MB, 3.8% used)
 MEMORY  - heap: 461.5K, program code space: 16K, global data space: 16K
 CONSOLE - UART0, width 114, height 33
 
-/: 
+/:
 
 ```
 
