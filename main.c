@@ -53,6 +53,7 @@ buf_t result;
 static int argc;
 static char* argv[MAX_ARGS + 1];
 static bool mounted = false, run = true;
+static char console[8];
 
 static void set_translate_crlf(bool enable) {
     stdio_driver_t* driver;
@@ -640,11 +641,13 @@ static void status_cmd(void) {
            stat.bss_size, stat.bss_size);
 #endif
     sprintf(result,
-            "\nDISK - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
-            "MEM  - heap: %.1fK, program code space: %dK, global data space: %dK\n",
+            "\nDISK   - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
+            "MEM    - heap: %.1fK, program code space: %dK, global data space: %dK\n"
+            "COSOLE - %s, width %d, height %d\n",
             (int)stat.block_count, (int)stat.blocks_used, (int)stat.block_size, used_size,
             total_size, stat.blocks_used * 100.0 / stat.block_count, percent,
-            (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024);
+            (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024, console,
+            screen_x, screen_y);
 }
 
 static void ls_cmd(void) {
@@ -780,7 +783,6 @@ static void quit_cmd(void) {
         fs_unmount();
     }
     printf("\nbye!\n");
-    sleep_ms(1000);
     exit(0);
 }
 
@@ -993,7 +995,6 @@ int main(void) {
 #else
     strcpy(buf, "flash");
 #endif
-    char console[8];
     if (uart) {
 #if defined(PICO_DEFAULT_UART)
         sprintf(console, "UART%d", PICO_DEFAULT_UART);
