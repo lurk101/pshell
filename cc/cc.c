@@ -66,8 +66,7 @@
 #define ADJ_MASK ((1 << ADJ_BITS) - 1)
 
 // executable version
-
-#define CC_VERSION 0xc3
+#define CC_VERSION 0xc4
 
 // pshell common functions
 extern char* full_path(char* name);                  // expand file name to full path name
@@ -4194,10 +4193,10 @@ void __not_in_flash_func(dummy)(void) {
 // executable file header
 struct exe_s {
     uint32_t entry;      // entry point
-    uint32_t tsize;      // text segment size
+    uint16_t tsize;      // text segment size
+    uint16_t nreloc;     // # of external function relocation entries
     uint32_t dsize : 24; // data segment size
     uint32_t ccver : 8;  // exec version
-    uint32_t nreloc;     // # of external function relocation entries
 };
 
 // compiler can be invoked in compile mode (mode = 0)
