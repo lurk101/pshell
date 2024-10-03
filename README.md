@@ -279,7 +279,7 @@ CC = 0
 200780d8    0000 0000   .word   0x00000000      ; "\0\0\0\0"
 11:
 
-/: # list available pshel command
+/: # list available pshell commands
 
 /:
 
