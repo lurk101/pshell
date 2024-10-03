@@ -65,6 +65,10 @@
 #define ADJ_BITS 5
 #define ADJ_MASK ((1 << ADJ_BITS) - 1)
 
+// executable version
+
+#define CC_VERSION 0xc3
+
 // pshell common functions
 extern char* full_path(char* name);                  // expand file name to full path name
 extern int cc_printf(void* stk, int wrds, int prnt); // shim for printf and sprintf
@@ -4189,10 +4193,11 @@ void __not_in_flash_func(dummy)(void) {
 
 // executable file header
 struct exe_s {
-    int entry;  // entry point
-    int tsize;  // text segment size
-    int dsize;  // data segment size
-    int nreloc; // # of external function relocation entries
+    uint32_t entry;      // entry point
+    uint32_t tsize;      // text segment size
+    uint32_t dsize : 24; // data segment size
+    uint32_t ccver : 8;  // exec version
+    uint32_t nreloc;     // # of external function relocation entries
 };
 
 // compiler can be invoked in compile mode (mode = 0)
@@ -4414,7 +4419,8 @@ int cc(int mode, int argc, char** argv) {
             }
             // initialize the header and write it
             exe.tsize = ((e + 1) - text_base) * sizeof(*e);
-            exe.dsize = (data - data_base) | 0xc3000000;
+            exe.dsize = data - data_base;
+            exe.ccver = CC_VERSION;
             exe.nreloc = nrelocs;
             if (fs_file_write(fd, &exe, sizeof(exe)) != sizeof(exe)) {
                 fs_file_close(fd);
@@ -4426,7 +4432,7 @@ int cc(int mode, int argc, char** argv) {
                 fatal("error writing executable file");
             }
             // write the data segment
-            int ds = exe.dsize & 0x00ffffff;
+            int ds = exe.dsize;
             if (ds && fs_file_write(fd, data_base, ds) != ds) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
@@ -4474,7 +4480,7 @@ int cc(int mode, int argc, char** argv) {
             fs_file_close(fd);
             fatal("error reading %s", ofn);
         }
-        if ((exe.dsize & 0xff000000) != 0xc3000000)
+        if (exe.ccver != CC_VERSION)
             fatal("executable compiled with earlier incompatible version, please recompile");
         // read in the code segment
         if (fs_file_read(fd, __StackLimit, exe.tsize) != exe.tsize) {
@@ -4483,7 +4489,7 @@ int cc(int mode, int argc, char** argv) {
             fatal("error reading %s", ofn);
         }
         // read in the data segment
-        int ds = exe.dsize & 0x00ffffff;
+        int ds = exe.dsize;
         if (ds && fs_file_read(fd, __StackLimit + TEXT_BYTES, ds) != ds) {
             fs_file_close(fd);
             fd = NULL;
