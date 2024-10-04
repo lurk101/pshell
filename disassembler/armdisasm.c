@@ -2065,7 +2065,7 @@ static bool v_ldr15(ARMSTATE* state, uint32_t instr) {
     state->size = 4;
     strcpy(state->text, "vldr");
     padinstr(state->text);
-    sprintf(state->text + strlen(state->text), "s15,[pc,#%d]", (instr & 0xff) * 4);
+    sprintf(state->text + strlen(state->text), "s15, [pc, #%d]", (instr & 0xff) * 4);
     append_comment_hex(state, ALIGN4(state->address + 4 + (instr & 0xff) * 4));
     return true;
 }
@@ -2132,7 +2132,7 @@ static bool v_mrs_sqrt(ARMSTATE* state, uint32_t instr) {
         padinstr(state->text);
         strcat(state->text, "s15, s15");
     } else {
-        strcpy(state->text, "v_mrs");
+        strcpy(state->text, "vmrs");
         padinstr(state->text);
         strcat(state->text, "apsr_nzcv, fpscr");
     }
