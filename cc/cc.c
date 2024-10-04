@@ -2338,7 +2338,7 @@ static void patch_pc_relative(int brnch) {
         struct patch_s* p = pcrel;
         while (p->locs) {
             struct patch_s* pl = p->locs;
-            if ((*pl->addr & 0x4800) != 0x4800)
+            if ((*pl->addr & 0xff00 != 0x4800) && (*pl->addr & 0xff00 != 0x4b00))
                 fatal("unexpected compiler error");
             int te = (int)e + 2;
             int ta = (int)pl->addr + 2;
