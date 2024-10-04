@@ -2323,16 +2323,24 @@ static void emit_load_immediate(int r, int val) {
     emit_load_long_imm(r, val, 0);
 }
 
+static void emit_nop(void) {
+#if PICO_RP2350
+    emit(0xbf00); // nop
+#else
+    emit(0x46c0);     // nop ; (mov r8, r8)
+#endif
+}
+
 static void patch_pc_relative(int brnch) {
     int rel_count = pcrel_count;
     pcrel_count = 0;
     if (brnch) {
         if ((int)e & 2)
-            emit(0x46c0); // nop ; (mov r8, r8)
+            emit_nop();
         emit_branch(e + 2 * rel_count);
     } else {
         if (!((int)e & 2))
-            emit(0x46c0); // nop ; (mov r8, r8)
+            emit_nop();
     }
     while (pcrel) {
         struct patch_s* p = pcrel;
@@ -3619,7 +3627,7 @@ static void stmt(int ctx) {
                 if (tk == ';') { // check for prototype
                     se = e;
                     if (!((int)e & 2))
-                        emit(0x46c0); // nop
+                        emit_nop();
                     emit(0x4800);     // ldr r0, [pc, #0]
                     emit(0xe001);     // b.n 1
                     dd->forward = e;
