@@ -4148,9 +4148,6 @@ static void help(char* lib) {
     if (!lib) {
         printf("\n"
                "usage: cc [-s] [-u] [-n]"
-#if PICO_RP2350
-               " [-x]"
-#endif
                " [-h [lib]] [-D [symbol[ = value]]]\n"
                "          [-o filename] filename\n"
                "    -s      display disassembly and quit.\n"
@@ -4347,6 +4344,7 @@ int cc(int mode, int argc, char** argv) {
         add_defines(i2c_defines);
         add_defines(spi_defines);
         add_defines(irq_defines);
+        add_defines(uart_defines);
 
         // make a copy of the full path and append .c if necessary
         char* fn = cc_malloc(strlen(full_path(*argv)) + 3, 1, 1);
