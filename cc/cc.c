@@ -2656,30 +2656,28 @@ static void emit_oper(int op) {
 
 #if PICO_RP2350
 static void emit_float_prefix(void) {
+    emit_pop(1);
     emit(0xee07);
     emit(0x0a90); // vmov s15,r0
     emit(0xee07);
     emit(0x1a10); // vmov s14,r1
 }
 
-static void emit_cmp_prefix(void) {
+static void emit_float_cmp(uint16_t ite) {
     emit_float_prefix();
     emit(0xeeb4);
     emit(0x7ae7); // vcmpe.f32 s14,s15
     emit(0xeef1);
     emit(0xfa10); // vmrs APSR_nzcv,fpscr
-}
-
-static void emit_cmp_postfix(void) {
-    emit(0x2001); // movge r0,#1
-    emit(0x2000); // movlt r0,#0
+    emit(ite);
+    emit(0x2001); // mov r0,#1
+    emit(0x2000); // mov r0,#0
 }
 #endif
 
 static void emit_float_oper(int op) {
     switch (op) {
     case ADDF:
-        emit_pop(1); // pop {r1}
 #if PICO_RP2350
         emit_float_prefix();
         emit(0xee77);
@@ -2687,12 +2685,12 @@ static void emit_float_oper(int op) {
         emit(0xee17);
         emit(0x0a90); // vmov r0,s15
 #else
+        emit_pop(1);  // pop {r1}
         emit_fop((int)aeabi_fadd);
 #endif
         break;
     case SUBF:
 #if PICO_RP2350
-        emit_pop(1);
         emit_float_prefix();
         emit(0xee77);
         emit(0x7a67); // vsub.f32 s15,s14,s15
@@ -2705,7 +2703,6 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case MULF:
-        emit_pop(1);
 #if PICO_RP2350
         emit_float_prefix();
         emit(0xee67);
@@ -2713,12 +2710,12 @@ static void emit_float_oper(int op) {
         emit(0xee17);
         emit(0x0a90); // vmov r0,s15
 #else
+        emit_pop(1);
         emit_fop((int)aeabi_fmul);
 #endif
         break;
     case DIVF:
 #if PICO_RP2350
-        emit_pop(1);
         emit_float_prefix();
         emit(0xeec7);
         emit(0x7a27); // vdiv.f32 s15,s14,s15
@@ -2732,10 +2729,7 @@ static void emit_float_oper(int op) {
         break;
     case GEF:
 #if PICO_RP2350
-        emit_pop(1);
-        emit_cmp_prefix();
-        emit(0xbfac); // ite ge
-        emit_cmp_postfix();
+        emit_float_cmp(0xbfac); // ite ge
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2744,10 +2738,7 @@ static void emit_float_oper(int op) {
         break;
     case GTF:
 #if PICO_RP2350
-        emit_pop(1);
-        emit_cmp_prefix();
-        emit(0xbfcc); // ite gt
-        emit_cmp_postfix();
+        emit_float_cmp(0xbfcc); // ite gt
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2756,10 +2747,7 @@ static void emit_float_oper(int op) {
         break;
     case LTF:
 #if PICO_RP2350
-        emit_pop(1);
-        emit_cmp_prefix();
-        emit(0xbf4c); // ite mi
-        emit_cmp_postfix();
+        emit_float_cmp(0xbf4c); // ite lt
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2768,10 +2756,7 @@ static void emit_float_oper(int op) {
         break;
     case LEF:
 #if PICO_RP2350
-        emit_pop(1);
-        emit_cmp_prefix();
-        emit(0xbf94); // ite ls
-        emit_cmp_postfix();
+        emit_float_cmp(0xbf94); // ite le
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2780,20 +2765,14 @@ static void emit_float_oper(int op) {
         break;
     case EQF:
 #if PICO_RP2350
-        emit_pop(1);
-        emit_cmp_prefix();
-        emit(0xbf0c); // ite eq
-        emit_cmp_postfix();
+        emit_float_cmp(0xbf0c); // ite eq
 #else
         emit_oper(EQ);
 #endif
         break;
     case NEF:
 #if PICO_RP2350
-        emit_pop(1);
-        emit_cmp_prefix();
-        emit(0xbf14); // ite ne
-        emit_cmp_postfix();
+        emit_float_cmp(0xbf14); // ite ne
 #else
         emit_oper(NE);
 #endif
