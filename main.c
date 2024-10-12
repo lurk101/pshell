@@ -643,9 +643,9 @@ static void status_cmd(void) {
            stat.bss_size, stat.bss_size);
 #endif
     sprintf(result,
-            "STORAGE - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
-            "MEMORY  - heap: %.1fK, program code space: %dK, global data space: %dK\n"
-            "CONSOLE - %s, width %d, height %d\n",
+            "Storage - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
+            "Memory  - heap: %.1fK, program code space: %dK, global data space: %dK\n"
+            "Console - %s, width %d, height %d\n",
             (int)stat.block_count, (int)stat.blocks_used, (int)stat.block_size, used_size,
             total_size, stat.blocks_used * 100.0 / stat.block_count, percent,
             (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024, console,

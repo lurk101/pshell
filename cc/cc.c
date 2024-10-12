@@ -2669,6 +2669,11 @@ static void emit_cmp_prefix(void) {
     emit(0xeef1);
     emit(0xfa10); // vmrs APSR_nzcv,fpscr
 }
+
+static void emit_cmp_postfix(void) {
+    emit(0x2001); // movge r0,#1
+    emit(0x2000); // movlt r0,#0
+}
 #endif
 
 static void emit_float_oper(int op) {
@@ -2730,8 +2735,7 @@ static void emit_float_oper(int op) {
         emit_pop(1);
         emit_cmp_prefix();
         emit(0xbfac); // ite ge
-        emit(0x2001); // movge r0,#1
-        emit(0x2000); // movlt r0,#0
+        emit_cmp_postfix();
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2743,8 +2747,7 @@ static void emit_float_oper(int op) {
         emit_pop(1);
         emit_cmp_prefix();
         emit(0xbfcc); // ite gt
-        emit(0x2001); // movgt r0,#1
-        emit(0x2000); // movle r0,#0
+        emit_cmp_postfix();
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2756,8 +2759,7 @@ static void emit_float_oper(int op) {
         emit_pop(1);
         emit_cmp_prefix();
         emit(0xbf4c); // ite mi
-        emit(0x2001); // movmi r0,#1
-        emit(0x2000); // movpl r0,#0
+        emit_cmp_postfix();
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2769,8 +2771,7 @@ static void emit_float_oper(int op) {
         emit_pop(1);
         emit_cmp_prefix();
         emit(0xbf94); // ite ls
-        emit(0x2001); // movls r0,#1
-        emit(0x2000); // movhi r0,#0
+        emit_cmp_postfix();
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2778,10 +2779,24 @@ static void emit_float_oper(int op) {
 #endif
         break;
     case EQF:
+#if PICO_RP2350
+        emit_pop(1);
+        emit_cmp_prefix();
+        emit(0xbf0c); // ite eq
+        emit_cmp_postfix();
+#else
         emit_oper(EQ);
+#endif
         break;
     case NEF:
+#if PICO_RP2350
+        emit_pop(1);
+        emit_cmp_prefix();
+        emit(0xbf14); // ite ne
+        emit_cmp_postfix();
+#else
         emit_oper(NE);
+#endif
         break;
 
     default:

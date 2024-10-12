@@ -80,7 +80,7 @@ target_link_libraries(${PSHELL} PUBLIC
     pico_stdlib pico_rand
     hardware_flash hardware_sync hardware_watchdog hardware_timer hardware_gpio
     hardware_pwm hardware_adc hardware_clocks hardware_uart hardware_i2c
-    hardware_spi hardware_irq hardware_dma)
+    hardware_spi hardware_irq hardware_dma hardware_uart)
 
 pico_add_extra_outputs(${PSHELL})
 
