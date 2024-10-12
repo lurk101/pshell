@@ -1008,9 +1008,8 @@ int main(void) {
 #endif
     } else
         strcpy(console, "USB");
-    printf("\nplatform: " PICO_BOARD ", console: %s [%u X %u], filesystem: %s\n\n"
-           "enter command or hit ENTER for help\n\n",
-           console, screen_x, screen_y, buf);
+    printf("\nplatform: " PICO_BOARD ", console: %s [%u X %u], filesystem: %s\n\n", console,
+           screen_x, screen_y, buf);
     if (!detected) {
         printf("\nYour terminal does not respond to standard VT100 escape sequences"
                "\nsequences. The editor will likely not work at all!");
@@ -1034,19 +1033,20 @@ int main(void) {
         putchar('\n');
         if (c == 'y' || c == 'y')
             if (fs_format() != LFS_ERR_OK)
-                printf("Error formating file system!\n");
+                printf("Error formating file system!\n\n");
             else {
                 if (fs_mount() != LFS_ERR_OK)
-                    printf("Error formating file system!\n");
+                    printf("Error formating file system!\n\n");
                 else {
-                    printf("file system formatted and mounted\n");
+                    printf("file system formatted and mounted\n\n");
                     mounted = true;
                 }
             }
     } else {
-        printf("file system automatically mounted\n");
+        printf("file system automatically mounted\n\n");
         mounted = true;
     }
+    printf("enter a command or hit ENTER for command list\n");
     while (run) {
         printf("\n" VT_BOLD "%s: " VT_NORMAL, full_path(""));
         fflush(stdout);
