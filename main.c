@@ -46,10 +46,11 @@ typedef char buf_t[128];
 extern char __heap_start;
 extern char __heap_end;
 
+buf_t result;
+
 static uint32_t screen_x = 80, screen_y = 24;
 static lfs_file_t file;
 static buf_t cmd_buffer, path, curdir = "/";
-buf_t result;
 static int argc;
 static char* argv[MAX_ARGS + 1];
 static bool mounted = false, run = true;
@@ -603,6 +604,13 @@ static void unmount_cmd(void) {
     strcpy(result, "unmounted");
 }
 
+static void trim_cmd(void) {
+    if (check_mount(true))
+        return;
+    if (fs_gc() != LFS_ERR_OK)
+        strcpy(result, "Error trimming filesystem");
+}
+
 static void format_cmd(void) {
     if (check_mount(false))
         return;
@@ -897,6 +905,7 @@ const cmd_t cmd_table[] = {
 #if !defined(NDEBUG) || defined(PSHELL_TESTS)
     {"tests",   tests_cmd,      "run all tests"},
 #endif
+    {"trim",    trim_cmd,       "filesystem garbage collection"},
     {"umount",  unmount_cmd,    "unmount the filesystem"},
     {"version", version_cmd,    "display pico shell's version"},
     {"vi",      vi_cmd,         "edit file(s) with vi"},

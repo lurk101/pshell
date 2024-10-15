@@ -53,7 +53,7 @@ static bool check(bool crc, const uint8_t* buf, int sz) {
 }
 
 static void flushreceive(void) {
-    while (getbyte((DLY_1S*3) >> 1) >= 0)
+    while (getbyte((DLY_1S * 3) >> 1) >= 0)
         ;
 }
 

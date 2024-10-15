@@ -36,10 +36,12 @@ struct fs_fsstat_t {
 // implemented
 
 extern lfs_t fs_lfs;
-extern struct lfs_config fs_cfg;
+extern const struct lfs_config fs_cfg;
 
 int fs_load(void);
 int fs_unload(void);
+
+static inline int fs_gc(void) { return lfs_fs_gc(&fs_lfs); }
 
 static inline int fs_format(void) { return lfs_format(&fs_lfs, &fs_cfg); }
 

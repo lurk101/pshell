@@ -92,6 +92,7 @@ void __wrap___aeabi_fcmpgt();
 void __wrap___aeabi_fcmplt();
 void __wrap___aeabi_fcmpge();
 #endif
+
 // accellerated SDK trig functions
 void __wrap_sinf();
 void __wrap_cosf();
@@ -152,39 +153,41 @@ struct reloc_s {
     int addr;             // address
 };
 
+// globals
+uint16_t* e; // current position in emitted code
+const uint16_t* text_base;
+int exit_sp; // stack at entry to main
+
 static struct reloc_s* relocs UDATA; // relocation list root
 static int nrelocs UDATA;            // relocation list size
-
-static char *p UDATA, *lp UDATA;                       // current position in source code
-static char* data UDATA;                               // data/bss pointer
-static char* data_base UDATA;                          // data/bss pointer
-static int* base_sp UDATA;                             // stack
-uint16_t* e;                                           // current position in emitted code
-const uint16_t* text_base;
+static char *p UDATA, *lp UDATA;     // current position in source code
+static char* data UDATA;             // data/bss pointer
+static char* data_base UDATA;        // data/bss pointer
+static int* base_sp UDATA;           // stack
 static uint16_t* le UDATA;
-static uint16_t* ecas UDATA;                           // case statement patch-up pointer
-static int* ncas UDATA;                                // case statement patch-up pointer
-static uint16_t* def UDATA;                            // default statement patch-up pointer
-static struct patch_s* brks UDATA;                     // break statement patch-up pointer
-static struct patch_s* cnts UDATA;                     // continue statement patch-up pointer
-static struct patch_s* pcrel UDATA;                    // pc relative address patch-up pointer
-static uint16_t* pcrel_1st UDATA;                      // first relative load address in group
-static int pcrel_count UDATA;                          // first relative load address in group
-static int swtc UDATA;                                 // !0 -> in a switch-stmt context
-static int brkc UDATA;                                 // !0 -> in a break-stmt context
-static int cntc UDATA;                                 // !0 -> in a continue-stmt context
-static int* tsize UDATA;                               // array (indexed by type) of type sizes
-static int tnew UDATA;                                 // next available type
-static int tk UDATA;                                   // current token
-static union conv {                                    //
-    int i;                                             // integer value
-    float f;                                           // floating point value
-} tkv UDATA;                                           // current token value
-static int ty UDATA;                                   // current expression type
-                                                       // bit 0:1 - tensor rank, eg a[4][4][4]
-                                                       // 0=scalar, 1=1d, 2=2d, 3=3d
-                                                       //   1d etype -- bit 0:30)
-                                                       //   2d etype -- bit 0:15,16:30 [32768,65536]
+static uint16_t* ecas UDATA;        // case statement patch-up pointer
+static int* ncas UDATA;             // case statement patch-up pointer
+static uint16_t* def UDATA;         // default statement patch-up pointer
+static struct patch_s* brks UDATA;  // break statement patch-up pointer
+static struct patch_s* cnts UDATA;  // continue statement patch-up pointer
+static struct patch_s* pcrel UDATA; // pc relative address patch-up pointer
+static uint16_t* pcrel_1st UDATA;   // first relative load address in group
+static int pcrel_count UDATA;       // first relative load address in group
+static int swtc UDATA;              // !0 -> in a switch-stmt context
+static int brkc UDATA;              // !0 -> in a break-stmt context
+static int cntc UDATA;              // !0 -> in a continue-stmt context
+static int* tsize UDATA;            // array (indexed by type) of type sizes
+static int tnew UDATA;              // next available type
+static int tk UDATA;                // current token
+static union conv {                 //
+    int i;                          // integer value
+    float f;                        // floating point value
+} tkv UDATA;                        // current token value
+static int ty UDATA;                // current expression type
+                                    // bit 0:1 - tensor rank, eg a[4][4][4]
+                                    // 0=scalar, 1=1d, 2=2d, 3=3d
+                                    //   1d etype -- bit 0:30)
+                                    //   2d etype -- bit 0:15,16:30 [32768,65536]
 //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
 // bit 2:9 - type
 // bit 10:11 - ptr level
@@ -205,7 +208,6 @@ static int ld UDATA;                  // local variable depth
 static int pplev UDATA, pplevt UDATA; // preprocessor conditional level
 static int* ast UDATA;                // abstract syntax tree
 static ARMSTATE state UDATA;          // disassembler state
-int exit_sp UDATA;                    // stack at entry to main
 static char* ofn UDATA;               // output file (executable) name
 static int indef UDATA;               // parsing in define statement
 static char* src_base UDATA;          // source code region
@@ -451,14 +453,11 @@ static const struct externs_s externs[] = {
 static const struct {
     const char* name;
     const struct define_grp* grp;
-} includes[] = {{"stdio", stdio_defines},   {"stdlib", stdlib_defines},
-                {"string", string_defines}, {"math", math_defines},
-                {"sync", sync_defines},     {"time", time_defines},
-                {"gpio", gpio_defines},     {"pwm", pwm_defines},
-                {"adc", adc_defines},       {"clocks", clk_defines},
-                {"i2c", i2c_defines},       {"spi", spi_defines},
-                {"irq", irq_defines},       {"uart", uart_defines},
-                {0}};
+} includes[] = {{"stdio", stdio_defines}, {"stdlib", stdlib_defines}, {"string", string_defines},
+                {"math", math_defines},   {"sync", sync_defines},     {"time", time_defines},
+                {"gpio", gpio_defines},   {"pwm", pwm_defines},       {"adc", adc_defines},
+                {"clocks", clk_defines},  {"i2c", i2c_defines},       {"spi", spi_defines},
+                {"irq", irq_defines},     {"uart", uart_defines},     {0}};
 
 static lfs_file_t* fd UDATA;
 static char* fp UDATA;
@@ -468,12 +467,13 @@ static char* fp UDATA;
 // binary search of external function table by name
 static int extern_search(char* name) // get cache index of external function
 {
-    int first = 0, last = NUMOF(externs) - 1, middle;
+    int first = 0, last = NUMOF(externs) - 1;
     while (first <= last) {
-        middle = (first + last) / 2;
-        if (strcmp(name, externs[middle].name) > 0)
+        int middle = (first + last) / 2;
+        int r = strcmp(name, externs[middle].name);
+        if (r > 0)
             first = middle + 1;
-        else if (strcmp(name, externs[middle].name) < 0)
+        else if (r < 0)
             last = middle - 1;
         else
             return middle;
@@ -3626,8 +3626,8 @@ static void stmt(int ctx) {
                     se = e;
                     if (!((int)e & 2))
                         emit_nop();
-                    emit(0x4800);     // ldr r0, [pc, #0]
-                    emit(0xe001);     // b.n 1
+                    emit(0x4800); // ldr r0, [pc, #0]
+                    emit(0xe001); // b.n 1
                     dd->forward = e;
                     emit_word(0);
                     emit(0x4700); // bx  r0
