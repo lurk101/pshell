@@ -638,24 +638,25 @@ static void disk_space(uint64_t n, char* buf) {
 }
 
 static void status_cmd(void) {
-    if (check_mount(true))
-        return;
     struct fs_fsstat_t stat;
-    fs_fsstat(&stat);
-    const char percent = 37;
-    char total_size[32], used_size[32];
-    disk_space((int64_t)stat.block_count * stat.block_size, total_size);
-    disk_space((int64_t)stat.blocks_used * stat.block_size, used_size);
+    if (mounted) {
+        fs_fsstat(&stat);
+        const char percent = 37;
+        char total_size[32], used_size[32];
+        disk_space((int64_t)stat.block_count * stat.block_size, total_size);
+        disk_space((int64_t)stat.blocks_used * stat.block_size, used_size);
 #ifndef NDEBUG
-    printf("\ntext size 0x%x (%d), bss size 0x%x (%d)", stat.text_size, stat.text_size,
-           stat.bss_size, stat.bss_size);
+        printf("\ntext size 0x%x (%d), bss size 0x%x (%d)", stat.text_size, stat.text_size,
+               stat.bss_size, stat.bss_size);
 #endif
-    sprintf(result,
-            "Storage - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n"
+        sprintf(result, "Storage - blocks: total %d, used %d, size %d (%s of %s, %1.1f%c used)\n",
+                (int)stat.block_count, (int)stat.blocks_used, (int)stat.block_size, used_size,
+                total_size, stat.blocks_used * 100.0 / stat.block_count, percent);
+    } else
+        sprintf(result, "Storage - not mounted\n");
+    sprintf(result + strlen(result),
             "Memory  - heap: %.1fK, program code space: %dK, global data space: %dK\n"
             "Console - %s, width %d, height %d\n",
-            (int)stat.block_count, (int)stat.blocks_used, (int)stat.block_size, used_size,
-            total_size, stat.blocks_used * 100.0 / stat.block_count, percent,
             (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024, console,
             screen_x, screen_y);
 }
