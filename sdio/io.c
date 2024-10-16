@@ -32,7 +32,7 @@ static int fs_hal_sync(const struct lfs_config* c);
 // configuration of the filesystem is provided by this struct
 // for Pico: prog size = 256, block size = 4096, so cache is 8K
 // minimum cache = block size, must be multiple
-const struct lfs_config fs_cfg = {
+struct lfs_config fs_cfg = {
     // block device operations
     .read = fs_hal_read,
     .prog = fs_hal_prog,

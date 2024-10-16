@@ -609,6 +609,8 @@ static void trim_cmd(void) {
         return;
     if (fs_gc() != LFS_ERR_OK)
         strcpy(result, "Error trimming filesystem");
+    else
+        strcpy(result, "Ok");
 }
 
 static void format_cmd(void) {
@@ -656,7 +658,7 @@ static void status_cmd(void) {
         sprintf(result, "Storage - not mounted\n");
     sprintf(result + strlen(result),
             "Memory  - heap: %.1fK, program code space: %dK, global data space: %dK\n"
-            "Console - %s, width %d, height %d\n",
+            "Console - %s, width %d, height %d",
             (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024, console,
             screen_x, screen_y);
 }
