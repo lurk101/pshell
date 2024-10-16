@@ -11,6 +11,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "hardware/structs/scb.h"
+
 #include "pico/bootrom.h"
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
@@ -759,8 +761,6 @@ static void vi_cmd(void) {
     vi(argc - 1, argv + 1);
 }
 
-#define AIRCR (*((volatile uint32_t*)(PPB_BASE + 0x0ED0C)))
-
 static void reboot_cmd(void) {
     // release any resources we were using
     if (mounted) {
@@ -768,7 +768,7 @@ static void reboot_cmd(void) {
         fs_unmount();
     }
     sleep_ms(500);
-    AIRCR = 0x5FA0004;
+    scb_hw->aircr = 0x5FA0004;
     for (;;)
         ;
 }
@@ -951,7 +951,7 @@ static void Fault_Handler(void) {
         ;
 #endif
     sleep_ms(3000);
-    AIRCR = 0x5FA0004;
+    scb_hw->aircr = 0x5FA0004;
     for (;;)
         ;
 }
