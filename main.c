@@ -11,9 +11,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "hardware/structs/scb.h"
-#include "hardware/watchdog.h"
-
 #include "pico/bootrom.h"
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
@@ -609,6 +606,8 @@ static void trim_cmd(void) {
         return;
     if (fs_gc() != LFS_ERR_OK)
         strcpy(result, "Error trimming filesystem");
+    else
+        strcpy(result, "Ok");
 }
 
 static void format_cmd(void) {
@@ -656,7 +655,7 @@ static void status_cmd(void) {
         sprintf(result, "Storage - not mounted\n");
     sprintf(result + strlen(result),
             "Memory  - heap: %.1fK, program code space: %dK, global data space: %dK\n"
-            "Console - %s, width %d, height %d\n",
+            "Console - %s, width %d, height %d",
             (&__heap_end - &__heap_start) / 1024.0, prog_space / 1024, data_space / 1024, console,
             screen_x, screen_y);
 }
@@ -760,13 +759,16 @@ static void vi_cmd(void) {
     vi(argc - 1, argv + 1);
 }
 
+#define AIRCR (*((volatile uint32_t*)(PPB_BASE + 0x0ED0C)))
+
 static void reboot_cmd(void) {
     // release any resources we were using
     if (mounted) {
         savehist();
         fs_unmount();
     }
-    watchdog_reboot(0, 0, 1);
+    sleep_ms(500);
+    AIRCR = 0x5FA0004;
     for (;;)
         ;
 }
@@ -948,9 +950,10 @@ static void Fault_Handler(void) {
     for (;;)
         ;
 #endif
-    watchdog_reboot(0, 0, 3000);
+    sleep_ms(3000);
+    AIRCR = 0x5FA0004;
     for (;;)
-        __wfi();
+        ;
 }
 
 static bool run_as_cmd(const char* dir) {
