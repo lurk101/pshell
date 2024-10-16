@@ -12,7 +12,6 @@
 #include <stdio.h>
 
 #include "hardware/structs/scb.h"
-#include "hardware/watchdog.h"
 
 #include "pico/bootrom.h"
 #include "pico/stdio.h"
@@ -768,7 +767,8 @@ static void reboot_cmd(void) {
         savehist();
         fs_unmount();
     }
-    watchdog_reboot(0, 0, 1);
+    sleep_ms(500);
+    scb_hw->aircr = 0x5FA0004;
     for (;;)
         ;
 }
@@ -950,9 +950,10 @@ static void Fault_Handler(void) {
     for (;;)
         ;
 #endif
-    watchdog_reboot(0, 0, 3000);
+    sleep_ms(3000);
+    scb_hw->aircr = 0x5FA0004;
     for (;;)
-        __wfi();
+        ;
 }
 
 static bool run_as_cmd(const char* dir) {
