@@ -763,16 +763,22 @@ static void vi_cmd(void) {
     vi(argc - 1, argv + 1);
 }
 
-static void reboot_cmd(void) {
+#define NORETURN __attribute__((noreturn))
+
+NORETURN static void reset_after(int ms) {
+    sleep_ms(ms);
+    scb_hw->aircr = 0x5FA0004;
+    for (;;)
+        ;
+}
+
+NORETURN static void reboot_cmd(void) {
     // release any resources we were using
     if (mounted) {
         savehist();
         fs_unmount();
     }
-    sleep_ms(500);
-    scb_hw->aircr = 0x5FA0004;
-    for (;;)
-        ;
+    reset_after(500);
 }
 
 #if LIB_PICO_STDIO_USB
@@ -943,7 +949,7 @@ static const char* search_cmds(int len) {
     return cmd_table[last_i].name + len;
 }
 
-static void Fault_Handler(void) {
+NORETURN static void Fault_Handler(void) {
     static const char* clear = "\n\n" VT_BOLD "*** " VT_BLINK "CRASH" VT_NORMAL VT_BOLD
                                " - Rebooting in 3 seconds ***" VT_NORMAL "\r\n\n";
     for (const char* cp = clear; *cp; cp++)
@@ -952,10 +958,7 @@ static void Fault_Handler(void) {
     for (;;)
         ;
 #endif
-    sleep_ms(3000);
-    scb_hw->aircr = 0x5FA0004;
-    for (;;)
-        ;
+    reset_after(3000);
 }
 
 static bool run_as_cmd(const char* dir) {
