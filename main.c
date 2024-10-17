@@ -603,6 +603,7 @@ static void unmount_cmd(void) {
     strcpy(result, "unmounted");
 }
 
+#if !defined(NDEBUG) || defined(PSHELL_TESTS)
 static void trim_cmd(void) {
     if (check_mount(true))
         return;
@@ -611,6 +612,7 @@ static void trim_cmd(void) {
     else
         strcpy(result, "Ok");
 }
+#endif
 
 static void format_cmd(void) {
     if (check_mount(false))
@@ -907,8 +909,8 @@ const cmd_t cmd_table[] = {
     {"tar",     tar_cmd,        "manage tar archives"},
 #if !defined(NDEBUG) || defined(PSHELL_TESTS)
     {"tests",   tests_cmd,      "run all tests"},
-#endif
     {"trim",    trim_cmd,       "filesystem garbage collection"},
+#endif
     {"umount",  unmount_cmd,    "unmount the filesystem"},
     {"version", version_cmd,    "display pico shell's version"},
     {"vi",      vi_cmd,         "edit file(s) with vi"},
