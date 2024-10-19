@@ -2321,14 +2321,21 @@ static void emit_load_immediate(int r, int val) {
         return;
     }
 #if PICO_RP2350
-    if ((val >= 0) && (val <= 0xffff)) {
+    if ((val > -65536) && (val < 65536)) {
+        int neg = 0;
+        if (val < 0) {
+            neg = 1;
+            val = -val;
+        }
         int im8 = val & 0xff;
         int im3 = (val >> 8) & 0x7;
         int i = (val >> 11) & 1;
         int im4 = (val >> 12) & 0xf;
         uint32_t t3 = 0xf2400000 | im8 | ((r & 0xf) << 8) | (im3 << 12) | (i << 26) | (im4 << 16);
         emit(t3 >> 16);
-        emit(t3);
+        emit(t3); // movw rd,#imm16
+        if (neg)
+            emit(0x4240 | (r << 3) | r); // negs rr, rr
         return;
     }
 #endif
