@@ -2326,9 +2326,9 @@ static void emit_load_immediate(int r, int val) {
         int im3 = (val >> 8) & 0x7;
         int i = (val >> 11) & 1;
         int im4 = (val >> 12) & 0xf;
-        uint32_t t2 = 0xf2400000 | im8 | ((r & 0xf) << 8) | (im3 << 12) | (i << 26) | (im4 << 16);
-        emit(t2 >> 16);
-        emit(t2);
+        uint32_t t3 = 0xf2400000 | im8 | ((r & 0xf) << 8) | (im3 << 12) | (i << 26) | (im4 << 16);
+        emit(t3 >> 16);
+        emit(t3);
         return;
     }
 #endif
