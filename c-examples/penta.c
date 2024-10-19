@@ -16,7 +16,7 @@ void clear(int on) {
 
 void set(int x, int y) {
     l0[(y + y_max / 2) * x_max + x + x_max / 2] = 1;
-    putchar_xy(x, y, '*');
+    putchar_xy(x + x_max / 2, y + y_max / 2, '*');
 }
 
 void next_gen() {

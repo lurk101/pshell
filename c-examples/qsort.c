@@ -46,7 +46,7 @@ int main() {
     int t = time_us_32();
     quicksort(0, sz - 1);
     t = time_us_32() - t;
-    printf("sorted\n");
+    printf("ascending\n");
     for (i = 0; i < sz; i++)
         printf("%d ", array[i]);
     printf("\nrun time %f ms.\n", (float)t / 1000.0);
