@@ -1,4 +1,4 @@
-int fade, slice, going_up, led_pin;
+int fade, slice, going_up;
 
 void on_pwm_wrap() {
     pwm_clear_irq(slice);
@@ -13,28 +13,30 @@ void on_pwm_wrap() {
             going_up = true;
         }
     }
-    pwm_set_gpio_level(led_pin, fade * fade);
+    pwm_set_gpio_level(PICO_DEFAULT_LED_PIN, fade * fade);
 }
 
 int main() {
     fade = 0;
     going_up = 0;
-    led_pin = PICO_DEFAULT_LED_PIN;
-    gpio_set_function(led_pin, GPIO_FUNC_PWM);
-    slice = pwm_gpio_to_slice_num(led_pin);
+    gpio_set_function(PICO_DEFAULT_LED_PIN, GPIO_FUNC_PWM);
+    slice = pwm_gpio_to_slice_num(PICO_DEFAULT_LED_PIN);
     pwm_clear_irq(slice);
-    pwm_set_irq_enabled(PWM_IRQ_WRAP, true);
-    irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
-    irq_set_enabled(PWM_IRQ_WRAP, true);
+    pwm_set_irq_enabled(slice, true);
+    irq_set_exclusive_handler(PWM_IRQ_WRAP_0, on_pwm_wrap);
+    irq_set_enabled(PWM_IRQ_WRAP_0, true);
     struct {
-        int csr;
-        int div;
-        int top;
+        int csr, div, top;
     } config;
     memcpy((int)&config, (int)pwm_get_default_config(), sizeof(config));
     pwm_config_set_clkdiv((int)&config, 4.0);
     pwm_init(slice, (int)&config, true);
-    while (1)
+    while (1) {
         wfi();
+        if (getchar_timeout_us(500000) == 3)
+            break;
+    }
+    irq_set_enabled(PWM_IRQ_WRAP_0, false);
+    pwm_set_irq_enabled(slice, false);
     return 0;
 }

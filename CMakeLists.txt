@@ -44,7 +44,7 @@ endif()
 
 
 add_executable(${PSHELL}
-    main.c
+    shell.c
 )
 
 target_compile_definitions(${PSHELL} PUBLIC

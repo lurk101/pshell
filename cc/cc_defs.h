@@ -147,6 +147,8 @@ static const struct define_grp irq_defines[] = {
     {"TIMER1_IRQ_1", TIMER1_IRQ_1},
     {"TIMER1_IRQ_2", TIMER1_IRQ_2},
     {"TIMER1_IRQ_3", TIMER1_IRQ_3},
+    {"PWM_IRQ_WRAP_0", PWM_IRQ_WRAP_0},
+    {"PWM_IRQ_WRAP_1", PWM_IRQ_WRAP_1},
 #endif
     {"PWM_IRQ_WRAP", PWM_IRQ_WRAP},
     {"USBCTRL_IRQ", USBCTRL_IRQ},
