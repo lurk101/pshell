@@ -2346,7 +2346,7 @@ static void emit_nop(void) {
 #if PICO_RP2350
     emit(0xbf00); // nop
 #else
-    emit(0x46c0);     // nop ; (mov r8, r8)
+    emit(0x46c0);     // mov r8,r8
 #endif
 }
 
@@ -2407,13 +2407,13 @@ static void check_pc_relative(void) {
 
 static void emit_enter(int n) {
     emit(0xb580);             // push {r7,lr}
-    emit(0x466f);             // mov  r7, sp
+    emit(0x466f);             // mov r7,sp
     if (n) {                  //
         if (n < 128)          //
-            emit(0xb080 | n); // sub  sp, #n
+            emit(0xb080 | n); // sub sp,#n
         else {                //
             emit_load_immediate(3, -n * 4);
-            emit(0x449d); // add sp, r3
+            emit(0x449d); // add sp,r3
         }
     }
 }
@@ -2675,11 +2675,10 @@ static void emit_oper(int op) {
 
 #if PICO_RP2350
 static void emit_float_prefix(void) {
-    emit_pop(1);
     emit(0xee07);
     emit(0x0a90); // vmov s15,r0
-    emit(0xee07);
-    emit(0x1a10); // vmov s14,r1
+    emit(0xecbd);
+    emit(0x7a01); // vpop {s14}
 }
 
 static void emit_float_cmp(uint16_t ite) {
