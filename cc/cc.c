@@ -66,7 +66,7 @@
 #define ADJ_MASK ((1 << ADJ_BITS) - 1)
 
 // executable version
-#define CC_VERSION 0xc4
+#define CC_VERSION 0xc5
 
 // pshell common functions
 extern char* full_path(char* name);                  // expand file name to full path name
@@ -78,8 +78,13 @@ extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
 const uint32_t prog_space = TEXT_BYTES;
 const uint32_t data_space = DATA_BYTES;
 
+static union conv { //
+    int i;          // integer value
+    float f;        // floating point value
+} tkv;              // current token value
+
 #if PICO_RP2040
-// SDK floating point functions
+// SDK floating point functions. RP2350 has HW instructions for these.
 void __wrap___aeabi_idiv();
 void __wrap___aeabi_i2f();
 void __wrap___aeabi_f2iz();
@@ -179,10 +184,6 @@ static int cntc UDATA;              // !0 -> in a continue-stmt context
 static int* tsize UDATA;            // array (indexed by type) of type sizes
 static int tnew UDATA;              // next available type
 static int tk UDATA;                // current token
-static union conv {                 //
-    int i;                          // integer value
-    float f;                        // floating point value
-} tkv UDATA;                        // current token value
 static int ty UDATA;                // current expression type
                                     // bit 0:1 - tensor rank, eg a[4][4][4]
                                     // 0=scalar, 1=1d, 2=2d, 3=3d

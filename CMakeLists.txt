@@ -47,10 +47,19 @@ add_executable(${PSHELL}
     shell.c
 )
 
+if ("${PICO_BOARD}" STREQUAL "pico_w")
 target_compile_definitions(${PSHELL} PUBLIC
   PICO_MALLOC_PANIC=0
   PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
+  PSHELL_NO_DEFAULT_LED=1
 )
+else()
+target_compile_definitions(${PSHELL} PUBLIC
+  PICO_MALLOC_PANIC=0
+  PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
+  PSHELL_NO_DEFAULT_LED=0
+)
+endif()
 
 if (FORCE_TESTS)
 target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
@@ -98,4 +107,3 @@ else()
 message("-- building for ${PICO_BOARD}, using flash file system")
 endif()
 message("-----------------------------------------------------")
-

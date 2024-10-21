@@ -67,8 +67,10 @@ static const struct define_grp gpio_defines[] = {
     {"GPIO_DRIVE_STRENGTH_8MA", GPIO_DRIVE_STRENGTH_8MA},
     {"GPIO_DRIVE_STRENGTH_12MA", GPIO_DRIVE_STRENGTH_12MA},
 
+#if defined(PICO_DEFAULT_LED_PIN)
     // LED
     {"PICO_DEFAULT_LED_PIN", PICO_DEFAULT_LED_PIN},
+#endif
     {0}};
 
 static const struct define_grp pwm_defines[] = {

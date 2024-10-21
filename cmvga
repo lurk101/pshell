@@ -1,0 +1,1 @@
+cmake .. -DUSB_CONSOLE=0 -DPICO_BOARD=vgaboard -DPICO_PLATFORM=rp2040
