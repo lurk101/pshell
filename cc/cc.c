@@ -2270,14 +2270,18 @@ static void emit(uint16_t n) {
         peep();
 }
 
+static void emit2(uint16_t n1, uint16_t n2) {
+    emit(n1);
+    emit(n2);
+}
+
 static void emit_branch(uint16_t* to);
 static void emit_cond_branch(uint16_t* to, int cond);
 
 static void emit_word(uint32_t n) {
     if (((int)e & 2) == 0)
         fatal("mis-aligned word");
-    emit(n & 0xffff);
-    emit(n >> 16);
+    emit2(n & 0xffff, n >> 16);
 }
 
 static void emit_load_long_imm(int r, int val, int ext) {
@@ -2332,8 +2336,7 @@ static void emit_load_immediate(int r, int val) {
         int i = (val >> 11) & 1;
         int im4 = (val >> 12) & 0xf;
         uint32_t t3 = 0xf2400000 | im8 | ((r & 0xf) << 8) | (im3 << 12) | (i << 26) | (im4 << 16);
-        emit(t3 >> 16);
-        emit(t3); // movw rd,#imm16
+        emit2(t3 >> 16, t3); // movw rd,#imm16
         if (neg)
             emit(0x4240 | (r << 3) | r); // negs rr, rr
         return;
@@ -2675,18 +2678,18 @@ static void emit_oper(int op) {
 
 #if PICO_RP2350
 static void emit_float_prefix(void) {
-    emit(0xee07);
-    emit(0x0a90); // vmov s15,r0
-    emit(0xecbd);
-    emit(0x7a01); // vpop {s14}
+    emit2(0xee07, 0x0a90); // vmov s15,r0
+    emit2(0xecbd, 0x7a01); // vpop {s14}
+}
+
+static void emit_float_suffix(void) {
+    emit2(0xee17, 0x0a90); // vmov r0,s15
 }
 
 static void emit_float_cmp(uint16_t ite) {
     emit_float_prefix();
-    emit(0xeeb4);
-    emit(0x7ae7); // vcmpe.f32 s14,s15
-    emit(0xeef1);
-    emit(0xfa10); // vmrs APSR_nzcv,fpscr
+    emit2(0xeeb4, 0x7ae7); // vcmpe.f32 s14,s15
+    emit2(0xeef1, 0xfa10); // vmrs APSR_nzcv,fpscr
     emit(ite);
     emit(0x2001); // mov r0,#1
     emit(0x2000); // mov r0,#0
@@ -2698,10 +2701,8 @@ static void emit_float_oper(int op) {
     case ADDF:
 #if PICO_RP2350
         emit_float_prefix();
-        emit(0xee77);
-        emit(0x7a27); // vadd.f32 s15,s14,s15
-        emit(0xee17);
-        emit(0x0a90); // vmov r0,s15
+        emit2(0xee77, 0x7a27); // vadd.f32 s15,s14,s15
+        emit_float_suffix();
 #else
         emit_pop(1);  // pop {r1}
         emit_fop((int)aeabi_fadd);
@@ -2710,10 +2711,8 @@ static void emit_float_oper(int op) {
     case SUBF:
 #if PICO_RP2350
         emit_float_prefix();
-        emit(0xee77);
-        emit(0x7a67); // vsub.f32 s15,s14,s15
-        emit(0xee17);
-        emit(0x0a90); // vmov r0,s15
+        emit2(0xee77, 0x7a67); // vsub.f32 s15,s14,s15
+        emit_float_suffix();
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2723,10 +2722,8 @@ static void emit_float_oper(int op) {
     case MULF:
 #if PICO_RP2350
         emit_float_prefix();
-        emit(0xee67);
-        emit(0x7a27); // vmul.f32 s15,s14,s15
-        emit(0xee17);
-        emit(0x0a90); // vmov r0,s15
+        emit2(0xee67, 0x7a27); // vmul.f32 s15,s14,s15
+        emit_float_suffix();
 #else
         emit_pop(1);
         emit_fop((int)aeabi_fmul);
@@ -2735,10 +2732,8 @@ static void emit_float_oper(int op) {
     case DIVF:
 #if PICO_RP2350
         emit_float_prefix();
-        emit(0xeec7);
-        emit(0x7a27); // vdiv.f32 s15,s14,s15
-        emit(0xee17);
-        emit(0x0a90); // vmov r0,s15
+        emit2(0xeec7, 0x7a27); // vdiv.f32 s15,s14,s15
+        emit_float_suffix();
 #else
         emit(0x0001); // movs r1,r0
         emit_pop(0);
@@ -2805,24 +2800,18 @@ static void emit_cast(int n) {
     switch (n) {
     case ITOF:
 #if PICO_RP2350
-        emit(0xee07);
-        emit(0x0a90); // vmov s15,r0
-        emit(0xeef8);
-        emit(0x7ae7); // vcvt.f32.s32 s15,s15
-        emit(0xee17);
-        emit(0x0a90); // vmov r0,s15
+        emit2(0xee07, 0x0a90); // vmov s15,r0
+        emit2(0xeef8, 0x7ae7); // vcvt.f32.s32 s15,s15
+        emit2(0xee17, 0x0a90); // vmov r0,s15
 #else
         emit_fop((int)aeabi_i2f);
 #endif
         break;
     case FTOI:
 #if PICO_RP2350
-        emit(0xee07);
-        emit(0x0a90); // vmov s15,r0
-        emit(0xeefd);
-        emit(0x7ae7); // vcvt.s32.f32 s15,s15
-        emit(0xee17);
-        emit(0x0a90); // vmov r0,s15
+        emit2(0xee07, 0x0a90); // vmov s15,r0
+        emit2(0xeefd, 0x7ae7); // vcvt.s32.f32 s15,s15
+        emit2(0xee17, 0x0a90); // vmov r0,s15
 #else
         emit_fop((int)aeabi_f2iz);
 #endif
@@ -2839,8 +2828,7 @@ static void emit_adjust_stack(int n) {
 
 static uint16_t* emit_call(int n) {
     if (n == 0) {
-        emit(0);
-        emit(0);
+        emit2(0, 0);
         return e - 1;
     }
     int ofs = (n - ((int)e + 6)) / 2;
@@ -2874,12 +2862,9 @@ static void emit_syscall(int n, int np) {
             emit_load_long_imm(3, n, 1);
 #if PICO_RP2350
     } else if (IS_SQRTF(p)) {
-        emit(0xecfd);
-        emit(0x7a01); // vpop {s15}
-        emit(0xeef1);
-        emit(0x7ae7); // vsqrt.f32 s15,s15
-        emit(0xee17);
-        emit(0x0a90); // vmov r0,s15
+        emit2(0xecfd, 0x7a01); // vpop {s15}
+        emit2(0xeef1, 0x7ae7); // vsqrt.f32 s15,s15
+        emit2(0xee17, 0x0a90); // vmov r0,s15
         return;
 #endif
     } else {
@@ -4037,27 +4022,9 @@ static void stmt(int ctx) {
     }
 }
 
-static float i_as_f(int i) {
-    union {
-        int i;
-        float f;
-    } u;
-    u.i = i;
-    return u.f;
-}
-
-static int f_as_i(float f) {
-    union {
-        int i;
-        float f;
-    } u;
-    u.f = f;
-    return u.i;
-}
-
 // printf/sprintf support
 
-static int common_vfunc(int etype, int prntf, int* sp) {
+static int printf_sprintf(int etype, int prntf, int* sp) {
     int stack[ADJ_MASK + ADJ_MASK + 2];
     int stkp = 0;
     int n_parms = (etype & ADJ_MASK);
@@ -4095,14 +4062,14 @@ static int x_printf(int etype) {
     int* sp;
     asm volatile("mov %0, sp \n" : "=r"(sp));
     sp += 2;
-    common_vfunc(etype, 1, sp);
+    printf_sprintf(etype, 1, sp);
 }
 
 static int x_sprintf(int etype) {
     int* sp;
     asm volatile("mov %0, sp \n" : "=r"(sp));
     sp += 2;
-    common_vfunc(etype, 0, sp);
+    printf_sprintf(etype, 0, sp);
 }
 
 // Help display
@@ -4453,8 +4420,7 @@ int cc(int mode, int argc, char** argv) {
                 fatal("error writing executable file");
             }
             // write the data segment
-            int ds = exe.dsize;
-            if (ds && fs_file_write(fd, data_base, ds) != ds) {
+            if (exe.dsize && (fs_file_write(fd, data_base, exe.dsize) != exe.dsize)) {
                 fs_file_close(fd);
                 fatal("error writing executable file");
             }
@@ -4477,7 +4443,7 @@ int cc(int mode, int argc, char** argv) {
                 fatal("unable to set executable attribute");
             printf(
                 "\ntext size   0x%04x\ndata size   0x%04x\nentry point 0x%04x\nreloc count %6d\n",
-                exe.tsize, ds, exe.entry - (int)text_base, exe.nreloc);
+                exe.tsize, exe.dsize, exe.entry - (int)text_base, exe.nreloc);
             goto done;
         }
         if (src_opt)
