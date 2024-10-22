@@ -3,39 +3,33 @@ if [ $# -eq 0 ] ; then
     echo "specify version as n.n.n"
 	exit
 fi
+
+function build() {
+    cmake .. -DUSB_CONSOLE=$1 -DPICO_BOARD=$2 -DPICO_PLATFORM=$3
+    make -j8
+    if [ "$1" = "ON" ]; then
+       CONS=usb 
+    else
+       CONS=uart
+    fi
+    cp pshell.elf ../pico.pshell_$CONS.elf
+    cp pshell.bin ../pico.pshell_$CONS.bin
+    cp pshell.uf2 ../pico.pshell_$CONS.uf2
+    rm -rf *
+}
+
 git checkout master
 rm -rf release
 mkdir release
 cd release
-cmake .. -DUSB_CONSOLE=ON -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
-make -j8
-cp pshell_usb.elf ../pico.pshell_usb.elf
-cp pshell_usb.bin ../pico.pshell_usb.bin
-cp pshell_usb.uf2 ../pico.pshell_usb.uf2
-rm -rf *
-cmake .. -DUSB_CONSOLE=OFF -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
-make -j8
-cp pshell_uart.elf ../pico.pshell_uart.elf
-cp pshell_uart.bin ../pico.pshell_uart.bin
-cp pshell_uart.uf2 ../pico.pshell_uart.uf2
-rm -rf *
-cmake .. -DPICO_BOARD=vgaboard -DPICO_BOARD=pico -DPICO_PLATFORM=rp2040
-make -j8
-cp pshell_usb.elf ../vgaboard.pshell_usb.elf
-cp pshell_usb.bin ../vgaboard.pshell_usb.bin
-cp pshell_usb.uf2 ../vgaboard.pshell_usb.uf2
-rm -rf *
-cmake .. -DUSB_CONSOLE=ON -DPICO_BOARD=pico2 -DPICO_PLATFORM=rp2350
-make -j8
-cp pshell_usb.elf ../pico2.pshell_usb.elf
-cp pshell_usb.bin ../pico2.pshell_usb.bin
-cp pshell_usb.uf2 ../pico2.pshell_usb.uf2
-rm -rf *
-cmake .. -DUSB_CONSOLE=OFF -DPICO_BOARD=pico2 -DPICO_PLATFORM=rp2350
-make -j8
-cp pshell_uart.elf ../pico2.pshell_uart.elf
-cp pshell_uart.bin ../pico2.pshell_uart.bin
-cp pshell_uart.uf2 ../pico2.pshell_uart.uf2
+build ON  pico     rp2040
+build OFF pico     rp2040
+build ON  vgaboard rp2040
+build OFF vgaboard rp2040
+build ON  pico_w   rp2040
+build OFF pico_w   rp2040
+build ON  pico2    rp2350
+build OFF pico2    rp2350
 cd ..
 rm -rf release
 tar czf pshell_$1.tgz *.elf *.bin *.uf2

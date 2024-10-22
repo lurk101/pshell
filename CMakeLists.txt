@@ -8,11 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
-if (USB_CONSOLE)
-    set(PSHELL pshell_usb)
-else()
-    set(PSHELL pshell_uart)
-endif()
+set(PSHELL pshell)
 
 project(${PSHELL} C CXX ASM)
 
