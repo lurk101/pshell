@@ -47,25 +47,14 @@ add_executable(${PSHELL}
     shell.c
 )
 
-if ("${PICO_BOARD}" STREQUAL "pico_w")
 target_compile_definitions(${PSHELL} PUBLIC
   PICO_MALLOC_PANIC=0
   PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
-  PSHELL_NO_DEFAULT_LED=1
 )
-else()
-target_compile_definitions(${PSHELL} PUBLIC
-  PICO_MALLOC_PANIC=0
-  PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
-  PSHELL_NO_DEFAULT_LED=0
-)
-endif()
 
 if (FORCE_TESTS)
 target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
 endif()
-
-target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/misc/${FS_DIR})
 
 if ("${PICO_BOARD}" STREQUAL "pico2")
 pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell_2350.ld)
