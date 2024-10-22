@@ -68,6 +68,11 @@ For UART console, add the following cmake command parameter.
 -DUSB_CONSOLE=OFF
 ```
 
+For pico wrireless.
+```
+cmake .. -DPICO_BOARD=pico_w -DPICO_PLATFORM=rp2040
+```
+
 For vgaboard with filesystem on microSD card. See [here] for details on differing GPIO & UART configurations.
 ```
 cmake .. -DPICO_BOARD=vgaboard -DPICO_PLATFORM=rp2040
