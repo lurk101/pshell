@@ -9,25 +9,21 @@ set(CMAKE_CXX_STANDARD 17)
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
 if (USB_CONSOLE)
-  set(PSHELL pshell_usb)
+    set(PSHELL pshell_usb)
 else()
-  set(PSHELL pshell_uart)
+    set(PSHELL pshell_uart)
 endif()
 
 project(${PSHELL} C CXX ASM)
 
 pico_sdk_init()
 
-if (PICO_SDK_VERSION_STRING VERSION_LESS "1.5.1")
-    message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.5.1 (or later) required.")
-endif()
-
 find_package(Git REQUIRED)
 execute_process(
-  COMMAND git describe
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE PSHELL_GIT_TAG
+    COMMAND git describe
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    OUTPUT_VARIABLE PSHELL_GIT_TAG
 )
 
 add_subdirectory(littlefs)
@@ -36,41 +32,30 @@ add_subdirectory(vi)
 add_subdirectory(cc)
 add_subdirectory(misc)
 add_subdirectory(xymodem)
-if ("${PICO_BOARD}" STREQUAL "vgaboard")
-  add_subdirectory(sdio)
-else()
-  add_subdirectory(flashio)
-endif()
 
+if ("${PICO_BOARD}" STREQUAL "vgaboard")
+    add_subdirectory(sdio)
+else()
+    add_subdirectory(flashio)
+endif()
 
 add_executable(${PSHELL}
     shell.c
 )
 
-if ("${PICO_BOARD}" STREQUAL "pico_w")
 target_compile_definitions(${PSHELL} PUBLIC
-  PICO_MALLOC_PANIC=0
-  PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
-  PSHELL_NO_DEFAULT_LED=1
+    PICO_MALLOC_PANIC=0
+    PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
 )
-else()
-target_compile_definitions(${PSHELL} PUBLIC
-  PICO_MALLOC_PANIC=0
-  PSHELL_GIT_TAG=\"${PSHELL_GIT_TAG}\"
-  PSHELL_NO_DEFAULT_LED=0
-)
-endif()
 
 if (FORCE_TESTS)
-target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
+    target_compile_definitions(${PSHELL} PUBLIC PSHELL_TESTS)
 endif()
 
-target_include_directories(${PSHELL} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/misc/${FS_DIR})
-
 if ("${PICO_BOARD}" STREQUAL "pico2")
-pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell_2350.ld)
+    pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell_2350.ld)
 else()
-pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell_2040.ld)
+    pico_set_linker_script(${PSHELL} ${CMAKE_CURRENT_LIST_DIR}/misc/pshell_2040.ld)
 endif()
 
 if (USB_CONSOLE)
@@ -81,8 +66,8 @@ else()
     pico_enable_stdio_usb(${PSHELL} 0)
 endif()
 
-#pico_set_program_name(${PSHELL} "pshell")
-#pico_set_program_version(${PSHELL} "${PSHELL_GIT_TAG}")
+pico_set_program_name(${PSHELL} "pshell")
+pico_set_program_version(${PSHELL} "${PSHELL_GIT_TAG}")
 
 target_link_libraries(${PSHELL} PUBLIC
     littlefs disassembler io vi cc misc xymodem
