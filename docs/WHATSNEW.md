@@ -1,3 +1,19 @@
+What's new in version 2.1.5
+
+- general source code, cmake, and script file cleanup
+- add support for picow and vgaboard
+- add RP2350 PWM IRQ numbers
+- update C example source code
+- rp2350 use expanded range of movw immediate to reduce amount of PC relative addressing
+- centralize reset function, not using watchdoc
+- remove trim command, garbage collection in littlefs is automatic
+- move all constant variables to flash, releasing RAM to better use
+- expand status command to show memory and screen use.
+- many rp2350 peep hole optimizer opportunities
+- clarify and pack exe file header
+- delete resize cmd, use clear instead
+
+
 What's new in version 2.1.4
 
 - Revert to merged cc_externs and cc_defs
