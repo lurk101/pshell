@@ -24,7 +24,7 @@ the [Squint] project.
 - Native machine code generation for CM0 and CM33 by Jean M. Cyr.
 - Console command recall and auto completion by Eric Olson.
 
-[What's new] in pshell
+[What's new] in pshell v2.1.5
 
 About the compiler, briefly:
 

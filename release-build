@@ -12,9 +12,9 @@ function build() {
     else
        CONS=uart
     fi
-    cp pshell.elf ../pico.pshell_$CONS.elf
-    cp pshell.bin ../pico.pshell_$CONS.bin
-    cp pshell.uf2 ../pico.pshell_$CONS.uf2
+    cp pshell.elf ../$2.pshell_$CONS.elf
+    cp pshell.bin ../$2.pshell_$CONS.bin
+    cp pshell.uf2 ../$2.pshell_$CONS.uf2
     rm -rf *
 }
 
