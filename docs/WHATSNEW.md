@@ -12,7 +12,7 @@ What's new in version 2.1.5
 - many rp2350 peep hole optimizer opportunities
 - clarify and pack exe file header
 - delete resize cmd, use clear instead
-
+- improve release_build script (less error prone)
 
 What's new in version 2.1.4
 
