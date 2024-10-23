@@ -2,17 +2,19 @@ What's new in version 2.1.5
 
 - general source code, cmake, and script file cleanup
 - add support for picow and vgaboard
-- add RP2350 PWM IRQ numbers
 - update C example source code
-- rp2350 use expanded range of movw immediate to reduce amount of PC relative addressing
-- centralize reset function, not using watchdoc
+- centralize reset function, no longer using watchdoc
 - remove trim command, garbage collection in littlefs is automatic
 - move all constant variables to flash, releasing RAM to better use
 - expand status command to show memory and screen use.
-- many rp2350 peep hole optimizer opportunities
 - clarify and pack exe file header
 - delete resize cmd, use clear instead
 - improve release_build script (less error prone)
+- add RP2350 PWM IRQ numbers
+- for rp2350 all floating pointt operators as well as sqrtf function calls are handled directly with inline CM33 floating point intructions instead of wrapper calls
+- for rp2350 integer divide and modulus operators are handled using inline CM33 hardware integer divide instructions instead of warpper calls
+- rp2350 use expanded range of movw immediate to reduce amount of PC relative addressing
+- many rp2350 peep hole optimizer opportunities
 
 What's new in version 2.1.4
 
