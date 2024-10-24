@@ -274,6 +274,30 @@ static void mv_cmd(void) {
     free(to);
 }
 
+static void news_cmd(void) {
+    printf("\nWhat's new in version 2.1.5\n\n"
+           " - general source code, cmake, and script file cleanup\n"
+           " - add support for picow and vgaboard\n"
+           " - update C example source code\n"
+           " - centralize reset function, no longer using watchdoc\n"
+           " - remove trim command, garbage collection in littlefs is automatic\n"
+           " - move all constant variables to flash, releasing RAM to better use\n"
+           " - expand status command to show memory and screen use.\n"
+           " - clarify and pack exe file header\n"
+           " - delete resize cmd, use clear instead\n"
+           " - improve release_build script (less error prone)\n"
+           " - add RP2350 PWM IRQ numbers\n"
+           " - for rp2350 all floating pointt operators as well as sqrtf function\n"
+           "   calls are handled directly with inline CM33 floating point intructions\n"
+           "   instead of wrapper calls\n"
+           " - for rp2350 integer divide and modulus operators are handled using\n"
+           "   inline CM33 hardware integer divide instructions instead of wrapper\n"
+           "   calls\n"
+           " - rp2350 use expanded range of movw immediate to reduce amount of PC\n"
+           "   relative addressing\n"
+           " - many rp2350 peep hole optimizer opportunities\n");
+}
+
 static void cp_cmd(void) {
     char* from;
     char* to;
@@ -908,6 +932,7 @@ const cmd_t cmd_table[] = {
     {"mkdir",   mkdir_cmd,      "create a directory"},
     {"mount",   mount_cmd,      "mount the filesystem"},
     {"mv",      mv_cmd,         "rename a file or directory"},
+    {"news",    news_cmd,       "what's new in this release"},
     {"quit",    quit_cmd,       "shutdown the system"},
     {"reboot",  reboot_cmd,     "restart the system"},
     {"rm",      rm_cmd,         "remove a file or directory. -r for recursive"},
