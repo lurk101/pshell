@@ -321,7 +321,38 @@ STORAGE - blocks: total 960, used 36, size 4096 (147.5KB of 3.9MB, 3.8% used)
 MEMORY  - heap: 461.5K, program code space: 16K, global data space: 16K
 CONSOLE - UART0, width 114, height 33
 
-/:
+/: # finally see what's new in this release
 
+/: news 
+
+What's new in version 2.1.5
+
+General
+
+ - general source code, cmake, and script file cleanup
+ - add support for picow and vgaboard
+ - update C example source code
+ - centralize reset function, no longer using watchdoc
+ - remove trim command, garbage collection in littlefs is automatic
+ - move all constant variables to flash, releasing RAM to better use
+ - expand status command to show memory and screen use.
+ - clarify and pack exe file header
+ - delete resize cmd, use clear instead
+ - improve release_build script (less error prone)
+
+Pico2 specific
+
+ - add PWM IRQ numbers
+ - all floating pointt operators as well as sqrtf function
+   calls are handled directly with inline CM33 floating point
+   intructions instead of wrapper calls
+ - integer divide and modulus operators are handled using
+   inline CM33 hardware integer divide instructions instead
+   of wrapper calls
+ - use expanded range of movw immediate to reduce amount of PC
+   relative addressing
+ - many new peep hole optimizer opportunities
+
+/: 
 ```
 
