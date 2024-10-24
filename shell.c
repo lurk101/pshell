@@ -280,7 +280,7 @@ static void news_cmd(void) {
            " - general source code, cmake, and script file cleanup\n"
            " - add support for picow and vgaboard\n"
            " - update C example source code\n"
-           " - centralize reset function, no longer using watchdoc\n"
+           " - centralize reset function, no longer using watchdog\n"
            " - remove trim command, garbage collection in littlefs is automatic\n"
            " - move all constant variables to flash, releasing RAM to better use\n"
            " - expand status command to show memory and screen use.\n"
