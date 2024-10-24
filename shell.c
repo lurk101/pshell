@@ -276,6 +276,7 @@ static void mv_cmd(void) {
 
 static void news_cmd(void) {
     printf("\nWhat's new in version 2.1.5\n\n"
+           "General\n\n"
            " - general source code, cmake, and script file cleanup\n"
            " - add support for picow and vgaboard\n"
            " - update C example source code\n"
@@ -285,17 +286,18 @@ static void news_cmd(void) {
            " - expand status command to show memory and screen use.\n"
            " - clarify and pack exe file header\n"
            " - delete resize cmd, use clear instead\n"
-           " - improve release_build script (less error prone)\n"
-           " - add RP2350 PWM IRQ numbers\n"
-           " - for rp2350 all floating pointt operators as well as sqrtf function\n"
-           "   calls are handled directly with inline CM33 floating point intructions\n"
-           "   instead of wrapper calls\n"
-           " - for rp2350 integer divide and modulus operators are handled using\n"
-           "   inline CM33 hardware integer divide instructions instead of warpper\n"
-           "   calls\n"
-           " - rp2350 use expanded range of movw immediate to reduce amount of PC\n"
+           " - improve release_build script (less error prone)\n\n"
+           "Pico2 specific\n\n"
+           " - add PWM IRQ numbers\n"
+           " - all floating pointt operators as well as sqrtf function\n"
+           "   calls are handled directly with inline CM33 floating point\n"
+           "   intructions instead of wrapper calls\n"
+           " - integer divide and modulus operators are handled using\n"
+           "   inline CM33 hardware integer divide instructions instead\n"
+           "   of wrapper calls\n"
+           " - use expanded range of movw immediate to reduce amount of PC\n"
            "   relative addressing\n"
-           " - many rp2350 peep hole optimizer opportunities\n");
+           " - many new peep hole optimizer opportunities\n");
 }
 
 static void cp_cmd(void) {
