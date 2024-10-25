@@ -73,7 +73,7 @@ extern char* full_path(char* name);                  // expand file name to full
 extern int cc_printf(void* stk, int wrds, int prnt); // shim for printf and sprintf
 extern void get_screen_xy(int* x, int* y);           // retrieve screem dimensions
 extern void cc_exit(int rc);                         // C exit function
-extern char __StackLimit[TEXT_BYTES + DATA_BYTES];   // start of code segment
+extern char __StackLimit[];                          // start of code segment
 
 const uint32_t prog_space = TEXT_BYTES;
 const uint32_t data_space = DATA_BYTES;
@@ -96,23 +96,7 @@ void __wrap___aeabi_fcmple();
 void __wrap___aeabi_fcmpgt();
 void __wrap___aeabi_fcmplt();
 void __wrap___aeabi_fcmpge();
-#endif
 
-// accellerated SDK trig functions
-void __wrap_sinf();
-void __wrap_cosf();
-void __wrap_tanf();
-void __wrap_asinf();
-void __wrap_acosf();
-void __wrap_atanf();
-void __wrap_sinhf();
-void __wrap_coshf();
-void __wrap_tanhf();
-void __wrap_asinhf();
-void __wrap_acoshf();
-void __wrap_atanhf();
-
-#if PICO_RP2040
 enum {
     aeabi_idiv = 1,
     aeabi_i2f,
@@ -143,6 +127,20 @@ static void (*fops[])() = {
 };
 #endif
 
+// accellerated SDK trig functions
+void __wrap_sinf();
+void __wrap_cosf();
+void __wrap_tanf();
+void __wrap_asinf();
+void __wrap_acosf();
+void __wrap_atanf();
+void __wrap_sinhf();
+void __wrap_coshf();
+void __wrap_tanhf();
+void __wrap_asinhf();
+void __wrap_acoshf();
+void __wrap_atanhf();
+
 // patch list entry
 struct patch_s {
     struct patch_s* next; // list link
@@ -163,35 +161,35 @@ uint16_t* e; // current position in emitted code
 const uint16_t* text_base;
 int exit_sp; // stack at entry to main
 
-static struct reloc_s* relocs UDATA; // relocation list root
-static int nrelocs UDATA;            // relocation list size
-static char *p UDATA, *lp UDATA;     // current position in source code
-static char* data UDATA;             // data/bss pointer
-static char* data_base UDATA;        // data/bss pointer
-static int* base_sp UDATA;           // stack
-static uint16_t* le UDATA;
-static uint16_t* ecas UDATA;        // case statement patch-up pointer
-static int* ncas UDATA;             // case statement patch-up pointer
-static uint16_t* def UDATA;         // default statement patch-up pointer
-static struct patch_s* brks UDATA;  // break statement patch-up pointer
-static struct patch_s* cnts UDATA;  // continue statement patch-up pointer
-static struct patch_s* pcrel UDATA; // pc relative address patch-up pointer
-static uint16_t* pcrel_1st UDATA;   // first relative load address in group
-static int pcrel_count UDATA;       // first relative load address in group
-static int swtc UDATA;              // !0 -> in a switch-stmt context
-static int brkc UDATA;              // !0 -> in a break-stmt context
-static int cntc UDATA;              // !0 -> in a continue-stmt context
-static int* tsize UDATA;            // array (indexed by type) of type sizes
-static int tnew UDATA;              // next available type
-static int tk UDATA;                // current token
-static int ty UDATA;                // current expression type
-                                    // bit 0:1 - tensor rank, eg a[4][4][4]
-                                    // 0=scalar, 1=1d, 2=2d, 3=3d
-                                    //   1d etype -- bit 0:30)
-                                    //   2d etype -- bit 0:15,16:30 [32768,65536]
-//   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
-// bit 2:9 - type
-// bit 10:11 - ptr level
+static struct reloc_s* relocs UDATA;  // relocation list root
+static int nrelocs UDATA;             // relocation list size
+static char *p UDATA, *lp UDATA;      // current position in source code
+static char* data UDATA;              // data/bss pointer
+static char* data_base UDATA;         // data/bss pointer
+static int* base_sp UDATA;            // stack
+static uint16_t* le UDATA;            //
+static uint16_t* ecas UDATA;          // case statement patch-up pointer
+static int* ncas UDATA;               // case statement patch-up pointer
+static uint16_t* def UDATA;           // default statement patch-up pointer
+static struct patch_s* brks UDATA;    // break statement patch-up pointer
+static struct patch_s* cnts UDATA;    // continue statement patch-up pointer
+static struct patch_s* pcrel UDATA;   // pc relative address patch-up pointer
+static uint16_t* pcrel_1st UDATA;     // first relative load address in group
+static int pcrel_count UDATA;         // first relative load address in group
+static int swtc UDATA;                // !0 -> in a switch-stmt context
+static int brkc UDATA;                // !0 -> in a break-stmt context
+static int cntc UDATA;                // !0 -> in a continue-stmt context
+static int* tsize UDATA;              // array (indexed by type) of type sizes
+static int tnew UDATA;                // next available type
+static int tk UDATA;                  // current token
+static int ty UDATA;                  // current expression type
+                                      // bit 0:1 - tensor rank, eg a[4][4][4]
+                                      // 0=scalar, 1=1d, 2=2d, 3=3d
+                                      //   1d etype -- bit 0:30)
+                                      //   2d etype -- bit 0:15,16:30 [32768,65536]
+                                      //   3d etype -- bit 0:10,11:20,21:30 [1024,1024,2048]
+                                      // bit 2:9 - type
+                                      // bit 10:11 - ptr level
 static int compound UDATA;            // manage precedence of compound assign expressions
 static int rtf UDATA, rtt UDATA;      // return flag and return type for current function
 static int loc UDATA;                 // local variable offset
@@ -4493,13 +4491,11 @@ int cc(int mode, int argc, char** argv) {
                 fatal("error reading %s", ofn);
             }
             int v = *((int*)addr);
-            if (v < 0)
+            if (v < 0) {
 #if PICO_RP2040
                 *((int*)addr) = (int)fops[-v];
-#else
-                ;
 #endif
-            else {
+            } else {
                 if (IS_PRINTF(&externs[v]))
                     *((int*)addr) = (int)x_printf;
                 else if (IS_SPRINTF(&externs[v]))
