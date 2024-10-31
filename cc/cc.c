@@ -66,7 +66,7 @@
 #define ADJ_MASK ((1 << ADJ_BITS) - 1)
 
 // executable version
-#define CC_VERSION 0xc5
+#define CC_VERSION 0xc6
 
 // pshell common functions
 extern char* full_path(char* name);                  // expand file name to full path name
