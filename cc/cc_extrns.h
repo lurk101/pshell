@@ -227,11 +227,19 @@
     {"time_us_32", 0, time_defines, time_us_32, 0},
     {"uart_default_tx_wait_blocking", 0, uart_defines,uart_default_tx_wait_blocking, 0},
     {"uart_deinit", 1, uart_defines, uart_deinit, 0},
+#if PICO_RP2040
+    {"uart_get_dreq_num", 2, uart_defines, uart_get_dreq, 0},
+#else
     {"uart_get_dreq_num", 2, uart_defines, uart_get_dreq_num, 0},
+#endif
     {"uart_get_hw", 1, uart_defines, uart_get_hw, 0},
     {"uart_get_index", 1, uart_defines, uart_get_index, 0},
     {"uart_get_instance", 1, uart_defines, uart_get_instance, 0},
+#if PICO_RP2040
+    {"uart_get_reset_num", 1, uart_defines, uart_get_instance, 0}, 
+#else
     {"uart_get_reset_num", 1, uart_defines, uart_get_reset_num, 0}, 
+#endif
     {"uart_getc", 1, uart_defines, uart_getc, 0},
     {"uart_init",  2, uart_defines,uart_init, 0},
     {"uart_is_enabled", 1, uart_defines, uart_is_enabled, 0},
@@ -247,7 +255,11 @@
     {"uart_set_fifo_enabled", 2,  uart_defines, uart_set_fifo_enabled, 0},
     {"uart_set_format", 3, uart_defines, uart_set_format, 0},
     {"uart_set_hw_flow", 3, uart_defines, uart_set_hw_flow, 0},
+#if PICO_RP2040
     {"uart_set_irqs_enabled", 3, uart_defines, uart_set_irqs_enabled, 0},
+#else
+    {"uart_set_irq_enables", 3, uart_defines, uart_set_irq_enables, 0},
+#endif
     {"uart_set_translate_crlf", 2, uart_defines, uart_set_translate_crlf, 0},
     {"uart_tx_wait_blocking", 1, uart_defines, uart_tx_wait_blocking, 0},
     {"uart_write_blocking", 3, uart_defines, uart_write_blocking, 0},
